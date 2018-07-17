@@ -526,8 +526,9 @@ public class Node {
 
                 try {
                     final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestone.latestMilestone);
-                    System.arraycopy(transactionViewModel.getBytes(), 0, tipRequestingPacket.getData(), 0, TransactionViewModel.SIZE);
-                    System.arraycopy(transactionViewModel.getHash().bytes(), 0, tipRequestingPacket.getData(), TransactionViewModel.SIZE,
+                    // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
+                    System.arraycopy(transactionViewModel.getBytes(), 0, tipRequestingPacket.getData(), 0, TransactionViewModel.SIZE - Integer.BYTES);
+                    System.arraycopy(transactionViewModel.getHash().bytes(), 0, tipRequestingPacket.getData(), TransactionViewModel.SIZE - Integer.BYTES,
                            reqHashSize);
                     //Hash.SIZE_IN_BYTES);
 
