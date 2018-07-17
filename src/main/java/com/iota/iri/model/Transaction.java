@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
  * Created by paul on 3/2/17 for iri.
  */
 public class Transaction implements Persistable {
-    public static final int SIZE = 1604;
+    public static final int SIZE = 1608;
 
     public byte[] bytes;
 
@@ -48,7 +48,7 @@ public class Transaction implements Persistable {
     public void read(byte[] bytes) {
         if(bytes != null) {
             this.bytes = new byte[SIZE];
-            System.arraycopy(bytes, 0, this.bytes, 0, SIZE);
+            System.arraycopy(bytes, 0, this.bytes, 0, bytes.length);
             this.type = TransactionViewModel.FILLED_SLOT;
         }
     }
@@ -60,7 +60,8 @@ public class Transaction implements Persistable {
                         Long.BYTES * 9 + //value,currentIndex,lastIndex,timestamp,attachmentTimestampLowerBound,attachmentTimestampUpperBound,arrivalTime,height
                         Integer.BYTES * 3 + //validity,type,snapshot
                         1 + //solid
-                        sender.getBytes().length; //sender
+                        sender.getBytes().length + //sender
+                        Integer.BYTES; // referenced Snapshot
         ByteBuffer buffer = ByteBuffer.allocate(allocateSize);
         buffer.put(address.bytes());
         buffer.put(bundle.bytes());

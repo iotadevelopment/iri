@@ -438,18 +438,26 @@ public class TransactionViewModel {
 
             // check if the referenced transaction is a milestone -> otherwise descend recursively
             int trunkReferencedSnapshot;
-            try {
-                 trunkReferencedSnapshot = MilestoneViewModel.fromHash(tangle, trunk.getHash()).index();
-            } catch(Exception e) {
-                trunkReferencedSnapshot = trunk.referencedSnapshot(tangle);
+            if(trunk.getHash().equals(Hash.NULL_HASH)) {
+                trunkReferencedSnapshot = 0;
+            } else {
+                try {
+                    trunkReferencedSnapshot = MilestoneViewModel.fromHash(tangle, trunk.getHash()).index();
+                } catch(Exception e) {
+                    trunkReferencedSnapshot = trunk.referencedSnapshot(tangle);
+                }
             }
 
             // check if the referenced transaction is a milestone -> otherwise descend recursively
             int branchReferencedSnapshot;
-            try {
-                branchReferencedSnapshot = MilestoneViewModel.fromHash(tangle, branch.getHash()).index();
-            } catch(Exception e) {
-                branchReferencedSnapshot = branch.referencedSnapshot(tangle);
+            if(branch.getHash().equals(Hash.NULL_HASH)) {
+                branchReferencedSnapshot = 0;
+            } else {
+                try {
+                    branchReferencedSnapshot = MilestoneViewModel.fromHash(tangle, branch.getHash()).index();
+                } catch(Exception e) {
+                    branchReferencedSnapshot = branch.referencedSnapshot(tangle);
+                }
             }
 
             // set the referenced milestone to the smaller one of both values
