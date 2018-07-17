@@ -94,6 +94,13 @@ public class Transaction implements Persistable {
     public void readMetadata(byte[] bytes) {
         int i = 0;
         if(bytes != null) {
+            // if the stored data is too small -> increase the size (database schema changed)
+            if(bytes.length < SIZE) {
+                byte[] increasedBytes = new byte[SIZE];
+                System.arraycopy(bytes, 0, increasedBytes, 0, bytes.length);
+                bytes = increasedBytes;
+            }
+
             address = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
             i += Hash.SIZE_IN_BYTES;
             bundle = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
@@ -138,7 +145,7 @@ public class Transaction implements Persistable {
             i++;
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
-            byte[] senderBytes = new byte[bytes.length - i];
+            byte[] senderBytes = new byte[bytes.length - i - Integer.BYTES];
             if (senderBytes.length != 0) {
                 System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
             }

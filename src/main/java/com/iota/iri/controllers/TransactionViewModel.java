@@ -13,7 +13,7 @@ public class TransactionViewModel {
 
     private final com.iota.iri.model.Transaction transaction;
 
-    public static final int SIZE = 1604;
+    public static final int SIZE = 1608;
     private static final int TAG_SIZE_IN_BYTES = 17; // = ceil(81 TRITS / 5 TRITS_PER_BYTE)
 
     public static final long SUPPLY = 2779530283277761L; // = (3^33 - 1) / 2
@@ -104,7 +104,7 @@ public class TransactionViewModel {
     public TransactionViewModel(final byte[] bytes, Hash hash) throws RuntimeException {
         transaction = new Transaction();
         transaction.bytes = new byte[SIZE];
-        System.arraycopy(bytes, 0, transaction.bytes, 0, SIZE);
+        System.arraycopy(bytes, 0, transaction.bytes, 0, bytes.length);
         this.hash = hash;
         weightMagnitude = this.hash.trailingZeros();
         transaction.type = FILLED_SLOT;
@@ -461,7 +461,7 @@ public class TransactionViewModel {
             }
 
             // set the referenced milestone to the smaller one of both values
-            this.referencedSnapshot(tangle, Math.min(trunkReferencedSnapshot, branchReferencedSnapshot));
+            this.referencedSnapshot(tangle, Math.max(trunkReferencedSnapshot, branchReferencedSnapshot));
         }
 
         // return the stored value
