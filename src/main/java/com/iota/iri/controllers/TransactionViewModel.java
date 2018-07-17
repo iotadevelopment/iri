@@ -104,7 +104,7 @@ public class TransactionViewModel {
     public TransactionViewModel(final byte[] bytes, Hash hash) throws RuntimeException {
         transaction = new Transaction();
         transaction.bytes = new byte[SIZE];
-        System.arraycopy(bytes, 0, transaction.bytes, 0, bytes.length);
+        System.arraycopy(bytes, 0, transaction.bytes, 0, SIZE);
         this.hash = hash;
         weightMagnitude = this.hash.trailingZeros();
         transaction.type = FILLED_SLOT;
@@ -230,8 +230,8 @@ public class TransactionViewModel {
     }
 
     public byte[] getBytes() {
-        if(transaction.bytes == null || transaction.bytes.length != Transaction.SIZE) {
-            transaction.bytes = new byte[Transaction.SIZE];
+        if(transaction.bytes == null || transaction.bytes.length != SIZE) {
+            transaction.bytes = new byte[SIZE];
             if(trits != null) {
                 Converter.bytes(trits(), 0, transaction.bytes, 0, trits().length);
             }

@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
  * Created by paul on 3/2/17 for iri.
  */
 public class Transaction implements Persistable {
-    public static final int SIZE = 1608;
+    public static final int SIZE = 1604;
 
     public byte[] bytes;
 
@@ -48,7 +48,7 @@ public class Transaction implements Persistable {
     public void read(byte[] bytes) {
         if(bytes != null) {
             this.bytes = new byte[SIZE];
-            System.arraycopy(bytes, 0, this.bytes, 0, bytes.length);
+            System.arraycopy(bytes, 0, this.bytes, 0, SIZE);
             this.type = TransactionViewModel.FILLED_SLOT;
         }
     }
@@ -85,8 +85,8 @@ public class Transaction implements Persistable {
         //buffer.put((byte) (confirmed ? 1:0));
         buffer.put((byte) (solid ? 1 : 0));
         buffer.put(Serializer.serialize(snapshot));
-        buffer.put(sender.getBytes());
         buffer.put(Serializer.serialize(referencedSnapshot));
+        buffer.put(sender.getBytes());
         return buffer.array();
     }
 
@@ -94,13 +94,6 @@ public class Transaction implements Persistable {
     public void readMetadata(byte[] bytes) {
         int i = 0;
         if(bytes != null) {
-            // if the stored data is too small -> increase the size (database schema changed)
-            if(bytes.length < SIZE) {
-                byte[] increasedBytes = new byte[SIZE];
-                System.arraycopy(bytes, 0, increasedBytes, 0, bytes.length);
-                bytes = increasedBytes;
-            }
-
             address = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
             i += Hash.SIZE_IN_BYTES;
             bundle = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
@@ -145,14 +138,14 @@ public class Transaction implements Persistable {
             i++;
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
-            byte[] senderBytes = new byte[bytes.length - i - Integer.BYTES];
+            referencedSnapshot = Serializer.getInteger(bytes, i);
+            i += Integer.BYTES;
+            byte[] senderBytes = new byte[bytes.length - i];
             if (senderBytes.length != 0) {
                 System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
             }
             sender = new String(senderBytes);
             i += senderBytes.length;
-            referencedSnapshot = Serializer.getInteger(bytes, i);
-            i += Integer.BYTES;
             parsed = true;
         }
     }
