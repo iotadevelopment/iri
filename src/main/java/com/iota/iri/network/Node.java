@@ -284,7 +284,6 @@ public class Node {
                 //Request bytes
 
                 //add request to reply queue (requestedHash, neighbor)
-                // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
                 Hash requestedHash = new Hash(receivedData, TransactionViewModel.SIZE, reqHashSize);
                 if (requestedHash.equals(receivedTransactionHash)) {
                     //requesting a random tip
