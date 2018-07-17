@@ -39,6 +39,7 @@ public class Transaction implements Persistable {
     public long height = 0;
     public String sender = "";
     public int snapshot;
+    public int referencedSnapshot = 0;
 
     public byte[] bytes() {
         return bytes;
@@ -84,6 +85,7 @@ public class Transaction implements Persistable {
         buffer.put((byte) (solid ? 1 : 0));
         buffer.put(Serializer.serialize(snapshot));
         buffer.put(sender.getBytes());
+        buffer.put(Serializer.serialize(referencedSnapshot));
         return buffer.array();
     }
 
@@ -140,6 +142,9 @@ public class Transaction implements Persistable {
                 System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
             }
             sender = new String(senderBytes);
+            i += senderBytes.length;
+            referencedSnapshot = Serializer.getInteger(bytes, i);
+            i += Integer.BYTES;
             parsed = true;
         }
     }

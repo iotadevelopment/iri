@@ -32,6 +32,21 @@ public class MilestoneViewModel {
         milestone.hash = milestoneHash;
     }
 
+    /**
+     * This method allows us to retrieve a milestone by its hash.
+     *
+     * It can be used to test if a transaction is a known milestone.
+     *
+     * @param tangle database interface
+     * @param hash transaction hash of the milestone
+     * @return MilestoneViewModel for the given milestone
+     * @throws Exception if the milestone can not be found
+     */
+    public static MilestoneViewModel fromHash(Tangle tangle, Hash hash) throws Exception {
+        MilestoneViewModel milestoneViewModel = new MilestoneViewModel((Milestone) tangle.load(Milestone.class, hash));
+        return milestoneViewModel;
+    }
+
     public static MilestoneViewModel get(Tangle tangle, int index) throws Exception {
         MilestoneViewModel milestoneViewModel = milestones.get(index);
         if(milestoneViewModel == null && load(tangle, index)) {
