@@ -13,7 +13,7 @@ public class TransactionViewModel {
 
     private final com.iota.iri.model.Transaction transaction;
 
-    public static final int SIZE = 1608;
+    public static final int SIZE = 1604;
     private static final int TAG_SIZE_IN_BYTES = 17; // = ceil(81 TRITS / 5 TRITS_PER_BYTE)
 
     public static final long SUPPLY = 2779530283277761L; // = (3^33 - 1) / 2
@@ -230,8 +230,8 @@ public class TransactionViewModel {
     }
 
     public byte[] getBytes() {
-        if(transaction.bytes == null || transaction.bytes.length != SIZE) {
-            transaction.bytes = new byte[SIZE];
+        if(transaction.bytes == null || transaction.bytes.length != Transaction.SIZE) {
+            transaction.bytes = new byte[Transaction.SIZE];
             if(trits != null) {
                 Converter.bytes(trits(), 0, transaction.bytes, 0, trits().length);
             }

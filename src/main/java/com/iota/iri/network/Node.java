@@ -241,7 +241,7 @@ public class Node {
                     //Transaction bytes
 
                     MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    digest.update(receivedData, 0, TransactionViewModel.SIZE - Integer.BYTES);
+                    digest.update(receivedData, 0, TransactionViewModel.SIZE);
                     ByteBuffer byteHash = ByteBuffer.wrap(digest.digest());
 
                     //check if cached
@@ -285,7 +285,7 @@ public class Node {
 
                 //add request to reply queue (requestedHash, neighbor)
                 // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
-                Hash requestedHash = new Hash(receivedData, TransactionViewModel.SIZE - Integer.BYTES, reqHashSize);
+                Hash requestedHash = new Hash(receivedData, TransactionViewModel.SIZE, reqHashSize);
                 if (requestedHash.equals(receivedTransactionHash)) {
                     //requesting a random tip
                     requestedHash = Hash.NULL_HASH;
@@ -480,11 +480,10 @@ public class Node {
         }
 
         synchronized (sendingPacket) {
-            // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
-            System.arraycopy(transactionViewModel.getBytes(), 0, sendingPacket.getData(), 0, TransactionViewModel.SIZE - Integer.BYTES);
+            System.arraycopy(transactionViewModel.getBytes(), 0, sendingPacket.getData(), 0, TransactionViewModel.SIZE);
             Hash hash = transactionRequester.transactionToRequest(rnd.nextDouble() < P_SELECT_MILESTONE);
             System.arraycopy(hash != null ? hash.bytes() : transactionViewModel.getHash().bytes(), 0,
-                    sendingPacket.getData(), TransactionViewModel.SIZE - Integer.BYTES, reqHashSize);
+                    sendingPacket.getData(), TransactionViewModel.SIZE, reqHashSize);
             neighbor.send(sendingPacket);
         }
 
@@ -528,9 +527,8 @@ public class Node {
 
                 try {
                     final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestone.latestMilestone);
-                    // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
-                    System.arraycopy(transactionViewModel.getBytes(), 0, tipRequestingPacket.getData(), 0, TransactionViewModel.SIZE - Integer.BYTES);
-                    System.arraycopy(transactionViewModel.getHash().bytes(), 0, tipRequestingPacket.getData(), TransactionViewModel.SIZE - Integer.BYTES,
+                    System.arraycopy(transactionViewModel.getBytes(), 0, tipRequestingPacket.getData(), 0, TransactionViewModel.SIZE);
+                    System.arraycopy(transactionViewModel.getHash().bytes(), 0, tipRequestingPacket.getData(), TransactionViewModel.SIZE,
                            reqHashSize);
                     //Hash.SIZE_IN_BYTES);
 
