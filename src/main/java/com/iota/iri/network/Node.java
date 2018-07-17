@@ -241,7 +241,7 @@ public class Node {
                     //Transaction bytes
 
                     MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    digest.update(receivedData, 0, TransactionViewModel.SIZE);
+                    digest.update(receivedData, 0, TransactionViewModel.SIZE - Integer.BYTES);
                     ByteBuffer byteHash = ByteBuffer.wrap(digest.digest());
 
                     //check if cached
@@ -284,7 +284,8 @@ public class Node {
                 //Request bytes
 
                 //add request to reply queue (requestedHash, neighbor)
-                Hash requestedHash = new Hash(receivedData, TransactionViewModel.SIZE, reqHashSize);
+                // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
+                Hash requestedHash = new Hash(receivedData, TransactionViewModel.SIZE - Integer.BYTES, reqHashSize);
                 if (requestedHash.equals(receivedTransactionHash)) {
                     //requesting a random tip
                     requestedHash = Hash.NULL_HASH;
@@ -479,10 +480,11 @@ public class Node {
         }
 
         synchronized (sendingPacket) {
-            System.arraycopy(transactionViewModel.getBytes(), 0, sendingPacket.getData(), 0, TransactionViewModel.SIZE);
+            // TODO: UPDATE THIS PART OF THE CODE TO ONLY SEND THE RAW TRANSACTION WITHOUT LOCAL METADATA
+            System.arraycopy(transactionViewModel.getBytes(), 0, sendingPacket.getData(), 0, TransactionViewModel.SIZE - Integer.BYTES);
             Hash hash = transactionRequester.transactionToRequest(rnd.nextDouble() < P_SELECT_MILESTONE);
             System.arraycopy(hash != null ? hash.bytes() : transactionViewModel.getHash().bytes(), 0,
-                    sendingPacket.getData(), TransactionViewModel.SIZE, reqHashSize);
+                    sendingPacket.getData(), TransactionViewModel.SIZE - Integer.BYTES, reqHashSize);
             neighbor.send(sendingPacket);
         }
 
