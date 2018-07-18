@@ -8,6 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -123,6 +126,22 @@ public class Snapshot {
         l = state.get(hash);
         rwlock.readLock().unlock();
         return l;
+    }
+
+    public void writeSnapshotFile(String snapshotPath) {
+        rwlock.readLock().lock();
+
+        Path snapshotFile = Paths.get(snapshotPath);
+
+        try {
+            Files.write(snapshotFile, () -> state.entrySet().stream().<CharSequence>map(entry -> entry.getKey() + ";" + entry.getValue() + "\n").iterator());
+        } catch (IOException e) {
+            System.out.println("Failed to write snapshot file");
+            log.error("Failed to write snapshot.", e);
+            System.exit(-1);
+        }
+
+        rwlock.readLock().unlock();
     }
 
     public Map<Hash, Long> patchedDiff(Map<Hash, Long> diff) {
