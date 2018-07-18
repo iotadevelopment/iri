@@ -104,7 +104,9 @@ public class Configuration {
         TRANSACTION_PACKET_SIZE,
         REQUEST_HASH_SIZE,
         SNAPSHOT_TIME,
-        TIPSELECTION_ALPHA
+        TIPSELECTION_ALPHA,
+        LOCAL_SNAPSHOTS_ENABLED,
+        LOCAL_SNAPSHOTS_DEPTH
     }
 
 
@@ -171,6 +173,9 @@ public class Configuration {
         conf.put(DefaultConfSettings.SNAPSHOT_TIME.name(), GLOBAL_SNAPSHOT_TIME);
         conf.put(DefaultConfSettings.TIPSELECTION_ALPHA.name(), "0.001");
 
+        // by default we always run in "perma-node" mode
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED.name(), "false");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "10000");
     }
 
     public boolean init() throws IOException {
