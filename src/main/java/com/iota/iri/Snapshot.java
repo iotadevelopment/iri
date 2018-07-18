@@ -134,7 +134,7 @@ public class Snapshot {
         Path snapshotFile = Paths.get(snapshotPath);
 
         try {
-            Files.write(snapshotFile, () -> state.entrySet().stream().<CharSequence>map(entry -> entry.getKey() + ";" + entry.getValue() + "\n").iterator());
+            Files.write(snapshotFile, () -> state.entrySet().stream().<CharSequence>map(entry -> entry.getKey() + ";" + entry.getValue()).iterator());
         } catch (IOException e) {
             System.out.println("Failed to write snapshot file");
             log.error("Failed to write snapshot.", e);
