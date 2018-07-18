@@ -251,6 +251,11 @@ public class API {
                 case "findTransactions": {
                     return findTransactionStatement(request);
                 }
+                case "takeSnapshot": {
+                    instance.milestone.latestSnapshot.writeSnapshotFile("test.txt");
+
+                    return ErrorResponse.create("Snapshot file written");
+                }
                 case "getBalances": {
                     final List<String> addresses = getParameterAsList(request,"addresses", HASH_SIZE);
                     final List<String> tips = request.containsKey("tips") ?
