@@ -111,7 +111,7 @@ public class Snapshot {
         return i;
     }
 
-    private Snapshot(Map<Hash, Long> initialState, int index) {
+    public Snapshot(Map<Hash, Long> initialState, int index) {
         state = new HashMap<>(initialState);
         this.index = index;
     }
@@ -136,7 +136,7 @@ public class Snapshot {
         try {
             Files.write(
                     snapshotFile,
-                    () -> state.entrySet().stream().<CharSequence>map(entry -> entry.getKey() + ";" + entry.getValue()).sorted().iterator()
+                    () -> state.entrySet().stream().filter(entry -> entry.getValue() != 0).<CharSequence>map(entry -> entry.getKey() + ";" + entry.getValue()).sorted().iterator()
             );
         } catch (IOException e) {
             System.out.println("Failed to write snapshot file");
@@ -157,7 +157,7 @@ public class Snapshot {
         return patch;
     }
 
-    void apply(Map<Hash, Long> patch, int newIndex) {
+    public void apply(Map<Hash, Long> patch, int newIndex) {
         if (!patch.entrySet().stream().map(Map.Entry::getValue).reduce(Math::addExact).orElse(0L).equals(0L)) {
             throw new RuntimeException("Diff is not consistent.");
         }

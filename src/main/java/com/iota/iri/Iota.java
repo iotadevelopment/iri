@@ -10,6 +10,7 @@ import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
+import com.iota.iri.service.localSnapshot.LocalSnapshotManager;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.service.tipselection.impl.*;
 import com.iota.iri.storage.*;
@@ -33,6 +34,7 @@ public class Iota {
 
     public final LedgerValidator ledgerValidator;
     public final Milestone milestone;
+    public final LocalSnapshotManager localSnapshotManager;
     public final Tangle tangle;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
@@ -96,6 +98,7 @@ public class Iota {
                 snapshotTimestamp);
         milestone = new Milestone(tangle, coordinator, initialSnapshot, transactionValidator, testnet, messageQ,
                 numKeysMilestone, milestoneStartIndex, dontValidateMilestoneSig);
+        localSnapshotManager = new LocalSnapshotManager(this);
         node = new Node(configuration, tangle, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
         replicator = new Replicator(node, tcpPort, maxPeers, testnet, transactionPacketSize);
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));

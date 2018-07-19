@@ -252,7 +252,8 @@ public class API {
                     return findTransactionStatement(request);
                 }
                 case "takeSnapshot": {
-                    instance.milestone.latestSnapshot.writeSnapshotFile("test.txt");
+                    instance.localSnapshotManager.getSnapshot(instance.milestone.latestSolidSubtangleMilestoneIndex - 2).writeSnapshotFile("rsnapshot_" + (instance.milestone.latestSolidSubtangleMilestoneIndex - 2) + ".txt");
+                    instance.milestone.latestSnapshot.writeSnapshotFile("snapshot_" + instance.milestone.latestSolidSubtangleMilestoneIndex + ".txt");
 
                     return ErrorResponse.create("Snapshot file written");
                 }
