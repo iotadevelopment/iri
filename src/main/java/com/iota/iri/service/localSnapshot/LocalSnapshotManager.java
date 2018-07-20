@@ -223,9 +223,9 @@ public class LocalSnapshotManager {
 
     public void dumpProgressStatistics() {
         if(totalDeletedTransactions % 10000 == 0) {
-            float progress = (latestMilestoneIndex - currentMilestoneIndex) / (latestMilestoneIndex - instance.milestone.milestoneStartIndex);
+            double progress = (latestMilestoneIndex - currentMilestoneIndex) * 1.0 / (latestMilestoneIndex - instance.milestone.milestoneStartIndex);
 
-            System.out.println("= PROGRESS (" + String.format("%.2f", progress) + " %) ===================================");
+            System.out.println("= PROGRESS (" + String.format("%02.2f", progress) + " %) ===================================");
             System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
             System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
             System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
