@@ -1,14 +1,11 @@
 package com.iota.iri.service.localSnapshot;
 
 import com.iota.iri.Iota;
-import com.iota.iri.Milestone;
 import com.iota.iri.Snapshot;
-import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.Transaction;
 
 import java.util.*;
 import java.util.stream.Collectors;
