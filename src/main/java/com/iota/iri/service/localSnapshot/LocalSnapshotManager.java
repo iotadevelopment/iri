@@ -72,6 +72,9 @@ public class LocalSnapshotManager {
     public boolean getTransactionsToPrune(MilestoneViewModel targetMilestone) throws Exception {
         int transactionCount = 0;
 
+        // create a set of visited transactions to prevent processing the same transaction more than once
+        Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
         while(currentMilestone != null) {
@@ -113,7 +116,7 @@ public class LocalSnapshotManager {
                         transactionsToDelete.add(trunkTransaction);
                     }
 
-                    // if we have "parent" -> "remember" to check them in the next step if they are orphaned
+                    // if we have "parents" -> "remember" to check them in the next step if they are orphaned
                     for(Hash approverHash: currentTransaction.getApprovers(instance.tangle).getHashes()) {
                         // only add them if we didn't add them yet and if they are not part of the already cleaned ones
                         if(
@@ -146,13 +149,13 @@ public class LocalSnapshotManager {
             final Queue<Hash> parentTransactionsToCheck = new LinkedList(possiblyOrphanedParents);
 
             // create a set of visited transactions to prevent processing the same transaction more than once
-            Set<Hash> visitedChildren = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+            //Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
 
             // iterate through our queue and process all elements (while we iterate we add more)
             Hash parentTransactionHash;
             while((parentTransactionHash = parentTransactionsToCheck.poll()) != null) {
                 // check if we see this transaction the first time
-                if(visitedChildren.add(parentTransactionHash)) {
+                if(visitedParents.add(parentTransactionHash)) {
                     // retrieve the child transaction
                     TransactionViewModel childTransaction = TransactionViewModel.fromHash(
                         instance.tangle,
