@@ -223,7 +223,7 @@ public class LocalSnapshotManager {
 
     public void dumpProgressStatistics() {
         if(totalDeletedTransactions % 10000 == 0) {
-            double progress = (latestMilestoneIndex - currentMilestoneIndex) * 1.0 / (latestMilestoneIndex - instance.milestone.milestoneStartIndex);
+            double progress = ((latestMilestoneIndex - currentMilestoneIndex) * 1.0 / (latestMilestoneIndex - instance.milestone.milestoneStartIndex)) * 100.0;
 
             System.out.println("= PROGRESS (" + String.format("%02.2f", progress) + " %) ===================================");
             System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
