@@ -75,7 +75,12 @@ public class LocalSnapshotManager {
 
     int maxDeletedChildTransactions;
 
+    int latestMilestoneIndex;
+
+    int currentMilestoneIndex;
+
     public boolean getTransactionsToPrune(MilestoneViewModel targetMilestone) throws Exception {
+        latestMilestoneIndex = instance.milestone.latestSolidSubtangleMilestoneIndex;
         totalDeletedTransactions = 0;
         maxDeletedParentTransactions = 0;
         maxDeletedChildTransactions = 0;
@@ -86,6 +91,8 @@ public class LocalSnapshotManager {
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
         while(currentMilestone != null) {
+            currentMilestoneIndex = currentMilestone.index();
+
             // retrieve the transaction belonging to our current milestone
             TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(
                 instance.tangle,
@@ -216,7 +223,9 @@ public class LocalSnapshotManager {
 
     public void dumpProgressStatistics() {
         if(totalDeletedTransactions % 10000 == 0) {
-            System.out.println("= PROGRESS =============================================");
+            float progress = (latestMilestoneIndex - currentMilestoneIndex) / (latestMilestoneIndex - instance.milestone.milestoneStartIndex);
+
+            System.out.println("= PROGRESS (" + String.format("%.2f", progress) + " %) ===================================");
             System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
             System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
             System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
