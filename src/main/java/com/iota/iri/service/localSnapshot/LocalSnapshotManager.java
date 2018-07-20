@@ -8,6 +8,7 @@ import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.model.Transaction;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -83,6 +84,8 @@ public class LocalSnapshotManager {
                 currentMilestone.getHash()
             );
 
+            //region ITERATE DOWN TOWARDS THE GENESIS //////////////////////////////////////////////////////////////////
+
             // create a queue where we collect the transactions that shall be deleted (starting with our milestone)
             final Queue<TransactionViewModel> transactionsToDelete = new LinkedList<>(
                 Collections.singleton(milestoneTransaction)
@@ -91,10 +94,8 @@ public class LocalSnapshotManager {
             // create a set of visited transactions to prevent processing the same transaction more than once
             Set<Hash> visitedTransactions = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
 
-            // create a set of visited transactions to prevent processing the same transaction more than once
-            Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
-
-            // ITERATE DOWN TOWARDS THE GENESIS ////////////////////////////////////////////////////////////////////////
+            // create a set where we collect the candidates for orphaned parent transactions
+            Set<Hash> possiblyOrphanedParents = new HashSet<>();
 
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
@@ -107,26 +108,31 @@ public class LocalSnapshotManager {
 
                     // if the transaction was approved by our current milestone (part of the current step) -> queue it
                     if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToDelete.offer(branchTransaction);
+                        transactionsToDelete.add(branchTransaction);
                     }
 
                     // if the transaction was approved by our current milestone (part of the current step) -> queue it
                     if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToDelete.offer(trunkTransaction);
+                        transactionsToDelete.add(trunkTransaction);
                     }
 
-                    // check if we have "children" who didn't get approved yet and only reference a milestone below our current depth
-                    ApproveeViewModel approvers = currentTransaction.getApprovers(instance.tangle);
-
-                    for(Hash approverHash: approvers.getHashes()) {
-                        if(!visitedTransactions.contains(approverHash)) {
-                            TransactionViewModel approverTransaction = TransactionViewModel.fromHash(instance.tangle, approverHash);
-                            if(approverTransaction.snapshotIndex() == 0) {
-                                transactionCount++;
-                            }
+                    // if we have "parent" -> "remember" to check them in the next step if they are orphaned
+                    for(Hash approverHash: currentTransaction.getApprovers(instance.tangle).getHashes()) {
+                        // only add them if we didn't add them yet and if they are not part of the already cleaned ones
+                        if(
+                            !possiblyOrphanedParents.contains(approverHash) &&
+                            !visitedTransactions.contains(approverHash)
+                        ) {
+                            possiblyOrphanedParents.add(approverHash);
                         }
                     }
 
+                    // remove the current transaction from the orphaned parent candidates (processed it already)
+                    possiblyOrphanedParents.remove(currentTransaction.getHash());
+
+                    // TODO: ACTUALLY DELETE THE TRANSACTION
+
+                    // increase our cleaned transactions counter (for debugging)
                     transactionCount++;
                 }
 
@@ -135,6 +141,50 @@ public class LocalSnapshotManager {
                     System.out.println("DELETED: " + transactionCount + " / " + currentMilestone.index());
                 }
             }
+            //endregion
+
+            //region ITERATE UP TOWARDS THE TIPS (PARASITIC SIDE TANGLES) //////////////////////////////////////////////
+
+            // create a queue where we collect the transactions that shall be deleted (starting with our milestone)
+            final Queue<Hash> parentTransactionsToCheck = new LinkedList(possiblyOrphanedParents);
+
+            // create a set of visited transactions to prevent processing the same transaction more than once
+            Set<Hash> visitedChildren = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+
+            // iterate through our queue and process all elements (while we iterate we add more)
+            Hash parentTransactionHash;
+            while((parentTransactionHash = parentTransactionsToCheck.poll()) != null) {
+                // check if we see this transaction the first time
+                if(visitedChildren.add(parentTransactionHash)) {
+                    // retrieve the child transaction
+                    TransactionViewModel childTransaction = TransactionViewModel.fromHash(
+                        instance.tangle,
+                        parentTransactionHash
+                    );
+
+                    // check if the transaction is not confirmed yet and if it references an "older" milestone
+                    if(
+                        childTransaction.snapshotIndex() == 0 /*&&
+                        childTransaction.referencedSnapshot(instance.tangle) < currentMilestone.index()*/
+                    ) {
+                        // if we have "parents" -> queue them to check them as well
+                        for(Hash approverHash: childTransaction.getApprovers(instance.tangle).getHashes()) {
+                            parentTransactionsToCheck.add(approverHash);
+                        }
+
+                        // increase our cleaned transactions counter (for debugging)
+                        transactionCount++;
+
+                        // TODO: ACTUALLY DELETE THE TRANSACTION
+                    }
+                }
+
+                // output hash (for debugging)
+                if(transactionCount % 10000 == 0) {
+                    System.out.println("DELETED: " + transactionCount + " / " + currentMilestone.index());
+                }
+            }
+            //endregion
 
             // go to the next milestone chunk
             currentMilestone = currentMilestone.previous(instance.tangle);
