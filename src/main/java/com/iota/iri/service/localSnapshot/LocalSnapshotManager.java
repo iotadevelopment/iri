@@ -157,18 +157,18 @@ public class LocalSnapshotManager {
                 // check if we see this transaction the first time
                 if(visitedParents.add(parentTransactionHash)) {
                     // retrieve the child transaction
-                    TransactionViewModel childTransaction = TransactionViewModel.fromHash(
+                    TransactionViewModel parentTransaction = TransactionViewModel.fromHash(
                         instance.tangle,
                         parentTransactionHash
                     );
 
                     // check if the transaction is not confirmed yet and if it references an "older" milestone
                     if(
-                        childTransaction.snapshotIndex() == 0 /*&&
-                        childTransaction.referencedSnapshot(instance.tangle) < currentMilestone.index()*/
+                        parentTransaction.snapshotIndex() == 0 /*&&
+                        parentTransaction.referencedSnapshot(instance.tangle) < currentMilestone.index()*/
                     ) {
                         // if we have "parents" -> queue them to check them as well
-                        for(Hash approverHash: childTransaction.getApprovers(instance.tangle).getHashes()) {
+                        for(Hash approverHash: parentTransaction.getApprovers(instance.tangle).getHashes()) {
                             parentTransactionsToCheck.add(approverHash);
                         }
 
@@ -176,12 +176,12 @@ public class LocalSnapshotManager {
                         transactionCount++;
 
                         // TODO: ACTUALLY DELETE THE TRANSACTION
-                    }
-                }
 
-                // output hash (for debugging)
-                if(transactionCount % 10000 == 0) {
-                    System.out.println("DELETED: " + transactionCount + " / " + currentMilestone.index());
+                        // output hash (for debugging)
+                        if(transactionCount % 10000 == 0) {
+                            System.out.println("DELETED PARENT: " + transactionCount + " / " + parentTransaction.getHash().toString());
+                        }
+                    }
                 }
             }
             //endregion
