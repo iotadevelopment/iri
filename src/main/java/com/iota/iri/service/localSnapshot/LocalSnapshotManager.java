@@ -227,8 +227,8 @@ public class LocalSnapshotManager {
 
             System.out.println("= PROGRESS (" + String.format("%02.2f", progress) + " %) ===================================");
             System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
-            System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
-            System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
+            System.out.println("| MAX DELETED CHILDREN (PER STEP / MILESTONE): " + maxDeletedChildTransactions);
+            System.out.println("| MAX DELETED PARENTS (PER STEP / MILESTONE): " + maxDeletedParentTransactions);
             System.out.println("========================================================");
         }
     }
@@ -236,8 +236,8 @@ public class LocalSnapshotManager {
     public void dumpFinalStatistics() {
         System.out.println("= DONE =================================================");
         System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
-        System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
-        System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
+        System.out.println("| MAX DELETED CHILDREN (PER STEP / MILESTONE): " + maxDeletedChildTransactions);
+        System.out.println("| MAX DELETED PARENTS (PER STEP / MILESTONE): " + maxDeletedParentTransactions);
         System.out.println("========================================================");
     }
 }
