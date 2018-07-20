@@ -69,8 +69,16 @@ public class LocalSnapshotManager {
         return getTransactionsToPrune(MilestoneViewModel.get(instance.tangle, milestoneIndex));
     }
 
+    int totalDeletedTransactions;
+
+    int maxDeletedParentTransactions;
+
+    int maxDeletedChildTransactions;
+
     public boolean getTransactionsToPrune(MilestoneViewModel targetMilestone) throws Exception {
-        int transactionCount = 0;
+        totalDeletedTransactions = 0;
+        maxDeletedParentTransactions = 0;
+        maxDeletedChildTransactions = 0;
 
         // create a set of visited transactions to prevent processing the same transaction more than once
         Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
@@ -96,6 +104,9 @@ public class LocalSnapshotManager {
 
             // create a set where we collect the candidates for orphaned parent transactions
             Set<Hash> possiblyOrphanedParents = new HashSet<>();
+
+            // gather some statistics
+            int deletedChildTransactions = 0;
 
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
@@ -133,14 +144,16 @@ public class LocalSnapshotManager {
                     // TODO: ACTUALLY DELETE THE TRANSACTION
 
                     // increase our cleaned transactions counter (for debugging)
-                    transactionCount++;
-                }
+                    totalDeletedTransactions++;
+                    deletedChildTransactions++;
 
-                // output hash (for debugging)
-                if(transactionCount % 10000 == 0) {
-                    System.out.println("DELETED: " + transactionCount + " / " + currentMilestone.index());
+                    // output statistics (for debugging)
+                    dumpProgressStatistics();
                 }
             }
+
+            // gather some statistics
+            maxDeletedChildTransactions = Math.max(maxDeletedChildTransactions, deletedChildTransactions);
             //endregion
 
             //region ITERATE UP TOWARDS THE TIPS (PARASITIC SIDE TANGLES) //////////////////////////////////////////////
@@ -150,6 +163,9 @@ public class LocalSnapshotManager {
 
             // create a set of visited transactions to prevent processing the same transaction more than once
             //Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+
+            // gather some statistics
+            int deletedParentTransactions = 0;
 
             // iterate through our queue and process all elements (while we iterate we add more)
             Hash parentTransactionHash;
@@ -173,26 +189,46 @@ public class LocalSnapshotManager {
                         }
 
                         // increase our cleaned transactions counter (for debugging)
-                        transactionCount++;
+                        totalDeletedTransactions++;
+                        deletedParentTransactions++;
 
                         // TODO: ACTUALLY DELETE THE TRANSACTION
 
-                        // output hash (for debugging)
-                        if(transactionCount % 10000 == 0) {
-                            System.out.println("DELETED PARENT: " + transactionCount + " / " + parentTransaction.getHash().toString());
-                        }
+                        // output statistics (for debugging)
+                        dumpProgressStatistics();
                     }
                 }
             }
+
+            // gather some statistics
+            maxDeletedParentTransactions = Math.max(maxDeletedParentTransactions, deletedParentTransactions);
             //endregion
 
             // go to the next milestone chunk
             currentMilestone = currentMilestone.previous(instance.tangle);
         }
 
-        // output hash (for debugging)
-        System.out.println("DELETED: " + transactionCount);
+        // output statistics (for debugging)
+        dumpFinalStatistics();
 
         return true;
+    }
+
+    public void dumpProgressStatistics() {
+        if(totalDeletedTransactions % 10000 == 0) {
+            System.out.println("= PROGRESS =============================================");
+            System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
+            System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
+            System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
+            System.out.println("========================================================");
+        }
+    }
+
+    public void dumpFinalStatistics() {
+        System.out.println("= DONE =================================================");
+        System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
+        System.out.println("| MAX DELETED CHILDREN: " + maxDeletedChildTransactions);
+        System.out.println("| MAX DELETED PARENTS: " + maxDeletedParentTransactions);
+        System.out.println("========================================================");
     }
 }
