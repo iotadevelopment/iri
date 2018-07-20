@@ -120,6 +120,8 @@ public class LocalSnapshotManager {
             while((currentTransaction = transactionsToDelete.poll()) != null) {
                 // check if we see this transaction the first time
                 if(visitedTransactions.add(currentTransaction.getHash())) {
+                    System.out.println(currentTransaction.getTag(instance.tangle).toString());
+
                     // retrieve the two referenced transactions
                     TransactionViewModel branchTransaction = currentTransaction.getBranchTransaction(instance.tangle);
                     TransactionViewModel trunkTransaction = currentTransaction.getTrunkTransaction(instance.tangle);
