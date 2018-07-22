@@ -238,7 +238,7 @@ public class LocalSnapshotManager {
             //endregion
 
             // go to the next milestone chunk
-            currentMilestone = currentMilestone.previous(instance.tangle);
+            currentMilestone = MilestoneViewModel.get(instance.tangle, currentMilestone.index() - 1);
         }
 
         // output statistics (for debugging)
