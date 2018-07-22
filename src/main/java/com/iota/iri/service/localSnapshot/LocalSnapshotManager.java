@@ -126,13 +126,13 @@ public class LocalSnapshotManager {
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
             while((currentTransaction = transactionsToDelete.poll()) != null) {
-                if(currentTransaction.getHash().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                if(currentTransaction.getHash().toString().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
                     sideTangleTransactionsSeen++;
                 }
 
                 // check if we see this transaction the first time
                 if(visitedTransactions.add(currentTransaction.getHash())) {
-                    if(currentTransaction.getHash().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                    if(currentTransaction.getHash().toString().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
                         sideTangleTransactionsDeleted++;
                     }
 
@@ -195,8 +195,16 @@ public class LocalSnapshotManager {
             // iterate through our queue and process all elements (while we iterate we add more)
             Hash parentTransactionHash;
             while((parentTransactionHash = parentTransactionsToCheck.poll()) != null) {
+                if(parentTransactionHash.toString().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                    sideTangleTransactionsSeen++;
+                }
+
                 // check if we see this transaction the first time
                 if(visitedParents.add(parentTransactionHash)) {
+                    if(parentTransactionHash.toString().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                        sideTangleTransactionsDeleted++;
+                    }
+
                     // retrieve the child transaction
                     TransactionViewModel parentTransaction = TransactionViewModel.fromHash(
                         instance.tangle,
