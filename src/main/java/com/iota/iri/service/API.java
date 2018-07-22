@@ -5,10 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.iota.iri.*;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.conf.Configuration.DefaultConfSettings;
-import com.iota.iri.controllers.AddressViewModel;
-import com.iota.iri.controllers.BundleViewModel;
-import com.iota.iri.controllers.TagViewModel;
-import com.iota.iri.controllers.TransactionViewModel;
+import com.iota.iri.controllers.*;
 import com.iota.iri.hash.Curl;
 import com.iota.iri.hash.PearlDiver;
 import com.iota.iri.hash.Sponge;
@@ -255,9 +252,11 @@ public class API {
                     //instance.localSnapshotManager.getTransactionDetails();
                     final Hash transactionHash  = new Hash(getParameterAsStringAndValidate(request,"transaction", HASH_SIZE));
 
+                    TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, MilestoneViewModel.first(instance.tangle).getHash());
+
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
 
-                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Referenced Milestone: " + transaction.referencedSnapshot(instance.tangle));
+                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Referenced Milestone: " + tx.referencedSnapshot(instance.tangle));
                 }
                 case "takeSnapshot": {
                     //instance.localSnapshotManager.getSnapshot(instance.milestone.latestSolidSubtangleMilestoneIndex - 2).writeSnapshotFile("rsnapshot_" + (instance.milestone.latestSolidSubtangleMilestoneIndex - 2) + ".txt");
