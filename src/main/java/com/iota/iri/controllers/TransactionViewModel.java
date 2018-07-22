@@ -126,6 +126,7 @@ public class TransactionViewModel {
         if(hash.equals(Hash.NULL_HASH)) {
             return false;
         }
+        System.out.println(transaction.referencedSnapshot);
         return tangle.update(transaction, hash, item);
     }
 
