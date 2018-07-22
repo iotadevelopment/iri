@@ -83,6 +83,35 @@ public class LocalSnapshotManager {
 
     int sideTangleTransactionsDeleted;
 
+    public int getReferencedMilestone(TransactionViewModel transaction) throws Exception {
+        Hash branchTransactionHash = transaction.getBranchTransactionHash();
+        Hash trunkTransactionHash = transaction.getTrunkTransactionHash();
+
+        int referencedBranchTransactionMilestone;
+        if(branchTransactionHash.equals(Hash.NULL_HASH)) {
+            referencedBranchTransactionMilestone = 0;
+        } else {
+            try {
+                referencedBranchTransactionMilestone = MilestoneViewModel.fromHash(instance.tangle, branchTransactionHash).index();
+            } catch(Exception e) {
+                referencedBranchTransactionMilestone = getReferencedMilestone(transaction.getBranchTransaction(instance.tangle));
+            }
+        }
+
+        int referencedTrunkTransactionMilestone;
+        if(branchTransactionHash.equals(Hash.NULL_HASH)) {
+            referencedTrunkTransactionMilestone = 0;
+        } else {
+            try {
+                referencedTrunkTransactionMilestone = MilestoneViewModel.fromHash(instance.tangle, branchTransactionHash).index();
+            } catch(Exception e) {
+                referencedTrunkTransactionMilestone = getReferencedMilestone(transaction.getTrunkTransaction(instance.tangle));
+            }
+        }
+
+        return Math.max(referencedBranchTransactionMilestone, referencedTrunkTransactionMilestone);
+    }
+
     public boolean getTransactionsToPrune(MilestoneViewModel targetMilestone) throws Exception {
         latestMilestoneIndex = instance.milestone.latestSolidSubtangleMilestoneIndex;
         totalDeletedTransactions = 0;

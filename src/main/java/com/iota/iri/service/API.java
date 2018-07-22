@@ -257,12 +257,9 @@ public class API {
 
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
 
-                    TransactionViewModel currentTransaction = transaction;
-                    while(!currentTransaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
-                        currentTransaction = currentTransaction.getBranchTransaction(instance.tangle);
-                    }
+                    int referencedMilestone = instance.localSnapshotManager.getReferencedMilestone(transaction);
 
-                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Root reached: " + (currentTransaction.getBranchTransactionHash().equals(Hash.NULL_HASH) ? "true" : "false"));
+                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Referenced Milestone: " + referencedMilestone);
                 }
                 case "takeSnapshot": {
                     //instance.localSnapshotManager.getSnapshot(instance.milestone.latestSolidSubtangleMilestoneIndex - 2).writeSnapshotFile("rsnapshot_" + (instance.milestone.latestSolidSubtangleMilestoneIndex - 2) + ".txt");
