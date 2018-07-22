@@ -147,8 +147,11 @@ public class Transaction implements Persistable {
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
 
-            short senderBytesLength = Serializer.getShort(bytes, i);
-            i += Short.BYTES;
+            short senderBytesLength = Short.MAX_VALUE;
+            if(i + Short.BYTES <= bytes.length) {
+                senderBytesLength = Serializer.getShort(bytes, i);
+                i += Short.BYTES;
+            }
 
             // old format (with string extending to the end
              if(i + senderBytesLength + Integer.BYTES != bytes.length) {
