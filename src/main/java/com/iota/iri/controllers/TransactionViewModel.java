@@ -432,7 +432,7 @@ public class TransactionViewModel {
             }
 
             // set the referenced milestone to the smaller one of both values
-            this.referencedSnapshot(tangle, Math.min(trunkReferencedSnapshot, branchReferencedSnapshot));
+            this.referencedSnapshot(tangle, Math.max(trunkReferencedSnapshot, branchReferencedSnapshot));
         }
 
         // return the stored value
