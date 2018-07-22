@@ -251,6 +251,14 @@ public class API {
                 case "findTransactions": {
                     return findTransactionStatement(request);
                 }
+                case "getTransactionDetails": {
+                    //instance.localSnapshotManager.getTransactionDetails();
+                    final Hash transactionHash  = new Hash(getParameterAsStringAndValidate(request,"transaction", HASH_SIZE));
+
+                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+
+                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex());
+                }
                 case "takeSnapshot": {
                     //instance.localSnapshotManager.getSnapshot(instance.milestone.latestSolidSubtangleMilestoneIndex - 2).writeSnapshotFile("rsnapshot_" + (instance.milestone.latestSolidSubtangleMilestoneIndex - 2) + ".txt");
                     //instance.milestone.latestSnapshot.writeSnapshotFile("snapshot_" + instance.milestone.latestSolidSubtangleMilestoneIndex + ".txt");
