@@ -39,6 +39,7 @@ public class Transaction implements Persistable {
     public long height = 0;
     public String sender = "";
     public int snapshot;
+    public int referencedSnapshot;
 
     public byte[] bytes() {
         return bytes;

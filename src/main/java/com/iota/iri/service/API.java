@@ -257,9 +257,7 @@ public class API {
 
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
 
-                    int referencedMilestone = instance.localSnapshotManager.getReferencedMilestone(transaction);
-
-                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Referenced Milestone: " + referencedMilestone);
+                    return ErrorResponse.create("Transaction details\n=========================\nSnapshot Index: " + transaction.snapshotIndex() + "\n" + "Referenced Milestone: " + transaction.referencedSnapshot(instance.tangle));
                 }
                 case "takeSnapshot": {
                     //instance.localSnapshotManager.getSnapshot(instance.milestone.latestSolidSubtangleMilestoneIndex - 2).writeSnapshotFile("rsnapshot_" + (instance.milestone.latestSolidSubtangleMilestoneIndex - 2) + ".txt");
