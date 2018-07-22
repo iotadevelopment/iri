@@ -23,6 +23,15 @@ public class Serializer {
         }
         return result;
     }
+
+    public static byte[] serialize(short shortValue) {
+        byte[] result = new byte[Short.BYTES];
+        for (int i = Short.BYTES - 1; i >= 0; i--) {
+            result[i] = (byte)(shortValue & 0xFF);
+            shortValue >>= 8;
+        }
+        return result;
+    }
     
     public static long getLong(byte[] bytes) {
         return getLong(bytes, 0);
@@ -52,5 +61,20 @@ public class Serializer {
             res |= (bytes[start + i] & 0xFFL) << ((length-i-1) * 8);
         }
         return res;
+    }
+
+    public static short getShort(byte[] bytes) {
+        return getShort(bytes, 0);
+    }
+    public static short getShort(byte[] bytes, int start) {
+        if(bytes == null) {
+            return 0;
+        }
+        int length = Short.BYTES;
+        int res = 0;
+        for (int i=0; i< length;i++) {
+            res |= (bytes[start + i] & 0xFFL) << ((length-i-1) * 8);
+        }
+        return (short) res;
     }
 }

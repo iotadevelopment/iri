@@ -83,6 +83,10 @@ public class LocalSnapshotManager {
 
     int sideTangleTransactionsDeleted;
 
+    public void updateReferencedSnapshot() throws Exception {
+        MilestoneViewModel firstMilestone = MilestoneViewModel.first(instance.tangle);
+    }
+
     public int getReferencedMilestone(TransactionViewModel transaction) throws Exception {
         Hash branchTransactionHash = transaction.getBranchTransactionHash();
         Hash trunkTransactionHash = transaction.getTrunkTransactionHash();

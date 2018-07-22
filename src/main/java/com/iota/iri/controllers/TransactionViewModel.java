@@ -400,6 +400,8 @@ public class TransactionViewModel {
     public int referencedSnapshot(Tangle tangle) throws Exception{
         // if the referenced snapshot is 0 -> we try to recursively determine it
         if(transaction.referencedSnapshot == 0) {
+            System.out.println("UNDEFINED");
+
             // retrieve the trunk and the branch
             TransactionViewModel trunk = this.getTrunkTransaction(tangle);
             TransactionViewModel branch = this.getBranchTransaction(tangle);
