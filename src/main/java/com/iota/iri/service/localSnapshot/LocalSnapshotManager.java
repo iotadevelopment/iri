@@ -79,11 +79,17 @@ public class LocalSnapshotManager {
 
     int currentMilestoneIndex;
 
+    int sideTangleTransactionsSeen;
+
+    int sideTangleTransactionsDeleted;
+
     public boolean getTransactionsToPrune(MilestoneViewModel targetMilestone) throws Exception {
         latestMilestoneIndex = instance.milestone.latestSolidSubtangleMilestoneIndex;
         totalDeletedTransactions = 0;
         maxDeletedParentTransactions = 0;
         maxDeletedChildTransactions = 0;
+        sideTangleTransactionsSeen = 0;
+        sideTangleTransactionsDeleted = 0;
 
         // create a set of visited transactions to prevent processing the same transaction more than once
         Set<Hash> visitedParents = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
@@ -112,15 +118,25 @@ public class LocalSnapshotManager {
             // create a set where we collect the candidates for orphaned parent transactions
             Set<Hash> possiblyOrphanedParents = new HashSet<>();
 
+            //IOTASPAM9DOT9COM9999TYPPI99999999999999999999999999999999999999999999999999999999
+
             // gather some statistics
             int deletedChildTransactions = 0;
 
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
             while((currentTransaction = transactionsToDelete.poll()) != null) {
+                if(currentTransaction.getHash().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                    sideTangleTransactionsSeen++;
+                }
+
                 // check if we see this transaction the first time
                 if(visitedTransactions.add(currentTransaction.getHash())) {
-                    System.out.println(currentTransaction.getTagValue().toString());
+                    if(currentTransaction.getHash().equals("WTQYOYGUUDPCF9WYGLVJBL9IJIYRFNXCFEMYLSDRWAOYLQHQSKBWH9ENNXHNJGGX9TRBXCNAJCWZA9999")) {
+                        sideTangleTransactionsDeleted++;
+                    }
+
+                    //System.out.println(currentTransaction.getTagValue().toString());
 
                     // retrieve the two referenced transactions
                     TransactionViewModel branchTransaction = currentTransaction.getBranchTransaction(instance.tangle);
@@ -231,6 +247,8 @@ public class LocalSnapshotManager {
             System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
             System.out.println("| MAX DELETED CHILDREN (PER STEP / MILESTONE): " + maxDeletedChildTransactions);
             System.out.println("| MAX DELETED PARENTS (PER STEP / MILESTONE): " + maxDeletedParentTransactions);
+            System.out.println("| SIDE TANGLE TRANSACTIONS (SEEN): " + sideTangleTransactionsSeen);
+            System.out.println("| SIDE TANGLE TRANSACTIONS (DELETED): " + sideTangleTransactionsDeleted);
             System.out.println("========================================================");
         }
     }
@@ -240,6 +258,8 @@ public class LocalSnapshotManager {
         System.out.println("| TOTAL DELETED: " + totalDeletedTransactions);
         System.out.println("| MAX DELETED CHILDREN (PER STEP / MILESTONE): " + maxDeletedChildTransactions);
         System.out.println("| MAX DELETED PARENTS (PER STEP / MILESTONE): " + maxDeletedParentTransactions);
+        System.out.println("| SIDE TANGLE TRANSACTIONS (SEEN): " + sideTangleTransactionsSeen);
+        System.out.println("| SIDE TANGLE TRANSACTIONS (DELETED): " + sideTangleTransactionsDeleted);
         System.out.println("========================================================");
     }
 }
