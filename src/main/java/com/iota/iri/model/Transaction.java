@@ -12,6 +12,10 @@ import java.nio.ByteBuffer;
 public class Transaction implements Persistable {
     public static final int SIZE = 1604;
 
+    // bitmasks used to encode the boolean values in 1 byte
+    public static int IS_SOLID_BITMASK    = 0b01;
+    public static int IS_SNAPSHOT_BITMASK = 0b10;
+
     public byte[] bytes;
 
     public Hash address;
@@ -36,6 +40,7 @@ public class Transaction implements Persistable {
     //public boolean confirmed = false;
     public boolean parsed = false;
     public boolean solid = false;
+    public boolean isSnapshot = false;
     public long height = 0;
     public String sender = "";
     public int snapshot;
@@ -81,7 +86,13 @@ public class Transaction implements Persistable {
         buffer.put(Serializer.serialize(arrivalTime));
         buffer.put(Serializer.serialize(height));
         //buffer.put((byte) (confirmed ? 1:0));
-        buffer.put((byte) (solid ? 1 : 0));
+
+        // encode booleans in 1 byte
+        byte flags = 0;
+        flags |= solid ? IS_SOLID_BITMASK : 0;
+        flags |= isSnapshot ? IS_SNAPSHOT_BITMASK : 0;
+        buffer.put(flags);
+
         buffer.put(Serializer.serialize(snapshot));
         buffer.put(sender.getBytes());
         return buffer.array();
@@ -131,7 +142,11 @@ public class Transaction implements Persistable {
             confirmed = bytes[i] == 1;
             i++;
             */
-            solid = bytes[i] == 1;
+
+            // decode the boolean byte by checking the bitmasks
+            solid      = (bytes[i] & IS_SOLID_BITMASK)    != 0;
+            isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
+
             i++;
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
