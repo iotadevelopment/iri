@@ -108,12 +108,19 @@ public class Milestone {
                                         final Validity valid = validateMilestone(mode, t, getIndex(t));
                                         switch (valid) {
                                             case VALID:
-                                                t.setIsSnapshot(tangle, true);
                                                 MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
                                                 if (milestoneViewModel != null && milestoneViewModel.index() > latestMilestoneIndex) {
                                                     latestMilestone = milestoneViewModel.getHash();
                                                     latestMilestoneIndex = milestoneViewModel.index();
                                                 }
+
+                                                // mark the transaction as a snapshot
+                                                t.setIsSnapshot(tangle, true);
+
+                                                // set the snapshot index of the transaction (a milestone is verified by
+                                                // itself + this allows us to retrieve the matching milestone object
+                                                // efficiently)
+                                                t.setSnapshot(tangle, milestoneViewModel.index());
                                                 break;
                                             case INCOMPLETE:
                                                 analyzedMilestoneCandidates.remove(t.getHash());
