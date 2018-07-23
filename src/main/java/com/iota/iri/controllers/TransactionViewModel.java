@@ -409,6 +409,17 @@ public class TransactionViewModel {
         }
     }
 
+    public void setIsSnapshot(Tangle tangle, final boolean isSnapshot) throws Exception {
+        if ( isSnapshot != transaction.isSnapshot ) {
+            transaction.isSnapshot = isSnapshot;
+            update(tangle, "isSnapshot");
+        }
+    }
+
+    public boolean getIsSnapshot() {
+        return transaction.isSnapshot;
+    }
+
     public long getHeight() {
         return transaction.height;
     }
