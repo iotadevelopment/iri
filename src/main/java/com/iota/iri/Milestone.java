@@ -120,7 +120,7 @@ public class Milestone {
                                                 // set the snapshot index of the transaction (a milestone is verified by
                                                 // itself + this allows us to retrieve the matching milestone object
                                                 // efficiently)
-                                                t.setSnapshot(tangle, milestoneViewModel.index());
+                                                t.setSnapshot(tangle, getIndex(t));
                                                 break;
                                             case INCOMPLETE:
                                                 analyzedMilestoneCandidates.remove(t.getHash());
