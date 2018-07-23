@@ -108,6 +108,7 @@ public class Milestone {
                                         final Validity valid = validateMilestone(mode, t, getIndex(t));
                                         switch (valid) {
                                             case VALID:
+                                                t.setIsSnapshot(tangle, true);
                                                 MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
                                                 if (milestoneViewModel != null && milestoneViewModel.index() > latestMilestoneIndex) {
                                                     latestMilestone = milestoneViewModel.getHash();
