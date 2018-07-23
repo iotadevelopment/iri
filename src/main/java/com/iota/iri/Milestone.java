@@ -115,7 +115,7 @@ public class Milestone {
                                                 }
 
                                                 // mark the transaction as a snapshot
-                                                t.setIsSnapshot(tangle, true);
+                                                t.isSnapshot(tangle, true);
 
                                                 // set the snapshot index of the transaction (a milestone is verified by
                                                 // itself + this allows us to retrieve the matching milestone object
