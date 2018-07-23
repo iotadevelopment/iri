@@ -378,12 +378,71 @@ public class TransactionViewModel {
             transactionViewModel = TransactionViewModel.fromHash(tangle, hashIterator.next());
 
             transactionViewModel.updateHeights(tangle);
+            transactionViewModel.updateReferencedSnapshot(tangle);
 
             if(!transactionViewModel.isSolid()) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.update(tangle, "solid|height");
             }
         }
+    }
+
+    public int updateReferencedSnapshot(Tangle tangle) throws Exception {
+        // if the referenced snapshot is 0 -> we try to recursively determine it
+        if(transaction.referencedSnapshot == 0) {
+            // retrieve the trunk and the branch
+            TransactionViewModel trunk = this.getTrunkTransaction(tangle);
+            TransactionViewModel branch = this.getBranchTransaction(tangle);
+
+            // create a variable for the referencedSnapshot of the trunk
+            int trunkReferencedSnapshot;
+
+            // check if the referenced transaction is pointing to the NULL_HASH
+            if(trunk.getHash().equals(Hash.NULL_HASH)) {
+                trunkReferencedSnapshot = 0;
+            }
+            // check if the trunk is a milestone -> set its index
+            else if(trunk.isSnapshot()) {
+                trunkReferencedSnapshot = trunk.snapshotIndex();
+            }
+            // otherwise descend recursively
+            else {
+                trunkReferencedSnapshot = trunk.updateReferencedSnapshot(tangle);
+            }
+
+            // create a variable for the referencedSnapshot of the branch
+            int branchReferencedSnapshot;
+
+            // check if the referenced transaction is pointing to the NULL_HASH
+            if(branch.getHash().equals(Hash.NULL_HASH)) {
+                branchReferencedSnapshot = 0;
+            }
+            // check if the branch is a milestone -> set its index
+            else if(branch.isSnapshot()) {
+                branchReferencedSnapshot = branch.snapshotIndex();
+            }
+            // otherwise descend recursively
+            else {
+                branchReferencedSnapshot = branch.updateReferencedSnapshot(tangle);
+            }
+
+            // set the referenced milestone to the smaller one of both values
+            this.referencedSnapshot(tangle, Math.max(trunkReferencedSnapshot, branchReferencedSnapshot));
+        }
+
+        // return the stored value
+        return transaction.referencedSnapshot;
+    }
+
+    public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
+        if ( referencedSnapshot != transaction.referencedSnapshot ) {
+            transaction.referencedSnapshot = referencedSnapshot;
+            update(tangle, "referencedSnapshot");
+        }
+    }
+
+    public int referencedSnapshot() {
+        return transaction.referencedSnapshot;
     }
 
     public boolean updateSolid(boolean solid) throws Exception {

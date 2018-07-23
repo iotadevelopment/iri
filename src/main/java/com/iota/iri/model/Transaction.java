@@ -44,6 +44,7 @@ public class Transaction implements Persistable {
     public long height = 0;
     public String sender = "";
     public int snapshot;
+    public int referencedSnapshot;
 
     public byte[] bytes() {
         return bytes;
@@ -62,7 +63,7 @@ public class Transaction implements Persistable {
         int allocateSize =
                 Hash.SIZE_IN_BYTES * 6 + //address,bundle,trunk,branch,obsoleteTag,tag
                         Long.BYTES * 9 + //value,currentIndex,lastIndex,timestamp,attachmentTimestampLowerBound,attachmentTimestampUpperBound,arrivalTime,height
-                        Integer.BYTES * 3 + //validity,type,snapshot
+                        Integer.BYTES * 4 + //validity,type,snapshot
                         1 + //solid
                         sender.getBytes().length; //sender
         ByteBuffer buffer = ByteBuffer.allocate(allocateSize);
@@ -94,6 +95,7 @@ public class Transaction implements Persistable {
         buffer.put(flags);
 
         buffer.put(Serializer.serialize(snapshot));
+        buffer.put(Serializer.serialize(referencedSnapshot));
         buffer.put(sender.getBytes());
         return buffer.array();
     }
@@ -149,6 +151,8 @@ public class Transaction implements Persistable {
 
             i++;
             snapshot = Serializer.getInteger(bytes, i);
+            i += Integer.BYTES;
+            referencedSnapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
             byte[] senderBytes = new byte[bytes.length - i];
             if (senderBytes.length != 0) {
