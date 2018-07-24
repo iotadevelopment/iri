@@ -388,9 +388,15 @@ public class TransactionViewModel {
         }
     }
 
+    private class UnsolidifiedTransactionException extends Exception {
+        public UnsolidifiedTransactionException(String s) {
+            super(s);
+        }
+    }
+
     private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) throws Exception {
-        if(!transaction.isSolid()) {
-            throw new Exception("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION" + transaction.getHash().toString());
+        if(!transaction.getHash().equals(Hash.NULL_HASH) && !transaction.isSolid()) {
+            throw new UnsolidifiedTransactionException("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION: " + transaction.getHash().toString());
         }
 
         return transaction.getHash().equals(Hash.NULL_HASH) || transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
@@ -427,62 +433,66 @@ public class TransactionViewModel {
     }
 
     public void updateReferencedSnapshot(Tangle tangle) throws Exception {
-        if(referencedSnapshot() == 0 && isSolid()) {
-            LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
-            stack.push(this);
+        try {
+            if(referencedSnapshot() == 0 && isSolid()) {
+                LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
+                stack.push(this);
 
-            TransactionViewModel previousTransaction = null;
-            while(stack.size() > 0) {
-                TransactionViewModel currentTransaction = stack.peek();
+                TransactionViewModel previousTransaction = null;
+                while(stack.size() > 0) {
+                    TransactionViewModel currentTransaction = stack.peek();
 
-                // if we are traversing down ...
-                if(
+                    // if we are traversing down ...
+                    if(
                     previousTransaction == null ||
                     previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
                     previousTransaction.getTrunkTransaction(tangle) == currentTransaction
-                ) {
-                    // if we have a branch to traverse -> do it ...
-                    if(!isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
-                        stack.push(currentTransaction.getBranchTransaction(tangle));
+                    ) {
+                        // if we have a branch to traverse -> do it ...
+                        if(!isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
+                            stack.push(currentTransaction.getBranchTransaction(tangle));
+                        }
+
+                        // ... or if we have a trunk to traverse -> do it ...
+                        else if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                            stack.push(currentTransaction.getTrunkTransaction(tangle));
+                        }
+
+                        // ... otherwise update the referencedSnapshot
+                        else {
+                            stack.pop();
+
+                            updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                        }
                     }
 
-                    // ... or if we have a trunk to traverse -> do it ...
-                    else if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                        stack.push(currentTransaction.getTrunkTransaction(tangle));
+                    // if we are traversing up from the branch ...
+                    else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
+                        // if we have a trunk to traverse -> do it
+                        if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                            stack.push(currentTransaction.getTrunkTransaction(tangle));
+                        }
+
+                        // otherwise -> update the referenced transaction
+                        else {
+                            stack.pop();
+
+                            updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                        }
                     }
 
-                    // ... otherwise update the referencedSnapshot
-                    else {
+                    // if we are traversing up from the trunk ...
+                    else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
                         stack.pop();
 
                         updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
                     }
+
+                    previousTransaction = currentTransaction;
                 }
-
-                // if we are traversing up from the branch ...
-                else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
-                    // if we have a trunk to traverse -> do it
-                    if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                        stack.push(currentTransaction.getTrunkTransaction(tangle));
-                    }
-
-                    // otherwise -> update the referenced transaction
-                    else {
-                        stack.pop();
-
-                        updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
-                    }
-                }
-
-                // if we are traversing up from the trunk ...
-                else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
-                    stack.pop();
-
-                    updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
-                }
-
-                previousTransaction = currentTransaction;
             }
+        } catch(UnsolidifiedTransactionException e) {
+            // ignore this error and try later
         }/*
 
         // if the referenced snapshot is 0 -> we try to recursively determine it
