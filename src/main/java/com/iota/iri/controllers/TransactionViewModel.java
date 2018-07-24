@@ -439,8 +439,16 @@ public class TransactionViewModel {
                 LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
                 stack.push(this);
 
+                int stepCount = 0;
+
                 TransactionViewModel previousTransaction = null;
                 while(stack.size() > 0) {
+                    stepCount++;
+
+                    if(stepCount % 10000 == 0) {
+                        System.out.println("updateReferencedSnapshot (" + stepCount + ")");
+                    }
+
                     TransactionViewModel currentTransaction = stack.peek();
 
                     // if we are traversing down ...
