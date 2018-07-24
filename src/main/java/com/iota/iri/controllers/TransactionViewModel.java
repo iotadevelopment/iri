@@ -396,7 +396,8 @@ public class TransactionViewModel {
 
     private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) throws Exception {
         if(!transaction.getHash().equals(Hash.NULL_HASH) && !transaction.isSolid()) {
-            throw new UnsolidifiedTransactionException("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION: " + transaction.getHash().toString());
+            transaction.updateSolid(true);
+            //throw new UnsolidifiedTransactionException("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION: " + transaction.getHash().toString());
         }
 
         return transaction.getHash().equals(Hash.NULL_HASH) || transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
