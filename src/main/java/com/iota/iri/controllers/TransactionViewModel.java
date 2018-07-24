@@ -390,7 +390,7 @@ public class TransactionViewModel {
 
     private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) throws Exception {
         if(!transaction.isSolid()) {
-            throw new Exception("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION");
+            throw new Exception("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION" + transaction.getHash().toString());
         }
 
         return transaction.getHash().equals(Hash.NULL_HASH) || transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
@@ -441,11 +441,18 @@ public class TransactionViewModel {
                     previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
                     previousTransaction.getTrunkTransaction(tangle) == currentTransaction
                 ) {
+                    // if we have a branch to traverse -> do it ...
                     if(!isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
                         stack.push(currentTransaction.getBranchTransaction(tangle));
-                    } else if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                    }
+
+                    // ... or if we have a trunk to traverse -> do it ...
+                    else if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
                         stack.push(currentTransaction.getTrunkTransaction(tangle));
-                    } else {
+                    }
+
+                    // ... otherwise update the referencedSnapshot
+                    else {
                         stack.pop();
 
                         updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
@@ -459,7 +466,7 @@ public class TransactionViewModel {
                         stack.push(currentTransaction.getTrunkTransaction(tangle));
                     }
 
-                    // otherwise -> calculate the referenced transaction
+                    // otherwise -> update the referenced transaction
                     else {
                         stack.pop();
 
