@@ -2,6 +2,7 @@ package com.iota.iri.controllers;
 
 import java.util.*;
 
+import com.iota.iri.conf.Configuration;
 import com.iota.iri.model.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
@@ -387,7 +388,96 @@ public class TransactionViewModel {
         }
     }
 
-    public int updateReferencedSnapshot(Tangle tangle) throws Exception {
+    private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) throws Exception {
+        if(!transaction.isSolid()) {
+            throw new Exception("TRYING TO DETERMINE REFERENCED SNAPSHOT OF AN UNSOLID TRANSACTION");
+        }
+
+        return transaction.getHash().equals(Hash.NULL_HASH) || transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
+    }
+
+    private void updateReferencedSnapshotOfLeaf(Tangle tangle, TransactionViewModel transaction) throws Exception {
+        int referencedSnapshotOfBranch;
+        if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
+            referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+        } else {
+            TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
+
+            if(branchTransaction.isSnapshot()) {
+                referencedSnapshotOfBranch = branchTransaction.snapshotIndex();
+            } else {
+                referencedSnapshotOfBranch = branchTransaction.referencedSnapshot();
+            }
+        }
+
+        int referencedSnapshotOfTrunk;
+        if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
+            referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+        } else {
+            TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
+
+            if(trunkTransaction.isSnapshot()) {
+                referencedSnapshotOfBranch = trunkTransaction.snapshotIndex();
+            } else {
+                referencedSnapshotOfBranch = trunkTransaction.referencedSnapshot();
+            }
+        }
+
+        transaction.referencedSnapshot(tangle, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
+    }
+
+    public void updateReferencedSnapshot(Tangle tangle) throws Exception {
+        if(referencedSnapshot() == 0 && isSolid()) {
+            LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
+            stack.push(this);
+
+            TransactionViewModel previousTransaction = null;
+            while(stack.size() > 0) {
+                TransactionViewModel currentTransaction = stack.peek();
+
+                // if we are traversing down ...
+                if(
+                    previousTransaction == null ||
+                    previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
+                    previousTransaction.getTrunkTransaction(tangle) == currentTransaction
+                ) {
+                    if(!isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
+                        stack.push(currentTransaction.getBranchTransaction(tangle));
+                    } else if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                        stack.push(currentTransaction.getTrunkTransaction(tangle));
+                    } else {
+                        stack.pop();
+
+                        updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                    }
+                }
+
+                // if we are traversing up from the branch ...
+                else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
+                    // if we have a trunk to traverse -> do it
+                    if(!isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                        stack.push(currentTransaction.getTrunkTransaction(tangle));
+                    }
+
+                    // otherwise -> calculate the referenced transaction
+                    else {
+                        stack.pop();
+
+                        updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                    }
+                }
+
+                // if we are traversing up from the trunk ...
+                else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
+                    stack.pop();
+
+                    updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                }
+
+                previousTransaction = currentTransaction;
+            }
+        }/*
+
         // if the referenced snapshot is 0 -> we try to recursively determine it
         if(transaction.referencedSnapshot == 0) {
             // retrieve the trunk and the branch
@@ -428,13 +518,14 @@ public class TransactionViewModel {
 
             // set the referenced milestone to the smaller one of both values
             this.referencedSnapshot(tangle, Math.max(trunkReferencedSnapshot, branchReferencedSnapshot));
-        }
+        }*/
 
         // return the stored value
         return transaction.referencedSnapshot;
     }
 
     public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
+        System.out.println(referencedSnapshot);
         if ( referencedSnapshot != transaction.referencedSnapshot ) {
             transaction.referencedSnapshot = referencedSnapshot;
             update(tangle, "referencedSnapshot");
