@@ -525,7 +525,6 @@ public class TransactionViewModel {
     }
 
     public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
-        System.out.println(referencedSnapshot);
         if ( referencedSnapshot != transaction.referencedSnapshot ) {
             transaction.referencedSnapshot = referencedSnapshot;
             update(tangle, "referencedSnapshot");
