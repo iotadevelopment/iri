@@ -389,61 +389,16 @@ public class TransactionViewModel {
     }
 
     /**
-     * This method is a utility method that determines if we have a leaf for our graph traversal.
+     * This method updates the referencedSnapshot value of this transaction.
      *
-     * A transaction is considered to be a leaf if it is either a snapshot or has a known referencedSnapshot value
-     * already. We do not have to separately check for the NULL_HASH here since the seenTransactions of the
-     * updateReferencedSnapshot method checks for that already.
+     * It get's called once a transaction becomes solid (by updateSolidTransactions) and traverses the graph in an
+     * iterative post-order way, until it finds a well defined snapshotIndex. It then updates all the found transactions
+     * and stores the calculated values.
      *
-     * @param transaction transaction that shall be checked
-     * @return true if we can stop traversing or false otherwise
+     * @param tangle Tangle object which acts as a database interface
+     * @throws Exception if something goes wrong while loading or storing transactions
      */
-    private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) {
-        return transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
-    }
-
-    /**
-     * This class is used to specify an error condition for our updateReferencedSnapshot method.
-     *
-     * It occurs if a transaction is processed in the updateReferencedSnapshot method, that refers to a
-     */
-    private class ReferencedSnapshotNotProcessedYetException extends Exception {}
-
-    private void updateReferencedSnapshotOfLeaf(Tangle tangle, TransactionViewModel transaction) throws Exception {
-        int referencedSnapshotOfBranch;
-        if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
-            referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
-        } else {
-            TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
-
-            if(branchTransaction.isSnapshot()) {
-                referencedSnapshotOfBranch = branchTransaction.snapshotIndex();
-            } else {
-                referencedSnapshotOfBranch = branchTransaction.referencedSnapshot();
-            }
-        }
-
-        int referencedSnapshotOfTrunk;
-        if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
-            referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
-        } else {
-            TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
-
-            if(trunkTransaction.isSnapshot()) {
-                if(trunkTransaction.snapshotIndex() == 0) {
-                    throw new ReferencedSnapshotNotProcessedYetException();
-                }
-
-                referencedSnapshotOfTrunk = trunkTransaction.snapshotIndex();
-            } else {
-                referencedSnapshotOfTrunk = trunkTransaction.referencedSnapshot();
-            }
-        }
-
-        transaction.referencedSnapshot(tangle, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
-    }
-
-    public void updateReferencedSnapshot(Tangle tangle) throws Exception {
+    private void updateReferencedSnapshot(Tangle tangle) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == 0) {
             try {
@@ -457,6 +412,7 @@ public class TransactionViewModel {
                 seenTransactions.add(this.getHash());
                 stack.push(this);
 
+                // variable to keep track of the amount of steps (for debugging unusual behaviours and debugging - get's removed in a final version)
                 int stepCount = 0;
 
                 // perform our iterative post-order traversal
@@ -464,12 +420,13 @@ public class TransactionViewModel {
                 while(stack.size() > 0) {
                     stepCount++;
 
+                    // print the last traversal steps and abort if it takes too long (for debugging - get's removed in a final version)
                     if(stepCount > 50000 && stepCount < 50050) {
                         System.out.println("updateReferencedSnapshot (" + stepCount + "): " + stack.peek().getHash().toString());
-                    }
 
-                    if(stepCount > 50050) {
-                        return;
+                        if(stepCount > 50050) {
+                            return;
+                        }
                     }
 
                     // retrieve the current transaction from the stack (leave it there)
@@ -477,9 +434,9 @@ public class TransactionViewModel {
 
                     // if we are traversing down ...
                     if(
-                    previousTransaction == null ||
-                    previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
-                    previousTransaction.getTrunkTransaction(tangle) == currentTransaction
+                        previousTransaction == null ||
+                        previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
+                        previousTransaction.getTrunkTransaction(tangle) == currentTransaction
                     ) {
                         // if we have a branch to traverse (that we haven't seen yet) -> do it ...
                         if(seenTransactions.add(currentTransaction.getBranchTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
@@ -529,6 +486,84 @@ public class TransactionViewModel {
             }
         }
     }
+
+    /**
+     * This method calculates the referencedSnapshot value of a transaction by examining its children.
+     *
+     * Since the tree traversal has already been done in the updateReferencedSnapshot method, we can only handle the
+     * base cases here and not care about possible unknown values.
+     *
+     * It retrieves the referencedSnapshot of the branch and the trunk and saves the maximum of both in the transaction.
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param transaction the transactions that shall have its referencedSnapshot value calculated
+     * @throws Exception if something goes wrong while loading or storing transactions or if we face a snapshot
+     *                   that doesn't know it's own snapshotIndex
+     */
+    private void updateReferencedSnapshotOfLeaf(Tangle tangle, TransactionViewModel transaction) throws Exception {
+        // retrieve the snapshotIndex of the branch
+        int referencedSnapshotOfBranch;
+        if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
+            referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+        } else {
+            TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
+
+            if(branchTransaction.isSnapshot()) {
+                if(branchTransaction.snapshotIndex() == 0) {
+                    throw new ReferencedSnapshotNotProcessedYetException();
+                }
+
+                referencedSnapshotOfBranch = branchTransaction.snapshotIndex();
+            } else {
+                referencedSnapshotOfBranch = branchTransaction.referencedSnapshot();
+            }
+        }
+
+        // retrieve the snapshotIndex of the trunk
+        int referencedSnapshotOfTrunk;
+        if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
+            referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+        } else {
+            TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
+
+            if(trunkTransaction.isSnapshot()) {
+                if(trunkTransaction.snapshotIndex() == 0) {
+                    throw new ReferencedSnapshotNotProcessedYetException();
+                }
+
+                referencedSnapshotOfTrunk = trunkTransaction.snapshotIndex();
+            } else {
+                referencedSnapshotOfTrunk = trunkTransaction.referencedSnapshot();
+            }
+        }
+
+        // update the referencedSnapshot of the transaction to the bigger one of both
+        transaction.referencedSnapshot(tangle, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
+    }
+
+    /**
+     * This method is a utility method that determines if we have a leaf for our graph traversal.
+     *
+     * A transaction is considered to be a leaf if it is either a snapshot or has a known referencedSnapshot value
+     * already. We do not have to separately check for the NULL_HASH here since the seenTransactions of the
+     * updateReferencedSnapshot method checks for that already.
+     *
+     * @param transaction transaction that shall be checked
+     * @return true if we can stop traversing or false otherwise
+     */
+    private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) {
+        return transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
+    }
+
+    /**
+     * This class is used to specify an error condition for our updateReferencedSnapshot method.
+     *
+     * It occurs if a transaction is processed in the updateReferencedSnapshot method, that refers to a milestone that
+     * doesn't know its own snapshotIndex value, yet and which makes it impossible to calculate the referencedSnapshot
+     * value of the child transaction. While this should theoretically not happen it is anyway better to be prepared and
+     * try again later.
+     */
+    private class ReferencedSnapshotNotProcessedYetException extends Exception {}
 
     public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
         if ( referencedSnapshot != transaction.referencedSnapshot ) {
