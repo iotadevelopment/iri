@@ -445,8 +445,12 @@ public class TransactionViewModel {
                 while(stack.size() > 0) {
                     stepCount++;
 
-                    if(stepCount % 10000 == 0) {
+                    if(stepCount > 10000 && stepCount < 10050) {
                         System.out.println("updateReferencedSnapshot (" + stepCount + "): " + stack.peek().getHash().toString());
+                    }
+
+                    if(stepCount > 10000) {
+                        return;
                     }
 
                     TransactionViewModel currentTransaction = stack.peek();
