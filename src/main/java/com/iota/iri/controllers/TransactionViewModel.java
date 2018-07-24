@@ -492,6 +492,7 @@ public class TransactionViewModel {
                 }
             }
         } catch(UnsolidifiedTransactionException e) {
+            System.out.println(e.getMessage());
             // ignore this error and try later
         }/*
 
