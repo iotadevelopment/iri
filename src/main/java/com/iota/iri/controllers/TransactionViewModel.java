@@ -417,9 +417,9 @@ public class TransactionViewModel {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
 
             if(trunkTransaction.isSnapshot()) {
-                referencedSnapshotOfBranch = trunkTransaction.snapshotIndex();
+                referencedSnapshotOfTrunk = trunkTransaction.snapshotIndex();
             } else {
-                referencedSnapshotOfBranch = trunkTransaction.referencedSnapshot();
+                referencedSnapshotOfTrunk = trunkTransaction.referencedSnapshot();
             }
         }
 
@@ -521,7 +521,7 @@ public class TransactionViewModel {
         }*/
 
         // return the stored value
-        return transaction.referencedSnapshot;
+        //return transaction.referencedSnapshot;
     }
 
     public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
