@@ -78,7 +78,7 @@ public class Transaction implements Persistable {
         int allocateSize =
                 Hash.SIZE_IN_BYTES * 6 + //address,bundle,trunk,branch,obsoleteTag,tag
                         Long.BYTES * 9 + //value,currentIndex,lastIndex,timestamp,attachmentTimestampLowerBound,attachmentTimestampUpperBound,arrivalTime,height
-                        Integer.BYTES * 4 + //validity,type,snapshot
+                        Integer.BYTES * 4 + // validity, type, snapshot, referencedSnapshot
                         1 + //solid
                         sender.getBytes().length; //sender
         ByteBuffer buffer = ByteBuffer.allocate(allocateSize);
