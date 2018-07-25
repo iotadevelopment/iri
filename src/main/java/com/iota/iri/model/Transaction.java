@@ -12,8 +12,14 @@ import java.nio.ByteBuffer;
 public class Transaction implements Persistable {
     public static final int SIZE = 1604;
 
-    // bitmasks used to encode the boolean values in 1 byte
+    /**
+     * Bitmask used to access and store the solid flag.
+     */
     public static int IS_SOLID_BITMASK    = 0b01;
+
+    /**
+     * Bitmask used to access and store the isSnapshot flag.
+     */
     public static int IS_SNAPSHOT_BITMASK = 0b10;
 
     public byte[] bytes;
@@ -40,7 +46,12 @@ public class Transaction implements Persistable {
     //public boolean confirmed = false;
     public boolean parsed = false;
     public boolean solid = false;
+
+    /**
+     * This flag indicates if the transaction is a coordinator issued milestone.
+     */
     public boolean isSnapshot = false;
+
     public long height = 0;
     public String sender = "";
     public int snapshot;
