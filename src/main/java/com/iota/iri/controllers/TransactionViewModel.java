@@ -412,23 +412,9 @@ public class TransactionViewModel {
                 seenTransactions.add(this.getHash());
                 stack.push(this);
 
-                // variable to keep track of the amount of steps (for debugging unusual behaviours and debugging - get's removed in a final version)
-                int stepCount = 0;
-
                 // perform our iterative post-order traversal
                 TransactionViewModel previousTransaction = null;
                 while(stack.size() > 0) {
-                    stepCount++;
-
-                    // print the last traversal steps and abort if it takes too long (for debugging - get's removed in a final version)
-                    if(stepCount > 50000 && stepCount < 50050) {
-                        System.out.println("updateReferencedSnapshot (" + stepCount + "): " + stack.peek().getHash().toString());
-
-                        if(stepCount > 50050) {
-                            return;
-                        }
-                    }
-
                     // retrieve the current transaction from the stack (leave it there)
                     TransactionViewModel currentTransaction = stack.peek();
 
