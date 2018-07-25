@@ -113,6 +113,9 @@ public class Milestone {
                                                     latestMilestone = milestoneViewModel.getHash();
                                                     latestMilestoneIndex = milestoneViewModel.index();
                                                 }
+
+                                                // mark the transaction as a snapshot
+                                                t.isSnapshot(tangle, true);
                                                 break;
                                             case INCOMPLETE:
                                                 analyzedMilestoneCandidates.remove(t.getHash());
