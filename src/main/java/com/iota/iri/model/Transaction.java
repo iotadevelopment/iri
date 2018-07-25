@@ -55,6 +55,10 @@ public class Transaction implements Persistable {
     public long height = 0;
     public String sender = "";
     public int snapshot;
+
+    /**
+     * This field indicates which milestone a transactions references.
+     */
     public int referencedSnapshot;
 
     public byte[] bytes() {
@@ -105,8 +109,10 @@ public class Transaction implements Persistable {
         flags |= isSnapshot ? IS_SNAPSHOT_BITMASK : 0;
         buffer.put(flags);
 
+        // store the milestone relates members
         buffer.put(Serializer.serialize(snapshot));
         buffer.put(Serializer.serialize(referencedSnapshot));
+
         buffer.put(sender.getBytes());
         return buffer.array();
     }
@@ -159,12 +165,14 @@ public class Transaction implements Persistable {
             // decode the boolean byte by checking the bitmasks
             solid      = (bytes[i] & IS_SOLID_BITMASK)    != 0;
             isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
-
             i++;
+
+            // restore the milestone related members
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
             referencedSnapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
+
             byte[] senderBytes = new byte[bytes.length - i];
             if (senderBytes.length != 0) {
                 System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
