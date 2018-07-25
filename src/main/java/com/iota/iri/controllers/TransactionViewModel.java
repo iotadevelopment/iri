@@ -379,6 +379,8 @@ public class TransactionViewModel {
             transactionViewModel = TransactionViewModel.fromHash(tangle, hashIterator.next());
 
             transactionViewModel.updateHeights(tangle);
+
+            // recursively update the referenced snapshots field of the transaction
             transactionViewModel.updateReferencedSnapshot(tangle);
 
             if(!transactionViewModel.isSolid()) {
