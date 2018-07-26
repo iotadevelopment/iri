@@ -231,9 +231,9 @@ public class Milestone {
             tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
         );
 
-        // if we found a milestone which is solid and which has either been updated + verified already or which is
-        // updated + verified in this run -> update our internal markers
-        if(
+        // while we have a milestone which is solid and which has either been updated + verified already or which is
+        // updated + verified in this run
+        while(
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
             (
@@ -242,8 +242,14 @@ public class Milestone {
             ) &&
             !shuttingDown
         ) {
+            // update our internal variables
             latestSolidSubtangleMilestone = nextMilestone.getHash();
             latestSolidSubtangleMilestoneIndex = nextMilestone.index();
+
+            // iterate to the next milestone
+            nextMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
+            );
         }
     }
 
