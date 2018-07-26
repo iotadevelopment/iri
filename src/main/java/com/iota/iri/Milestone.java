@@ -226,18 +226,14 @@ public class Milestone {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        MilestoneViewModel milestoneViewModel;
-        MilestoneViewModel latest = MilestoneViewModel.latest(tangle);
-        if (latest != null) {
-            MilestoneViewModel nextMilestone = MilestoneViewModel.get(tangle, latestSolidSubtangleMilestoneIndex + 1);
-            if(
-                nextMilestone != null &&
-                transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-                ledgerValidator.updateSnapshot(nextMilestone)
-            ) {
-                latestSolidSubtangleMilestone = nextMilestone.getHash();
-                latestSolidSubtangleMilestoneIndex = nextMilestone.index();
-            }
+        MilestoneViewModel nextMilestone = MilestoneViewModel.get(tangle, latestSolidSubtangleMilestoneIndex + 1);
+        if(
+            nextMilestone != null &&
+            transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
+            ledgerValidator.updateSnapshot(nextMilestone)
+        ) {
+            latestSolidSubtangleMilestone = nextMilestone.getHash();
+            latestSolidSubtangleMilestoneIndex = latestSolidSubtangleMilestoneIndex + 1;
         }
     }
 
