@@ -239,10 +239,11 @@ public class Milestone {
             (
                 TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() != 0 ||
                 ledgerValidator.updateSnapshot(nextMilestone)
-            )
+            ) &&
+            !shuttingDown
         ) {
             latestSolidSubtangleMilestone = nextMilestone.getHash();
-            latestSolidSubtangleMilestoneIndex = latestSolidSubtangleMilestoneIndex + 1;
+            latestSolidSubtangleMilestoneIndex = nextMilestone.index();
         }
     }
 
