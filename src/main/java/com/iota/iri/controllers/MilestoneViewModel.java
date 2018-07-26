@@ -93,6 +93,20 @@ public class MilestoneViewModel {
         return null;
     }
 
+    /**
+     * This method looks for the next milestone in the database that arrived after the current one by iterating over the
+     * milestone index.
+     *
+     * In contrast to the {@code next} method we do not rely on the insertion order in the database but actively search
+     * for the milestone that arrived after the given index.
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param index milestone index where the search shall start
+     * @param testnet boolean flag indicating if we are running in testnet or mainnet
+     * @param milestoneStartIndex start index of the milestones (changes with a global snapshot only)
+     * @return the milestone which follows directly after the given index
+     * @throws Exception if anything goes wrong while loading entries from the database
+     */
     public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
                                                               int milestoneStartIndex) throws Exception {
         // fallback if we provide an index that is lower than our start index
