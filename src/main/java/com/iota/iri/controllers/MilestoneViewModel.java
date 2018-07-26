@@ -107,7 +107,7 @@ public class MilestoneViewModel {
      * @throws Exception if anything goes wrong while loading entries from the database
      */
     public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
-                                                              int milestoneStartIndex) throws Exception {
+                                                              int milestoneStartIndex, int milestoneStopIndex) throws Exception {
         // fallback if we provide an index that is lower than our start index
         if(!testnet && index <= milestoneStartIndex) {
             return first(tangle);
@@ -116,15 +116,9 @@ public class MilestoneViewModel {
         // create a variable that will contain our search result
         MilestoneViewModel nextMilestoneViewModel = null;
 
-        // retrieve the latest milestone to determine where we can stop to search for the next one
-        MilestoneViewModel latestMilestoneViewModel = latest(tangle);
-
-        // if we have at least 1 milestone in our database -> search
-        if(latestMilestoneViewModel != null) {
-            // try to find the next milestone by index rather than db insertion order until we are successfull
-            while(nextMilestoneViewModel == null && ++index <= latestMilestoneViewModel.index()) {
-                nextMilestoneViewModel = MilestoneViewModel.get(tangle, index);
-            }
+        // try to find the next milestone by index rather than db insertion order until we are successfull
+        while(nextMilestoneViewModel == null && ++index <= milestoneStopIndex) {
+            nextMilestoneViewModel = MilestoneViewModel.get(tangle, index);
         }
 
         // return our result
