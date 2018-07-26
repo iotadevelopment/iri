@@ -94,11 +94,10 @@ public class MilestoneViewModel {
     }
 
     /**
-     * This method looks for the next milestone in the database that arrived after the current one by iterating over the
-     * milestone index.
+     * This method looks for the next milestone after a given index.
      *
      * In contrast to the {@code next} method we do not rely on the insertion order in the database but actively search
-     * for the milestone that arrived after the given index.
+     * for the milestone that was issued next by the coordinator (coo-order preserved).
      *
      * @param tangle Tangle object which acts as a database interface
      * @param index milestone index where the search shall start
