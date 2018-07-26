@@ -95,14 +95,28 @@ public class MilestoneViewModel {
 
     public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
                                                               int milestoneStartIndex) throws Exception {
+        // fallback if we provide an index that is lower than our start index
         if(!testnet && index <= milestoneStartIndex) {
             return first(tangle);
         }
-        Pair<Indexable, Persistable> milestonePair = tangle.next(Milestone.class, new IntegerIndex(index));
-        if(milestonePair != null && milestonePair.hi != null) {
-            return new MilestoneViewModel((Milestone) milestonePair.hi);
+
+        // retrieve the latest milestone to determine where we can stop to search for the next one
+        MilestoneViewModel latestMilestoneViewModel = latest(tangle);
+
+        // create a variable that will contain our search result
+        MilestoneViewModel nextMilestoneViewModel = null;
+
+        // if we have at least 1 milestone in our database -> search
+        if(latestMilestoneViewModel != null) {
+            // try to find the next milestone by index rather than db insertion order until we are successfull
+            int currentMilestoneIndex = index + 1;
+            while(nextMilestoneViewModel == null && currentMilestoneIndex <= latestMilestoneViewModel.index()) {
+                nextMilestoneViewModel = MilestoneViewModel.get(tangle, currentMilestoneIndex++);
+            }
         }
-        return null;
+
+        // return our result
+        return nextMilestoneViewModel;
     }
 
     public boolean store(Tangle tangle) throws Exception {
