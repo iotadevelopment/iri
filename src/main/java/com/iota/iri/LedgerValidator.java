@@ -209,6 +209,8 @@ public class LedgerValidator {
      * @throws Exception
      */
     private MilestoneViewModel buildSnapshot() throws Exception {
+        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
+
         MilestoneViewModel consistentMilestone = null;
         milestone.latestSnapshot.rwlock.writeLock().lock();
         try {
@@ -248,7 +250,7 @@ public class LedgerValidator {
 
                 // iterate to the next milestone
                 candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, milestoneStartIndex
+                    tangle, candidateMilestone.index(), testnet, milestoneStartIndex, latestMilestone.index()
                 );
             }
         } finally {
