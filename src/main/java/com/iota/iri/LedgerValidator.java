@@ -242,7 +242,7 @@ public class LedgerValidator {
 
                         // iterate to the next milestone
                         candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                        tangle, candidateMilestone.index(), testnet, milestoneStartIndex, latestMilestone.index()
+                            tangle, candidateMilestone.index(), testnet, milestoneStartIndex, latestMilestone.index()
                         );
                     } while(candidateMilestone != null);
 
