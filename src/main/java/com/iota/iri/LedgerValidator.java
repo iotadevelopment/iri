@@ -208,7 +208,7 @@ public class LedgerValidator {
         MilestoneViewModel consistentMilestone = null;
         milestone.latestSnapshot.rwlock.writeLock().lock();
         try {
-            MilestoneViewModel candidateMilestone = MilestoneViewModel.first(tangle);
+            MilestoneViewModel candidateMilestone = MilestoneViewModel.get(tangle, milestone.milestoneStartIndex + 1);
             while (candidateMilestone != null) {
                 if (candidateMilestone.index() % 10000 == 0) {
                     StringBuilder logMessage = new StringBuilder();
@@ -232,7 +232,7 @@ public class LedgerValidator {
                         }
                     }
                 }
-                candidateMilestone = candidateMilestone.next(tangle);
+                candidateMilestone = MilestoneViewModel.get(tangle, candidateMilestone.index() + 1);
             }
         } finally {
             milestone.latestSnapshot.rwlock.writeLock().unlock();
