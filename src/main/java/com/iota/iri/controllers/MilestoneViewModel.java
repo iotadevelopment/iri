@@ -93,16 +93,42 @@ public class MilestoneViewModel {
         return null;
     }
 
+    /**
+     * This method looks for the next milestone after a given index.
+     *
+     * In contrast to the {@code next} method we do not rely on the insertion order in the database but actively search
+     * for the milestone that was issued next by the coordinator (coo-order preserved).
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param index milestone index where the search shall start
+     * @param testnet boolean flag indicating if we are running in testnet or mainnet
+     * @param milestoneStartIndex start index of the milestones (changes with a global snapshot only)
+     * @return the milestone which follows directly after the given index
+     * @throws Exception if anything goes wrong while loading entries from the database
+     */
     public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
                                                               int milestoneStartIndex) throws Exception {
+        // fallback if we provide an index that is lower than our start index
         if(!testnet && index <= milestoneStartIndex) {
             return first(tangle);
         }
-        Pair<Indexable, Persistable> milestonePair = tangle.next(Milestone.class, new IntegerIndex(index));
-        if(milestonePair != null && milestonePair.hi != null) {
-            return new MilestoneViewModel((Milestone) milestonePair.hi);
+
+        // create a variable that will contain our search result
+        MilestoneViewModel nextMilestoneViewModel = null;
+
+        // retrieve the latest milestone to determine where we can stop to search for the next one
+        MilestoneViewModel latestMilestoneViewModel = latest(tangle);
+
+        // if we have at least 1 milestone in our database -> search
+        if(latestMilestoneViewModel != null) {
+            // try to find the next milestone by index rather than db insertion order until we are successfull
+            while(nextMilestoneViewModel == null && ++index <= latestMilestoneViewModel.index()) {
+                nextMilestoneViewModel = MilestoneViewModel.get(tangle, index);
+            }
         }
-        return null;
+
+        // return our result
+        return nextMilestoneViewModel;
     }
 
     public boolean store(Tangle tangle) throws Exception {

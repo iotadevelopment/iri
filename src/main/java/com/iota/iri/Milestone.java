@@ -229,14 +229,30 @@ public class Milestone {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        MilestoneViewModel nextMilestone = MilestoneViewModel.get(tangle, latestSolidSubtangleMilestoneIndex + 1);
-        if(
+        // get the next milestone
+        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
+        );
+
+        // while we have a milestone which is solid and which has either been updated + verified already or which is
+        // updated + verified in this run
+        while(
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-            ledgerValidator.updateSnapshot(nextMilestone)
+            (
+                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() != 0 ||
+                ledgerValidator.updateSnapshot(nextMilestone)
+            ) &&
+            !shuttingDown
         ) {
+            // update our internal variables
             latestSolidSubtangleMilestone = nextMilestone.getHash();
-            latestSolidSubtangleMilestoneIndex = latestSolidSubtangleMilestoneIndex + 1;
+            latestSolidSubtangleMilestoneIndex = nextMilestone.index();
+
+            // iterate to the next milestone
+            nextMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
+            );
         }
     }
 

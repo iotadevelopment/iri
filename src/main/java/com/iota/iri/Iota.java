@@ -102,7 +102,7 @@ public class Iota {
         node = new Node(configuration, tangle, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
         replicator = new Replicator(node, tcpPort, maxPeers, testnet, transactionPacketSize);
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
-        ledgerValidator = new LedgerValidator(tangle, milestone, transactionRequester, messageQ);
+        ledgerValidator = new LedgerValidator(tangle, milestone, transactionRequester, messageQ, testnet, milestoneStartIndex);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(milestoneStartIndex, alpha, belowMaxDepthTxLimit, walkValidatorCacheSize);
     }
