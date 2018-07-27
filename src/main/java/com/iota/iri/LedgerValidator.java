@@ -149,7 +149,7 @@ public class LedgerValidator {
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (visitedHashes.add(hashPointer)) {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
-                if(transactionViewModel2.snapshotIndex() == 0) {
+                if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
                     transactionViewModel2.setSnapshot(tangle, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
                     messageQ.publish("sn %d %s %s %s %s %s", index, transactionViewModel2.getHash(),
@@ -279,7 +279,7 @@ public class LedgerValidator {
         milestone.latestSnapshot.rwlock.writeLock().lock();
         try {
             final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
-            boolean hasSnapshot = transactionSnapshotIndex != 0;
+            boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
             if (!hasSnapshot) {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, milestone.latestSnapshot.index(), true);
