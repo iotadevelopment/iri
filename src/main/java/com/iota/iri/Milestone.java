@@ -108,6 +108,9 @@ public class Milestone {
                                         final Validity valid = validateMilestone(mode, t, getIndex(t));
                                         switch (valid) {
                                             case VALID:
+                                                // issue a solidity check to solidify unsolid milestones
+                                                transactionValidator.checkSolidity(t.getHash(), true);
+
                                                 MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
                                                 if (milestoneViewModel != null && milestoneViewModel.index() > latestMilestoneIndex) {
                                                     latestMilestone = milestoneViewModel.getHash();
@@ -115,6 +118,9 @@ public class Milestone {
                                                 }
                                                 break;
                                             case INCOMPLETE:
+                                                // issue a solidity check to solidify unsolid milestones
+                                                transactionValidator.checkSolidity(t.getHash(), true);
+
                                                 analyzedMilestoneCandidates.remove(t.getHash());
                                                 break;
                                             case INVALID:
