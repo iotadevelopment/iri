@@ -229,11 +229,11 @@ public class LedgerValidator {
                     log.info(logMessage.toString());
                 }
 
-                // if we face a milestone that wasn't processed by updateSnapshot, yet -> reset the following milestones
-                // and let the "Latest Milestone Tracker" do it's magic
+                // if we face a milestone that wasn't processed by updateSnapshot, correctly -> reset the following
+                // milestones and let the "Latest Milestone Tracker" do it's magic again
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() == 0) {
+                if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
                     do {
                         // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
                         TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).setSnapshot(tangle, 0);
