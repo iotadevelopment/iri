@@ -109,6 +109,9 @@ public class Milestone {
                                         switch (valid) {
                                             case VALID:
                                                 // issue a solidity check to solidify unsolid milestones
+                                                // Note: otherwise a milestone that was followed by a coo-snapshot might
+                                                //       never get solidifed again since it doesnt have connections to
+                                                //       the tips
                                                 transactionValidator.checkSolidity(t.getHash(), true);
 
                                                 MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
@@ -119,6 +122,9 @@ public class Milestone {
                                                 break;
                                             case INCOMPLETE:
                                                 // issue a solidity check to solidify unsolid milestones
+                                                // Note: otherwise a milestone that was followed by a coo-snapshot might
+                                                //       never get solidifed again since it doesnt have connections to
+                                                //       the tips
                                                 transactionValidator.checkSolidity(t.getHash(), true);
 
                                                 analyzedMilestoneCandidates.remove(t.getHash());
