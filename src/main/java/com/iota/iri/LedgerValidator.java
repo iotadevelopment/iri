@@ -210,6 +210,7 @@ public class LedgerValidator {
      * @throws Exception
      */
     private MilestoneViewModel buildSnapshot() throws Exception {
+        // retrieve the latest snapshot in the database to have a point where we can stop iterating (loop further down)
         MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
 
         MilestoneViewModel consistentMilestone = null;
