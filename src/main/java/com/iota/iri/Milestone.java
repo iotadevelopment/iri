@@ -43,6 +43,7 @@ public class Milestone {
     private final MessageQ messageQ;
     private final int numOfKeysInMilestone;
     private final boolean acceptAnyTestnetCoo;
+    public Snapshot initialSnapshot;
     public Snapshot latestSnapshot;
 
     private LedgerValidator ledgerValidator;
@@ -67,7 +68,8 @@ public class Milestone {
                      ) {
         this.tangle = tangle;
         this.coordinator = coordinator;
-        this.latestSnapshot = initialSnapshot;
+        this.initialSnapshot = initialSnapshot;
+        this.latestSnapshot = initialSnapshot.clone();
         this.transactionValidator = transactionValidator;
         this.testnet = testnet;
         this.messageQ = messageQ;
@@ -76,6 +78,12 @@ public class Milestone {
         this.latestMilestoneIndex = milestoneStartIndex;
         this.latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
+    }
+
+    public void reset() {
+        latestSnapshot = initialSnapshot;
+        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
     }
 
     private boolean shuttingDown;
@@ -246,7 +254,7 @@ public class Milestone {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
             (
-                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() != 0 ||
+                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() == nextMilestone.index() ||
                 ledgerValidator.updateSnapshot(nextMilestone)
             ) &&
             !shuttingDown
