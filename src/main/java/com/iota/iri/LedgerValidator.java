@@ -234,19 +234,6 @@ public class LedgerValidator {
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                 if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
-                    do {
-                        // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                        TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).setSnapshot(tangle, 0);
-
-                        // remove the StateDiff
-                        tangle.delete(StateDiff.class, candidateMilestone.getHash());
-
-                        // iterate to the next milestone
-                        candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                            tangle, candidateMilestone.index(), testnet, milestoneStartIndex, latestMilestone.index()
-                        );
-                    } while(candidateMilestone != null);
-
                     break;
                 }
 
@@ -281,6 +268,25 @@ public class LedgerValidator {
             final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
             boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
             if (!hasSnapshot) {
+                // if the snapshotIndex of our transaction was set already, we have processed our milestones in
+                // the wrong order (i.e. while rescanning the db)
+                if(transactionSnapshotIndex != 0) {
+                    MilestoneViewModel currentMilestone = milestoneVM;
+
+                    while(currentMilestone != null) {
+                        // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
+                        TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+
+                        // remove the following StateDiffs
+                        tangle.delete(StateDiff.class, currentMilestone.getHash());
+
+                        // iterate to the next milestone
+                        currentMilestone = MilestoneViewModel.findClosestNextMilestone(
+                            tangle, currentMilestone.index(), testnet, milestoneStartIndex, Integer.MAX_VALUE
+                        );
+                    }
+                }
+
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, milestone.latestSnapshot.index(), true);
                 hasSnapshot = currentState != null && Snapshot.isConsistent(milestone.latestSnapshot.patchedDiff(currentState));
