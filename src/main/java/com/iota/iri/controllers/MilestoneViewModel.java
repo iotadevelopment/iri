@@ -116,9 +116,12 @@ public class MilestoneViewModel {
         // create a variable that will contain our search result
         MilestoneViewModel nextMilestoneViewModel = null;
 
+        // create a counter variable
+        int currentIndex = index;
+
         // try to find the next milestone by index rather than db insertion order until we are successfull
-        while(nextMilestoneViewModel == null && ++index <= milestoneStopIndex) {
-            nextMilestoneViewModel = MilestoneViewModel.get(tangle, index);
+        while(nextMilestoneViewModel == null && ++currentIndex <= index + 50) {
+            nextMilestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
         }
 
         // return our result
