@@ -232,7 +232,7 @@ public class Milestone {
                         if ((testnet && acceptAnyTestnetCoo) || (new Hash(merkleRoot)).equals(coordinator)) {
                             new MilestoneViewModel(index, transactionViewModel.getHash()).store(tangle);
 
-                            // if we find a new milestone that is before our current latest solid milestone -> reset
+                            // if we find a new milestone that belongs before our current latest solid milestone -> reset
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
                                 reset();
