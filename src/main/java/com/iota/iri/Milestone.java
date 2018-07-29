@@ -16,6 +16,7 @@ import javax.net.ssl.HttpsURLConnection;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
+import com.iota.iri.model.StateDiff;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -80,10 +81,23 @@ public class Milestone {
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
-    public void reset() {
+    public void reset(MilestoneViewModel currentMilestone) throws Exception {
         latestSnapshot = initialSnapshot;
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
         latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
+
+        while(currentMilestone != null) {
+            // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
+            TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+
+            // remove the following StateDiffs
+            tangle.delete(StateDiff.class, currentMilestone.getHash());
+
+            // iterate to the next milestone
+            currentMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, currentMilestone.index(), testnet, milestoneStartIndex
+            );
+        }
     }
 
     private boolean shuttingDown;
@@ -245,12 +259,15 @@ public class Milestone {
                                 signatureFragmentTrits)),
                                 transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
                         if ((testnet && acceptAnyTestnetCoo) || (new Hash(merkleRoot)).equals(coordinator)) {
-                            new MilestoneViewModel(index, transactionViewModel.getHash()).store(tangle);
+                            MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(index, transactionViewModel.getHash());
+                            newMilestoneViewModel.store(tangle);
 
-                            // if we find a new milestone that belongs before our current latest solid milestone -> reset
+                            // if we find a NEW milestone that should have been processed before our latest solid
+                            // milestone -> reset
+                            //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
-                                reset();
+                                reset(newMilestoneViewModel);
                             }
                             return VALID;
                         } else {
