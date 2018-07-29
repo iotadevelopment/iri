@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -35,6 +36,12 @@ public class Milestone {
         INVALID,
         INCOMPLETE
     }
+
+    // variable keeping track of our initialization process (used to synchronize the Solid Milestone Tracker)
+    // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we wait
+    // for the "Latest Milestone Tracker" to process all milestones at least once and create the corresponding
+    // MilestoneViewModels to our transactions
+    private final AtomicInteger solidMilestoneTrackerTasks = new AtomicInteger(1);
 
     private final Logger log = LoggerFactory.getLogger(Milestone.class);
     private final Tangle tangle;
@@ -81,23 +88,29 @@ public class Milestone {
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
-    public void reset(MilestoneViewModel currentMilestone) throws Exception {
+    public void reset(MilestoneViewModel currentMilestone) {
+        solidMilestoneTrackerTasks.incrementAndGet();
+
+        try {
+            while(currentMilestone != null) {
+                // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
+                TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+
+                // remove the following StateDiffs
+                tangle.delete(StateDiff.class, currentMilestone.getHash());
+
+                // iterate to the next milestone
+                currentMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, currentMilestone.index(), testnet, milestoneStartIndex
+                );
+            }
+        } catch(Exception e) { /* do nothing */ }
+
         latestSnapshot = initialSnapshot;
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
         latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
 
-        while(currentMilestone != null) {
-            // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-            TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
-
-            // remove the following StateDiffs
-            tangle.delete(StateDiff.class, currentMilestone.getHash());
-
-            // iterate to the next milestone
-            currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, currentMilestone.index(), testnet, milestoneStartIndex
-            );
-        }
+        solidMilestoneTrackerTasks.decrementAndGet();
     }
 
     private boolean shuttingDown;
@@ -106,9 +119,6 @@ public class Milestone {
     public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
         this.ledgerValidator = ledgerValidator;
         AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
-
-        // variable keeping track of our initialization process (used to synchronize the Solid Milestone Tracker)
-        AtomicBoolean initialMilestonesProcessed = new AtomicBoolean(false);
 
         (new Thread(() -> {
             log.info("Waiting for Ledger Validator initialization...");
@@ -166,7 +176,7 @@ public class Milestone {
                     }
 
                     // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
-                    initialMilestonesProcessed.set(true);
+                    solidMilestoneTrackerTasks.decrementAndGet();
 
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
                 } catch (final Exception e) {
@@ -183,17 +193,6 @@ public class Milestone {
             } catch (Exception e) {
                 log.error("Error initializing snapshots. Skipping.", e);
             }
-
-            // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we wait
-            // for the "Latest Milestone Tracker" to process all milestones at least once and create the corresponding
-            // MilestoneViewModels to our transactions
-            log.info("Waiting for Latest Milestone Tracker to process all milestone candidates ...");
-            while(!initialMilestonesProcessed.get()) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) { /* do nothing */ }
-            }
-
             log.info("Tracker started.");
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();
@@ -288,6 +287,7 @@ public class Milestone {
 
         // while we have a milestone which is solid and which was updated + verified
         while(
+            solidMilestoneTrackerTasks.get() == 0 &&
             !shuttingDown &&
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
