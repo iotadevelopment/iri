@@ -2,7 +2,6 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -266,20 +265,9 @@ public class LedgerValidator {
                 // if the snapshotIndex of our transaction was set already, we have processed our milestones in
                 // the wrong order (i.e. while rescanning the db)
                 if(transactionSnapshotIndex != 0) {
-                    MilestoneViewModel currentMilestone = milestoneVM;
+                    milestone.reset(milestoneVM);
 
-                    while(currentMilestone != null) {
-                        // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                        TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
-
-                        // remove the following StateDiffs
-                        tangle.delete(StateDiff.class, currentMilestone.getHash());
-
-                        // iterate to the next milestone
-                        currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                            tangle, currentMilestone.index(), testnet, milestone.milestoneStartIndex
-                        );
-                    }
+                    return false;
                 }
 
                 Hash tail = transactionViewModel.getHash();
