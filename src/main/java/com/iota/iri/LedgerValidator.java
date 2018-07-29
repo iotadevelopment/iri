@@ -23,15 +23,13 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
     private boolean testnet;
-    private int milestoneStartIndex;
 
-    public LedgerValidator(Tangle tangle, Milestone milestone, TransactionRequester transactionRequester, MessageQ messageQ, boolean testnet, int milestoneStartIndex) {
+    public LedgerValidator(Tangle tangle, Milestone milestone, TransactionRequester transactionRequester, MessageQ messageQ, boolean testnet) {
         this.tangle = tangle;
         this.milestone = milestone;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.testnet = testnet;
-        this.milestoneStartIndex = milestoneStartIndex;
     }
 
     /**
@@ -226,8 +224,8 @@ public class LedgerValidator {
                     log.info(logMessage.toString());
                 }
 
-                // if we face a milestone that wasn't processed by updateSnapshot, correctly -> reset the following
-                // milestones and let the "Latest Milestone Tracker" do it's magic again
+                // if we face a milestone that wasn't processed by updateSnapshot, correctly -> abort and let the
+                // "Latest Milestone Tracker" do it's magic
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                 if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
@@ -249,7 +247,7 @@ public class LedgerValidator {
 
                 // iterate to the next milestone
                 candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, milestoneStartIndex
+                    tangle, candidateMilestone.index(), testnet, milestone.milestoneStartIndex
                 );
             }
         } finally {
@@ -279,7 +277,7 @@ public class LedgerValidator {
 
                         // iterate to the next milestone
                         currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                            tangle, currentMilestone.index(), testnet, milestoneStartIndex
+                            tangle, currentMilestone.index(), testnet, milestone.milestoneStartIndex
                         );
                     }
                 }
