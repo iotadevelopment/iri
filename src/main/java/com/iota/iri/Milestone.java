@@ -269,15 +269,11 @@ public class Milestone {
             tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
         );
 
-        // while we have a milestone which is solid and which has either been updated + verified already or which is
-        // updated + verified in this run
+        // while we have a milestone which is solid and which was updated + verified
         while(
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-            (
-                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() == nextMilestone.index() ||
-                ledgerValidator.updateSnapshot(nextMilestone)
-            ) &&
+            ledgerValidator.updateSnapshot(nextMilestone) &&
             !shuttingDown
         ) {
             // update our internal variables
