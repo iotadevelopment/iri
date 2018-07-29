@@ -263,7 +263,7 @@ public class Milestone {
                             newMilestoneViewModel.store(tangle);
 
                             // if we find a NEW milestone that should have been processed before our latest solid
-                            // milestone -> reset
+                            // milestone -> reset the ledger state
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
