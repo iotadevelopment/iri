@@ -15,6 +15,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * Created by paul on 4/11/17.
  */
 public class MilestoneViewModel {
+    /**
+     * This value represents the maximum amount of milestone indexes that can be skipped by the coordinator.
+     *
+     * Note: This is in fact 1 already but, to be able to deal with databases before the adjustment we set this to 50.
+     */
+    private final static int MAX_MILESTONE_INDEX_GAP = 50;
+
     private final Milestone milestone;
     private static final Map<Integer, MilestoneViewModel> milestones = new ConcurrentHashMap<>();
 
@@ -120,7 +127,7 @@ public class MilestoneViewModel {
         int currentIndex = index;
 
         // try to find the next milestone by index rather than db insertion order until we are successfull
-        while(nextMilestoneViewModel == null && ++currentIndex <= index + 50) {
+        while(nextMilestoneViewModel == null && ++currentIndex <= index + MAX_MILESTONE_INDEX_GAP) {
             nextMilestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
         }
 
