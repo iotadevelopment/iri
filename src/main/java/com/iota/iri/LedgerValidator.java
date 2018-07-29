@@ -2,7 +2,6 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -23,15 +22,13 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
     private boolean testnet;
-    private int milestoneStartIndex;
 
-    public LedgerValidator(Tangle tangle, Milestone milestone, TransactionRequester transactionRequester, MessageQ messageQ, boolean testnet, int milestoneStartIndex) {
+    public LedgerValidator(Tangle tangle, Milestone milestone, TransactionRequester transactionRequester, MessageQ messageQ, boolean testnet) {
         this.tangle = tangle;
         this.milestone = milestone;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.testnet = testnet;
-        this.milestoneStartIndex = milestoneStartIndex;
     }
 
     /**
@@ -210,9 +207,6 @@ public class LedgerValidator {
      * @throws Exception
      */
     private MilestoneViewModel buildSnapshot() throws Exception {
-        // retrieve the latest snapshot in the database to have a point where we can stop iterating (loop further down)
-        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
-
         MilestoneViewModel consistentMilestone = null;
         milestone.latestSnapshot.rwlock.writeLock().lock();
         try {
@@ -229,8 +223,8 @@ public class LedgerValidator {
                     log.info(logMessage.toString());
                 }
 
-                // if we face a milestone that wasn't processed by updateSnapshot, correctly -> reset the following
-                // milestones and let the "Latest Milestone Tracker" do it's magic again
+                // if we face a milestone that wasn't processed by updateSnapshot, correctly -> abort and let the
+                // "Solid Milestone Tracker" do it's magic
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                 if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
@@ -252,7 +246,7 @@ public class LedgerValidator {
 
                 // iterate to the next milestone
                 candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, milestoneStartIndex, latestMilestone.index()
+                    tangle, candidateMilestone.index(), testnet, milestone.milestoneStartIndex
                 );
             }
         } finally {
@@ -271,20 +265,9 @@ public class LedgerValidator {
                 // if the snapshotIndex of our transaction was set already, we have processed our milestones in
                 // the wrong order (i.e. while rescanning the db)
                 if(transactionSnapshotIndex != 0) {
-                    MilestoneViewModel currentMilestone = milestoneVM;
+                    milestone.reset(milestoneVM);
 
-                    while(currentMilestone != null) {
-                        // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                        TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
-
-                        // remove the following StateDiffs
-                        tangle.delete(StateDiff.class, currentMilestone.getHash());
-
-                        // iterate to the next milestone
-                        currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                            tangle, currentMilestone.index(), testnet, milestoneStartIndex, Integer.MAX_VALUE
-                        );
-                    }
+                    return false;
                 }
 
                 Hash tail = transactionViewModel.getHash();

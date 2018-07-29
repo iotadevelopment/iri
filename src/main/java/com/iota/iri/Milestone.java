@@ -11,11 +11,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.HttpsURLConnection;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
+import com.iota.iri.model.StateDiff;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -34,6 +36,11 @@ public class Milestone {
         INVALID,
         INCOMPLETE
     }
+
+    /**
+     * This variable is used to keep track of the asynchronous tasks, that the "Solid Milestone Tracker" should wait for.
+     */
+    private AtomicInteger solidMilestoneTrackerTasks;
 
     private final Logger log = LoggerFactory.getLogger(Milestone.class);
     private final Tangle tangle;
@@ -80,16 +87,15 @@ public class Milestone {
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
-    public void reset() {
-        latestSnapshot = initialSnapshot;
-        latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
-    }
-
     private boolean shuttingDown;
     private static int RESCAN_INTERVAL = 5000;
 
     public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
+        // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize
+        // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once and
+        // create the corresponding MilestoneViewModels to our transactions
+        solidMilestoneTrackerTasks = new AtomicInteger(1);
+
         this.ledgerValidator = ledgerValidator;
         AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
         (new Thread(() -> {
@@ -154,6 +160,9 @@ public class Milestone {
                 } catch (final Exception e) {
                     log.error("Error during Latest Milestone updating", e);
                 }
+
+                // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
+                solidMilestoneTrackerTasks.decrementAndGet();
             }
         }, "Latest Milestone Tracker")).start();
 
@@ -196,6 +205,45 @@ public class Milestone {
 
     }
 
+    /**
+     * This method allows us to reset the ledger state in case we detect, that  milestones were processed in the wrong
+     * order.
+     *
+     * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
+     * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
+     * us to recover from the invalid ledger state without repairing or pruning the database.
+     *
+     * @param currentMilestone the last correct milestone
+     */
+    public void reset(MilestoneViewModel currentMilestone) {
+        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.incrementAndGet();
+
+        // prune all potentially invalid database fields
+        try {
+            while(currentMilestone != null) {
+                // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
+                TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+
+                // remove the following StateDiffs
+                tangle.delete(StateDiff.class, currentMilestone.getHash());
+
+                // iterate to the next milestone
+                currentMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, currentMilestone.index(), testnet, milestoneStartIndex
+                );
+            }
+        } catch(Exception e) { /* do nothing */ }
+
+        // reset the ledger state to the initial state
+        latestSnapshot = initialSnapshot;
+        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
+
+        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.decrementAndGet();
+    }
+
     private Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
         if (index < 0 || index >= 0x200000) {
             return INVALID;
@@ -230,12 +278,15 @@ public class Milestone {
                                 signatureFragmentTrits)),
                                 transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
                         if ((testnet && acceptAnyTestnetCoo) || (new Hash(merkleRoot)).equals(coordinator)) {
-                            new MilestoneViewModel(index, transactionViewModel.getHash()).store(tangle);
+                            MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(index, transactionViewModel.getHash());
+                            newMilestoneViewModel.store(tangle);
 
-                            // if we find a new milestone that belongs before our current latest solid milestone -> reset
+                            // if we find a NEW milestone that should have been processed before our latest solid
+                            // milestone -> reset the ledger state and check the milestones again
+                            //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
-                                reset();
+                                reset(newMilestoneViewModel);
                             }
                             return VALID;
                         } else {
@@ -249,24 +300,18 @@ public class Milestone {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        // get the last milestone
-        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
-
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex, latestMilestone.index()
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
         );
 
-        // while we have a milestone which is solid and which has either been updated + verified already or which is
-        // updated + verified in this run
+        // while we have a milestone which is solid and which was updated + verified
         while(
+            solidMilestoneTrackerTasks.get() == 0 &&
+            !shuttingDown &&
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-            (
-                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).snapshotIndex() == nextMilestone.index() ||
-                ledgerValidator.updateSnapshot(nextMilestone)
-            ) &&
-            !shuttingDown
+            ledgerValidator.updateSnapshot(nextMilestone)
         ) {
             // update our internal variables
             latestSolidSubtangleMilestone = nextMilestone.getHash();
@@ -274,7 +319,7 @@ public class Milestone {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex, latestMilestone.index()
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
             );
         }
     }
