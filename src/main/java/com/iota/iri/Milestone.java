@@ -37,11 +37,10 @@ public class Milestone {
         INCOMPLETE
     }
 
-    // variable keeping track of our initialization process (used to synchronize the Solid Milestone Tracker)
-    // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we wait
-    // for the "Latest Milestone Tracker" to process all milestones at least once and create the corresponding
-    // MilestoneViewModels to our transactions
-    private final AtomicInteger solidMilestoneTrackerTasks = new AtomicInteger(1);
+    /**
+     * This variable is used to keep track of the asynchronous tasks, that the "Solid Milestone Tracker" should wait for.
+     */
+    private AtomicInteger solidMilestoneTrackerTasks;
 
     private final Logger log = LoggerFactory.getLogger(Milestone.class);
     private final Tangle tangle;
@@ -117,9 +116,13 @@ public class Milestone {
     private static int RESCAN_INTERVAL = 5000;
 
     public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
+        // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize
+        // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once and
+        // create the corresponding MilestoneViewModels to our transactions
+        solidMilestoneTrackerTasks = new AtomicInteger(1);
+
         this.ledgerValidator = ledgerValidator;
         AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
-
         (new Thread(() -> {
             log.info("Waiting for Ledger Validator initialization...");
             while(!ledgerValidatorInitialized.get()) {
@@ -175,13 +178,13 @@ public class Milestone {
                                 + " to #" + latestMilestoneIndex);
                     }
 
-                    // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
-                    solidMilestoneTrackerTasks.decrementAndGet();
-
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
                 } catch (final Exception e) {
                     log.error("Error during Latest Milestone updating", e);
                 }
+
+                // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
+                solidMilestoneTrackerTasks.decrementAndGet();
             }
         }, "Latest Milestone Tracker")).start();
 
