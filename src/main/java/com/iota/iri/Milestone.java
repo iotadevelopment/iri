@@ -264,12 +264,9 @@ public class Milestone {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        // get the last milestone
-        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
-
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex, latestMilestone.index()
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
         );
 
         // while we have a milestone which is solid and which has either been updated + verified already or which is
@@ -289,7 +286,7 @@ public class Milestone {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex, latestMilestone.index()
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
             );
         }
     }
