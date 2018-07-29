@@ -224,7 +224,7 @@ public class LedgerValidator {
                 }
 
                 // if we face a milestone that wasn't processed by updateSnapshot, correctly -> abort and let the
-                // "Latest Milestone Tracker" do it's magic
+                // "Solid Milestone Tracker" do it's magic
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                 if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {

@@ -87,31 +87,6 @@ public class Milestone {
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
-    public void reset(MilestoneViewModel currentMilestone) {
-        solidMilestoneTrackerTasks.incrementAndGet();
-
-        try {
-            while(currentMilestone != null) {
-                // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
-
-                // remove the following StateDiffs
-                tangle.delete(StateDiff.class, currentMilestone.getHash());
-
-                // iterate to the next milestone
-                currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, currentMilestone.index(), testnet, milestoneStartIndex
-                );
-            }
-        } catch(Exception e) { /* do nothing */ }
-
-        latestSnapshot = initialSnapshot;
-        latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
-
-        solidMilestoneTrackerTasks.decrementAndGet();
-    }
-
     private boolean shuttingDown;
     private static int RESCAN_INTERVAL = 5000;
 
@@ -225,6 +200,45 @@ public class Milestone {
         }, "Solid Milestone Tracker")).start();
 
 
+    }
+
+    /**
+     * This method allows us to reset the ledger state in case we detect, that  milestones were processed in the wrong
+     * order.
+     *
+     * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
+     * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
+     * us to recover from the invalid ledger state without repairing or pruning the database.
+     *
+     * @param currentMilestone the last correct milestone
+     */
+    public void reset(MilestoneViewModel currentMilestone) {
+        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.incrementAndGet();
+
+        // prune all potentially invalid database fields
+        try {
+            while(currentMilestone != null) {
+                // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
+                TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+
+                // remove the following StateDiffs
+                tangle.delete(StateDiff.class, currentMilestone.getHash());
+
+                // iterate to the next milestone
+                currentMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, currentMilestone.index(), testnet, milestoneStartIndex
+                );
+            }
+        } catch(Exception e) { /* do nothing */ }
+
+        // reset the ledger state to the initial state
+        latestSnapshot = initialSnapshot;
+        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
+
+        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.decrementAndGet();
     }
 
     private Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
