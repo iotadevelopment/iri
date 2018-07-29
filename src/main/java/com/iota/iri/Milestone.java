@@ -92,6 +92,10 @@ public class Milestone {
     public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
         this.ledgerValidator = ledgerValidator;
         AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
+
+        // variable keeping track of our initialization process (used to synchronize the Solid Milestone Tracker)
+        AtomicBoolean initialMilestonesProcessed = new AtomicBoolean(false);
+
         (new Thread(() -> {
             log.info("Waiting for Ledger Validator initialization...");
             while(!ledgerValidatorInitialized.get()) {
@@ -147,6 +151,9 @@ public class Milestone {
                                 + " to #" + latestMilestoneIndex);
                     }
 
+                    // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
+                    initialMilestonesProcessed.set(true);
+
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
                 } catch (final Exception e) {
                     log.error("Error during Latest Milestone updating", e);
@@ -162,6 +169,17 @@ public class Milestone {
             } catch (Exception e) {
                 log.error("Error initializing snapshots. Skipping.", e);
             }
+
+            // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we wait
+            // for the "Latest Milestone Tracker" to process all milestones at least once and create the corresponding
+            // MilestoneViewModels to our transactions
+            log.info("Waiting for Latest Milestone Tracker to process all milestone candidates ...");
+            while(!initialMilestonesProcessed.get()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) { /* do nothing */ }
+            }
+
             log.info("Tracker started.");
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();
