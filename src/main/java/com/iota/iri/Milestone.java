@@ -263,7 +263,7 @@ public class Milestone {
                             newMilestoneViewModel.store(tangle);
 
                             // if we find a NEW milestone that should have been processed before our latest solid
-                            // milestone -> reset the ledger state
+                            // milestone -> reset the ledger state and check the milestones again
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
@@ -288,10 +288,10 @@ public class Milestone {
 
         // while we have a milestone which is solid and which was updated + verified
         while(
+            !shuttingDown &&
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-            ledgerValidator.updateSnapshot(nextMilestone) &&
-            !shuttingDown
+            ledgerValidator.updateSnapshot(nextMilestone)
         ) {
             // update our internal variables
             latestSolidSubtangleMilestone = nextMilestone.getHash();
