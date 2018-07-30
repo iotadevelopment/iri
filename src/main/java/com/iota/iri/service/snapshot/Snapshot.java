@@ -10,15 +10,34 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-
 public class Snapshot {
+    /**
+     * Holds a reference to the metadata that belongs to this snapshot.
+     */
+    private SnapshotMetaData metaData;
+
+    public final ReadWriteLock rwlock = new ReentrantReadWriteLock();
+
+    /**
+     * Constructor of the Snapshot class.
+     *
+     * It takes a
+     *
+     * @param initialState
+     * @param metaData
+     */
+    public Snapshot(Map<Hash, Long> initialState, SnapshotMetaData metaData) {
+        state = new HashMap<>(initialState);
+        this.metaData = metaData;
+    }
+
+    // OLD STUFF (NOT CLEANED UP) //////////////////////////////////////////////////////////////////////////////////////
+
     private static final Logger log = LoggerFactory.getLogger(Snapshot.class);
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
     public static int SNAPSHOT_PUBKEY_DEPTH = 6;
@@ -27,7 +46,7 @@ public class Snapshot {
     private static Snapshot initialSnapshot;
 
 
-    public final ReadWriteLock rwlock = new ReentrantReadWriteLock();
+
 
 
     public static Snapshot init(Configuration configuration) throws IOException {
@@ -43,7 +62,13 @@ public class Snapshot {
                 throw new RuntimeException("Snapshot signature failed.");
             }
             Map<Hash, Long> initialState = initInitialState(snapshotPath);
-            initialSnapshot = new Snapshot(initialState, testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX));
+            initialSnapshot = new Snapshot(
+                initialState,
+                new SnapshotMetaData(
+                    testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
+                    new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH))
+                )
+            );
             checkStateHasCorrectSupply(initialState);
             checkInitialSnapshotIsConsistent(initialState);
 
@@ -115,13 +140,8 @@ public class Snapshot {
         return i;
     }
 
-    private Snapshot(Map<Hash, Long> initialState, int index) {
-        state = new HashMap<>(initialState);
-        this.index = index;
-    }
-
     public Snapshot clone() {
-        return new Snapshot(state, index);
+        return new Snapshot(state, metaData.clone());
     }
 
     public Long getBalance(Hash hash) {
