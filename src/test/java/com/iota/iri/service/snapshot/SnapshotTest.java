@@ -1,4 +1,4 @@
-package com.iota.iri;
+package com.iota.iri.service.snapshot;
 
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.model.Hash;

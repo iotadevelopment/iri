@@ -1,5 +1,6 @@
-package com.iota.iri;
+package com.iota.iri.service.snapshot;
 
+import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
@@ -141,7 +142,7 @@ public class Snapshot {
         return patch;
     }
 
-    void apply(Map<Hash, Long> patch, int newIndex) {
+    public void apply(Map<Hash, Long> patch, int newIndex) {
         if (!patch.entrySet().stream().map(Map.Entry::getValue).reduce(Math::addExact).orElse(0L).equals(0L)) {
             throw new RuntimeException("Diff is not consistent.");
         }
