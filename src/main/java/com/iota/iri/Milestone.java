@@ -59,7 +59,6 @@ public class Milestone {
 
     public int latestMilestoneIndex;
     public int latestSolidSubtangleMilestoneIndex;
-    public final int milestoneStartIndex;
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
 
@@ -70,7 +69,6 @@ public class Milestone {
                      final boolean testnet,
                      final MessageQ messageQ,
                      final int numOfKeysInMilestone,
-                     final int milestoneStartIndex,
                      final boolean acceptAnyTestnetCoo
                      ) {
         this.tangle = tangle;
@@ -81,9 +79,8 @@ public class Milestone {
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.milestoneStartIndex = milestoneStartIndex;
-        this.latestMilestoneIndex = milestoneStartIndex;
-        this.latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
+        this.latestMilestoneIndex = initialSnapshot.index();
+        this.latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
@@ -240,7 +237,7 @@ public class Milestone {
 
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, currentMilestone.index(), testnet, milestoneStartIndex
+                tangle, currentMilestone.index(), testnet, initialSnapshot.index()
                 );
             }
         } catch(Exception e) { /* do nothing */ }
@@ -248,7 +245,7 @@ public class Milestone {
         // reset the ledger state to the initial state
         latestSnapshot = initialSnapshot;
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = milestoneStartIndex;
+        latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -312,7 +309,7 @@ public class Milestone {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.index()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -329,7 +326,7 @@ public class Milestone {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, milestoneStartIndex
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.index()
             );
         }
     }
