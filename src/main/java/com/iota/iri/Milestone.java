@@ -106,6 +106,10 @@ public class Milestone {
                 } catch (InterruptedException e) {
                 }
             }
+
+            // keep track if we run the first time
+            boolean firstRun = true;
+
             log.info("Tracker started.");
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();
@@ -161,8 +165,14 @@ public class Milestone {
                     log.error("Error during Latest Milestone updating", e);
                 }
 
-                // if we processed all milestone candidates once, we allow the "Solid Milestone Tracker" to continue
-                solidMilestoneTrackerTasks.decrementAndGet();
+                // if we processed all milestone candidates once
+                if(firstRun) {
+                    // allow the "Solid Milestone Tracker" to continue
+                    solidMilestoneTrackerTasks.decrementAndGet();
+
+                    // only execute this part once (remember we ran once)
+                    firstRun = false;
+                }
             }
         }, "Latest Milestone Tracker")).start();
 
