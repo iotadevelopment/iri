@@ -3,7 +3,11 @@ package com.iota.iri.service.snapshot;
 import com.iota.iri.model.Hash;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.stream.Stream;
 
 public class SnapshotMetaData implements Cloneable {
     /**
@@ -93,6 +97,20 @@ public class SnapshotMetaData implements Cloneable {
         // store our parameters
         this.milestoneIndex = milestoneIndex;
         this.solidEntryPoints = solidEntryPoints;
+    }
+
+    public void writeFile(String filePath) throws IOException {
+        writeFile(new File(filePath));
+    }
+
+    public void writeFile(File metaDataFile) throws IOException {
+        Files.write(
+            Paths.get(metaDataFile.getAbsolutePath()),
+            () -> Stream.concat(
+                Stream.of(String.valueOf(milestoneIndex)),
+                solidEntryPoints.stream().<CharSequence>map(entry -> entry.toString())
+            ).iterator()
+        );
     }
 
     /**
