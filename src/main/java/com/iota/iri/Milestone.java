@@ -80,8 +80,8 @@ public class Milestone {
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.latestMilestoneIndex = initialSnapshot.index();
-        this.latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
+        this.latestMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
+        this.latestSolidSubtangleMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
@@ -238,7 +238,7 @@ public class Milestone {
 
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, currentMilestone.index(), testnet, initialSnapshot.index()
+                tangle, currentMilestone.index(), testnet, initialSnapshot.metaData().milestoneIndex()
                 );
             }
         } catch(Exception e) { /* do nothing */ }
@@ -246,7 +246,7 @@ public class Milestone {
         // reset the ledger state to the initial state
         latestSnapshot = initialSnapshot;
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
+        latestSolidSubtangleMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -310,7 +310,7 @@ public class Milestone {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.index()
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.metaData().milestoneIndex()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -327,7 +327,7 @@ public class Milestone {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.index()
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.metaData().milestoneIndex()
             );
         }
     }

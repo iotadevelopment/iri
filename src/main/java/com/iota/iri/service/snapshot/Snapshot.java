@@ -24,7 +24,7 @@ public class Snapshot {
     /**
      *
      */
-    public final ReadWriteLock rwlock = new ReentrantReadWriteLock();
+    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
      * Constructor of the Snapshot class.
@@ -35,8 +35,19 @@ public class Snapshot {
      * @param metaData
      */
     public Snapshot(Map<Hash, Long> initialState, SnapshotMetaData metaData) {
-        state = new HashMap<>(initialState);
+        this.state = new HashMap<>(initialState);
         this.metaData = metaData;
+    }
+
+    /**
+     * This method is the getter of the metadata object.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return metadata of this snapshot
+     */
+    public SnapshotMetaData metaData() {
+        return metaData;
     }
 
     // OLD STUFF (NOT CLEANED UP) //////////////////////////////////////////////////////////////////////////////////////
@@ -133,15 +144,6 @@ public class Snapshot {
     }
 
     protected final Map<Hash, Long> state;
-    private int index;
-
-    public int index() {
-        int i;
-        rwlock.readLock().lock();
-        i = index;
-        rwlock.readLock().unlock();
-        return i;
-    }
 
     public Snapshot clone() {
         return new Snapshot(state, metaData.clone());
@@ -149,19 +151,19 @@ public class Snapshot {
 
     public Long getBalance(Hash hash) {
         Long l;
-        rwlock.readLock().lock();
+        readWriteLock.readLock().lock();
         l = state.get(hash);
-        rwlock.readLock().unlock();
+        readWriteLock.readLock().unlock();
         return l;
     }
 
     public Map<Hash, Long> patchedDiff(Map<Hash, Long> diff) {
         Map<Hash, Long> patch;
-        rwlock.readLock().lock();
+        readWriteLock.readLock().lock();
         patch = diff.entrySet().stream().map(hashLongEntry ->
             new HashMap.SimpleEntry<>(hashLongEntry.getKey(), state.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue())
         ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        rwlock.readLock().unlock();
+        readWriteLock.readLock().unlock();
         return patch;
     }
 
@@ -169,14 +171,14 @@ public class Snapshot {
         if (!patch.entrySet().stream().map(Map.Entry::getValue).reduce(Math::addExact).orElse(0L).equals(0L)) {
             throw new RuntimeException("Diff is not consistent.");
         }
-        rwlock.writeLock().lock();
+        readWriteLock.writeLock().lock();
         patch.entrySet().stream().forEach(hashLongEntry -> {
             if (state.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
                 state.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
             }
         });
-        index = newIndex;
-        rwlock.writeLock().unlock();
+        metaData.milestoneIndex(newIndex);
+        readWriteLock.writeLock().unlock();
     }
 
     public static boolean isConsistent(Map<Hash, Long> state) {

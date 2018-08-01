@@ -280,7 +280,7 @@ public class API {
                     return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                             Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
                             Runtime.getRuntime().totalMemory(), instance.milestone.latestMilestone, instance.milestone.latestMilestoneIndex,
-                            instance.milestone.latestSolidSubtangleMilestone, instance.milestone.latestSolidSubtangleMilestoneIndex, instance.milestone.initialSnapshot.index(),
+                            instance.milestone.latestSolidSubtangleMilestone, instance.milestone.latestSolidSubtangleMilestoneIndex, instance.milestone.initialSnapshot.metaData().milestoneIndex(),
                             instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                             System.currentTimeMillis(), instance.tipsViewModel.size(),
                             instance.transactionRequester.numberOfTransactionsToRequest());
@@ -457,7 +457,7 @@ public class API {
         }
 
         if (state) {
-            instance.milestone.latestSnapshot.rwlock.readLock().lock();
+            instance.milestone.latestSnapshot.readWriteLock.readLock().lock();
             try {
                 WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.ledgerValidator,
                         instance.transactionValidator, instance.milestone, instance.tipsSelector.getMaxDepth(),
@@ -471,7 +471,7 @@ public class API {
                     }
                 }
             } finally {
-                instance.milestone.latestSnapshot.rwlock.readLock().unlock();
+                instance.milestone.latestSnapshot.readWriteLock.readLock().unlock();
             }
         }
 
@@ -863,8 +863,8 @@ public class API {
                 .collect(Collectors.toCollection(LinkedList::new));
         final List<Hash> hashes;
         final Map<Hash, Long> balances = new HashMap<>();
-        instance.milestone.latestSnapshot.rwlock.readLock().lock();
-        final int index = instance.milestone.latestSnapshot.index();
+        instance.milestone.latestSnapshot.readWriteLock.readLock().lock();
+        final int index = instance.milestone.latestSnapshot.metaData().milestoneIndex();
         if (tips == null || tips.size() == 0) {
             hashes = Collections.singletonList(instance.milestone.latestSolidSubtangleMilestone);
         } else {
@@ -895,7 +895,7 @@ public class API {
             }
             diff.forEach((key, value) -> balances.computeIfPresent(key, (hash, aLong) -> value + aLong));
         } finally {
-            instance.milestone.latestSnapshot.rwlock.readLock().unlock();
+            instance.milestone.latestSnapshot.readWriteLock.readLock().unlock();
         }
 
         final List<String> elements = addresses.stream().map(address -> balances.get(address).toString())

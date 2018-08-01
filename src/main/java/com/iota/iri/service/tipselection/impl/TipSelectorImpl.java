@@ -8,10 +8,8 @@ import com.iota.iri.model.HashId;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
-import com.iota.iri.zmq.MessageQ;
 
 import java.security.InvalidAlgorithmParameterException;
-import java.security.SecureRandom;
 import java.util.*;
 
 /**
@@ -87,7 +85,7 @@ public class TipSelectorImpl implements TipSelector {
     @Override
     public List<Hash> getTransactionsToApprove(int depth, Optional<Hash> reference) throws Exception {
         try {
-            milestone.latestSnapshot.rwlock.readLock().lock();
+            milestone.latestSnapshot.readWriteLock.readLock().lock();
 
             //preparation
             Hash entryPoint = entryPointSelector.getEntryPoint(depth);
@@ -116,7 +114,7 @@ public class TipSelectorImpl implements TipSelector {
 
             return tips;
         } finally {
-            milestone.latestSnapshot.rwlock.readLock().unlock();
+            milestone.latestSnapshot.readWriteLock.readLock().unlock();
         }
     }
 
