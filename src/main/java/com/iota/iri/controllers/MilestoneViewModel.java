@@ -93,11 +93,19 @@ public class MilestoneViewModel {
     }
 
     public static MilestoneViewModel findClosestPrevMilestone(Tangle tangle, int index) throws Exception {
-        Pair<Indexable, Persistable> milestonePair = tangle.previous(Milestone.class, new IntegerIndex(index));
-        if(milestonePair != null && milestonePair.hi != null) {
-            return new MilestoneViewModel((Milestone) milestonePair.hi);
+        // create a variable that will contain our search result
+        MilestoneViewModel previousMilestoneViewModel = null;
+
+        // create a counter variable
+        int currentIndex = index;
+
+        // try to find the next milestone by index rather than db insertion order until we are successfull
+        while(previousMilestoneViewModel == null && --currentIndex >= index - MAX_MILESTONE_INDEX_GAP) {
+            previousMilestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
         }
-        return null;
+
+        // return our result
+        return previousMilestoneViewModel;
     }
 
     /**
