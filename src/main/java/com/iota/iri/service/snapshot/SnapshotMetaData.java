@@ -6,7 +6,6 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.stream.Stream;
 
 public class SnapshotMetaData implements Cloneable {
@@ -15,7 +14,7 @@ public class SnapshotMetaData implements Cloneable {
      *
      * The initial snapshot has its milestoneIndex set to the milestoneStartIndex.
      */
-    public int milestoneIndex;
+    private int milestoneIndex;
 
     /**
      * Set of transaction hashes that were cut off when creating the snapshot.
@@ -23,7 +22,7 @@ public class SnapshotMetaData implements Cloneable {
      * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
      * in this Set.
      */
-    public HashSet<Hash> solidEntryPoints;
+    private HashSet<Hash> solidEntryPoints;
 
     /**
      * This method retrieves the meta data of a snapshot from a file.
@@ -99,11 +98,88 @@ public class SnapshotMetaData implements Cloneable {
         this.solidEntryPoints = solidEntryPoints;
     }
 
-    public void writeFile(String filePath) throws IOException {
-        writeFile(new File(filePath));
+    /**
+     * This method is the getter of the milestone index.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return current milestone index of this metadata
+     */
+    public int milestoneIndex() {
+        return this.milestoneIndex;
     }
 
-    public void writeFile(File metaDataFile) throws IOException {
+    /**
+     * This method is the setter of the milestone index.
+     *
+     * It simply stores the passed value in the private property.
+     *
+      * @param milestoneIndex milestone index that shall be set
+     */
+    public void milestoneIndex(int milestoneIndex) {
+        this.milestoneIndex = milestoneIndex;
+    }
+
+    /**
+     * This method performs a member check on the underlying solid entry points.
+     *
+     * It can be used to check if a transaction referenced by a hash can be considered solid. For nodes that do not use
+     * local snapshots this set consists of the NULL_HASH only.
+     *
+     * @param solidEntrypoint hash that shall be checked
+     * @return true if the hash is a solid entry point and false otherwise
+     */
+    public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
+        return solidEntryPoints.contains(solidEntrypoint);
+    }
+
+    /**
+     * This method is the getter of the solid entrypoints.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return set of transaction hashes that shall be considered solid when being referenced
+     */
+    public HashSet<Hash> solidEntryPoints() {
+        return solidEntryPoints;
+    }
+
+    /**
+     * This method is the setter of the milestone index.
+     *
+     * It simply stores the passed value in the private property.
+     *
+     * @param solidEntryPoints set of solid entry points that shall be stored
+     */
+    public void solidEntryPoints(HashSet<Hash> solidEntryPoints) {
+        this.solidEntryPoints = solidEntryPoints;
+    }
+
+    /**
+     * This method writes a file containing a serialized version of this metadata object.
+     *
+     * It can be used to store the current values and read them on a later point in time. It is used by the local
+     * snapshot manager to generate and maintain the snapshot files.
+     *
+     * @param filePath path to the snapshot metadata file
+     * @return return a file handle to the generated file
+     * @throws IOException if something goes wrong while writing to the file
+     */
+    public File writeFile(String filePath) throws IOException {
+        return writeFile(new File(filePath));
+    }
+
+    /**
+     * This method writes a file containing a serialized version of this metadata object.
+     *
+     * It can be used to store the current values and read them on a later point in time. It is used by the local
+     * snapshot manager to generate and maintain the snapshot files.
+     *
+     * @param metaDataFile File handle to the snapshot metadata file
+     * @return return a file handle to the generated file
+     * @throws IOException if something goes wrong while writing to the file
+     */
+    public File writeFile(File metaDataFile) throws IOException {
         Files.write(
             Paths.get(metaDataFile.getAbsolutePath()),
             () -> Stream.concat(
@@ -111,6 +187,8 @@ public class SnapshotMetaData implements Cloneable {
                 solidEntryPoints.stream().<CharSequence>map(entry -> entry.toString())
             ).iterator()
         );
+
+        return metaDataFile;
     }
 
     /**

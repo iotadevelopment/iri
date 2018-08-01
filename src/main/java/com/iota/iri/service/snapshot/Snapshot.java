@@ -21,6 +21,9 @@ public class Snapshot {
      */
     private SnapshotMetaData metaData;
 
+    /**
+     *
+     */
     public final ReadWriteLock rwlock = new ReentrantReadWriteLock();
 
     /**
