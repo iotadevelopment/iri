@@ -107,6 +107,12 @@ public class Configuration {
         SNAPSHOT_TIME,
         TIPSELECTION_ALPHA,
         BELOW_MAX_DEPTH_TRANSACTION_LIMIT,
+
+        LOCAL_SNAPSHOTS_ENABLED,
+        LOCAL_SNAPSHOTS_DEPTH,
+        LOCAL_SNAPSHOTS_MAINNET_BASE_PATH,
+        LOCAL_SNAPSHOTS_TESTNET_BASE_PATH,
+
         WALK_VALIDATOR_CACHE_SIZE
     }
 
@@ -174,6 +180,12 @@ public class Configuration {
         conf.put(DefaultConfSettings.SNAPSHOT_TIME.name(), GLOBAL_SNAPSHOT_TIME);
         conf.put(DefaultConfSettings.TIPSELECTION_ALPHA.name(), "0.001");
         conf.put(DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT.name(), BELOW_MAX_DEPTH_LIMIT);
+
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED.name(), "false");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "100");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH.name(), "snapshotMainnet.txt");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH.name(), "snapshotTestnet.txt");
+
         conf.put(DefaultConfSettings.WALK_VALIDATOR_CACHE_SIZE.name(), WALK_VALIDATOR_CACHE);
     }
 

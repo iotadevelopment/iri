@@ -63,30 +63,48 @@ public class Snapshot {
 
 
 
-    public static Snapshot init(Configuration configuration) throws IOException {
-        // read the config vars for the built in snapshot files
-        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
-        String snapshotPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_FILE);
-        String snapshotSigPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE);
-
+    public static Snapshot init(SnapshotManager snapshotManager, Configuration configuration) throws IOException {
         //This is not thread-safe (and it is ok)
         if (initialSnapshot == null) {
-            if (!testnet && !SignedFiles.isFileSignatureValid(snapshotPath, snapshotSigPath, SNAPSHOT_PUBKEY,
-                    SNAPSHOT_PUBKEY_DEPTH, SNAPSHOT_INDEX)) {
-                throw new RuntimeException("Snapshot signature failed.");
-            }
-            Map<Hash, Long> initialState = initInitialState(snapshotPath);
-            initialSnapshot = new Snapshot(
-                initialState,
-                new SnapshotMetaData(
-                    testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
-                    new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH))
-                )
-            );
-            checkStateHasCorrectSupply(initialState);
-            checkInitialSnapshotIsConsistent(initialState);
+            // try to load a local snapshot first
+            Snapshot localSnapshot = snapshotManager.loadLocalSnapshot();
 
+            // if we loaded a local snapshot successfully -> set it
+            if(localSnapshot != null) {
+                initialSnapshot = localSnapshot;
+            }
+
+            // otherwise continue from the builtin snapshot (permanode mode)
+            else {
+                // read the config vars for the built in snapshot files
+                boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
+                String snapshotPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_FILE);
+                String snapshotSigPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE);
+
+                if (!testnet && !SignedFiles.isFileSignatureValid(
+                    snapshotPath,
+                    snapshotSigPath,
+                    SNAPSHOT_PUBKEY,
+                    SNAPSHOT_PUBKEY_DEPTH,
+                    SNAPSHOT_INDEX
+                )) {
+                    throw new RuntimeException("Snapshot signature failed.");
+                }
+
+                Map<Hash, Long> initialState = initInitialState(snapshotPath);
+                initialSnapshot = new Snapshot(
+                    initialState,
+                    new SnapshotMetaData(
+                        testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
+                        new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH))
+                    )
+                );
+
+                checkStateHasCorrectSupply(initialState);
+                checkInitialSnapshotIsConsistent(initialState);
+            }
         }
+
         return initialSnapshot;
     }
 
@@ -100,14 +118,14 @@ public class Snapshot {
         return inputStream;
     }
 
-    private static void checkInitialSnapshotIsConsistent(Map<Hash, Long> initialState) {
+    public static void checkInitialSnapshotIsConsistent(Map<Hash, Long> initialState) {
         if (!isConsistent(initialState)) {
             log.error("Initial Snapshot inconsistent.");
             System.exit(-1);
         }
     }
 
-    private static void checkStateHasCorrectSupply(Map<Hash, Long> initialState) {
+    public static void checkStateHasCorrectSupply(Map<Hash, Long> initialState) {
         long stateValue = initialState.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
         if (stateValue != TransactionViewModel.SUPPLY) {
             log.error("Transaction resolves to incorrect ledger balance: {}", TransactionViewModel.SUPPLY - stateValue);
@@ -115,7 +133,7 @@ public class Snapshot {
         }
     }
 
-    private static Map<Hash, Long> initInitialState(String snapshotFile) {
+    public static Map<Hash, Long> initInitialState(String snapshotFile) {
         String line;
         Map<Hash, Long> state = new HashMap<>();
         BufferedReader reader = null;

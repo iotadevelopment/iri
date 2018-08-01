@@ -11,6 +11,7 @@ import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
 import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.service.tipselection.impl.*;
 import com.iota.iri.storage.*;
@@ -32,6 +33,7 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
+    public final SnapshotManager snapshotManager;
     public final LedgerValidator ledgerValidator;
     public final Milestone milestone;
     public final Tangle tangle;
@@ -60,7 +62,10 @@ public class Iota {
         udpPort = configuration.integer(Configuration.DefaultConfSettings.UDP_RECEIVER_PORT);
         tcpPort = configuration.integer(Configuration.DefaultConfSettings.TCP_RECEIVER_PORT);
 
-        Snapshot initialSnapshot = Snapshot.init(configuration).clone();
+        // create the snapshot manager
+        snapshotManager = new SnapshotManager(this);
+
+        Snapshot initialSnapshot = Snapshot.init(snapshotManager, configuration).clone();
         long snapshotTimestamp = configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME);
         int milestoneStartIndex = configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX);
         int numKeysMilestone = configuration.integer(Configuration.DefaultConfSettings.NUMBER_OF_KEYS_IN_A_MILESTONE);
