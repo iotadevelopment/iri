@@ -97,7 +97,7 @@ public class SnapshotManager {
 
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws Exception {
         // check if the milestone was solidified already
-        if(targetMilestone.index() > latestSnapshot.metaData().milestoneIndex()) {
+        if(targetMilestone.index() > latestSnapshot.getMetaData().milestoneIndex()) {
             throw new IllegalArgumentException("the milestone was not solidified yet");
         }
 
@@ -105,12 +105,12 @@ public class SnapshotManager {
         Snapshot snapshot = latestSnapshot.clone();
 
         // if the target is the latest milestone we can return immediately
-        if(targetMilestone.index() == latestSnapshot.metaData().milestoneIndex()) {
+        if(targetMilestone.index() == latestSnapshot.getMetaData().milestoneIndex()) {
             return snapshot;
         }
 
         // retrieve the latest milestone
-        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, latestSnapshot.metaData().milestoneIndex());
+        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, latestSnapshot.getMetaData().milestoneIndex());
 
         // this should not happen but better give a reasonable error message if it ever does
         if(currentMilestone == null) {
@@ -124,11 +124,14 @@ public class SnapshotManager {
 
             // if we have a diff apply it
             if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                // create the SnapshotStateDiff object for our changes
+                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff().entrySet().stream().map(
+                    hashLongEntry -> new HashMap.SimpleEntry<>(hashLongEntry.getKey(), -hashLongEntry.getValue())
+                ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+
                 // apply the balance changes to the snapshot (with inverted values)
-                snapshot.apply(
-                    stateDiffViewModel.getDiff().entrySet().stream().map(
-                        hashLongEntry -> new HashMap.SimpleEntry<>(hashLongEntry.getKey(), -hashLongEntry.getValue())
-                    ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
+                snapshot.update(
+                    snapshotStateDiff,
                     currentMilestone.index()
                 );
             }

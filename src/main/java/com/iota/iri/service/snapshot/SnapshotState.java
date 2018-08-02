@@ -10,6 +10,9 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 public class SnapshotState {
     /**
@@ -22,9 +25,10 @@ public class SnapshotState {
      */
     protected final Map<Hash, Long> state;
 
-    public SnapshotState(Map<Hash, Long> initialState) {
-        this.state = new HashMap<>(initialState);
-    }
+    /**
+     *
+     */
+    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     public static SnapshotState fromFile(String snapshotStateFilePath) {
         String line;
@@ -59,6 +63,67 @@ public class SnapshotState {
         return new SnapshotState(state);
     }
 
+    public SnapshotState(Map<Hash, Long> initialState) {
+        this.state = new HashMap<>(initialState);
+    }
+
+    public void lockRead() {
+        readWriteLock.readLock().lock();
+    }
+
+    public void lockWrite() {
+        readWriteLock.writeLock().lock();
+    }
+
+    public void unlockRead() {
+        readWriteLock.readLock().unlock();
+    }
+
+    public void unlockWrite() {
+        readWriteLock.writeLock().unlock();
+    }
+
+    public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
+        lockRead();
+
+        Map<Hash, Long> patch = snapshotStateDiff.diff.entrySet().stream().map(
+            hashLongEntry -> new HashMap.SimpleEntry<>(
+                hashLongEntry.getKey(),
+                state.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue()
+            )
+        ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        unlockRead();
+
+        return new SnapshotState(patch);
+    }
+
+    public void apply(SnapshotStateDiff diff) {
+        apply(diff, true);
+    }
+
+    /**
+     * This method allows us to apply
+     *
+     * @param diff
+     * @param lock
+     */
+    protected void apply(SnapshotStateDiff diff, boolean lock) {
+        if(lock) {
+            lockWrite();
+        }
+
+        diff.diff.entrySet().stream().forEach(hashLongEntry -> {
+            if (state.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
+                state.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
+            }
+        });
+
+        if(lock) {
+            unlockWrite();
+        }
+    }
+
     public boolean isConsistent() {
         final Iterator<Map.Entry<Hash, Long>> stateIterator = state.entrySet().iterator();
         while (stateIterator.hasNext()) {
@@ -79,8 +144,14 @@ public class SnapshotState {
     }
 
     public boolean hasCorrectSupply() {
+        // block reading access
+        lockRead();
+
         // calculate the sum of all balances
         long supply = state.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
+
+        // unblock reading access
+        unlockRead();
 
         // if the sum differs from the expected supply -> dump an error and return false ...
         if(supply != TransactionViewModel.SUPPLY) {
@@ -94,7 +165,13 @@ public class SnapshotState {
     }
 
     public Long getBalance(Hash address) {
-        return this.state.get(address);
+        lockRead();
+
+        Long balance = this.state.get(address);
+
+        unlockRead();
+
+        return balance;
     }
 
     public SnapshotState clone() {

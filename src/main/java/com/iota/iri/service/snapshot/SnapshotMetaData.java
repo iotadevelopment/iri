@@ -6,9 +6,13 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 public class SnapshotMetaData implements Cloneable {
+    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+
     /**
      * Holds the current milestone index of this snapshot.
      *
@@ -98,6 +102,22 @@ public class SnapshotMetaData implements Cloneable {
         this.solidEntryPoints = solidEntryPoints;
     }
 
+    public void lockRead() {
+        readWriteLock.readLock().lock();
+    }
+
+    public void lockWrite() {
+        readWriteLock.writeLock().lock();
+    }
+
+    public void unlockRead() {
+        readWriteLock.readLock().unlock();
+    }
+
+    public void unlockWrite() {
+        readWriteLock.writeLock().unlock();
+    }
+
     /**
      * This method is the getter of the milestone index.
      *
@@ -117,7 +137,19 @@ public class SnapshotMetaData implements Cloneable {
       * @param milestoneIndex milestone index that shall be set
      */
     public void milestoneIndex(int milestoneIndex) {
+        milestoneIndex(milestoneIndex, true);
+    }
+
+    protected void milestoneIndex(int milestoneIndex, boolean lock) {
+        if(lock) {
+            lockWrite();
+        }
+
         this.milestoneIndex = milestoneIndex;
+
+        if(lock) {
+            unlockWrite();
+        }
     }
 
     /**

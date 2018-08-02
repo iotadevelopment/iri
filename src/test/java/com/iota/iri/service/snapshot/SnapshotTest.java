@@ -42,18 +42,18 @@ public class SnapshotTest {
 
     @Test
     public void isConsistent() {
-        Assert.assertTrue("Initial confirmed should be consistent", Snapshot.isConsistent(initSnapshot.state));
+        Assert.assertTrue("Initial confirmed should be consistent", initSnapshot.getState().isConsistent());
     }
 
     @Test
     public void patch() {
-        Map.Entry<Hash, Long> firstOne = initSnapshot.state.entrySet().iterator().next();
+        Map.Entry<Hash, Long> firstOne = initSnapshot.getState().state.entrySet().iterator().next();
         Hash someHash = new Hash("PSRQPWWIECDGDDZXHGJNMEVJNSVOSMECPPVRPEVRZFVIZYNNXZNTOTJOZNGCZNQVSPXBXTYUJUOXYASLS");
         Map<Hash, Long> diff = new HashMap<>();
         diff.put(firstOne.getKey(), -firstOne.getValue());
         diff.put(someHash, firstOne.getValue());
         Assert.assertNotEquals(0, diff.size());
-        Assert.assertTrue("The ledger should be consistent", Snapshot.isConsistent(initSnapshot.patchedDiff(diff)));
+        Assert.assertTrue("The ledger should be consistent", initSnapshot.getState().patchedState(new SnapshotStateDiff(diff)).isConsistent());
     }
 
     @Test
@@ -62,8 +62,7 @@ public class SnapshotTest {
         Map<Hash, Long> badMap = new HashMap<>();
         badMap.put(new Hash("PSRQPWWIECDGDDZEHGJNMEVJNSVOSMECPPVRPEVRZFVIZYNNXZNTOTJOZNGCZNQVSPXBXTYUJUOXYASLS"), 100L);
         badMap.put(new Hash("ESRQPWWIECDGDDZEHGJNMEVJNSVOSMECPPVRPEVRZFVIZYNNXZNTOTJOZNGCZNQVSPXBXTYUJUOXYASLS"), -100L);
-        Map<Hash, Long> patch = latestSnapshot.patchedDiff(badMap);
-        assertFalse("should be inconsistent", Snapshot.isConsistent(latestSnapshot.patchedDiff(badMap)));
+        assertFalse("should be inconsistent", latestSnapshot.getState().patchedState(new SnapshotStateDiff(badMap)).isConsistent());
     }
 
     private Map<Hash, Long> getModifiedMap() {

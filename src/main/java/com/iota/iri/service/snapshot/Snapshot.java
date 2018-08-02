@@ -2,37 +2,24 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
-
 public class Snapshot {
     /**
      * Holds a reference to the state of this snapshot.
      */
-    private SnapshotState state;
+    private final SnapshotState state;
 
     /**
      * Holds a reference to the metadata of this snapshot.
      */
-    private SnapshotMetaData metaData;
-
-    /**
-     *
-     */
-    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    private final SnapshotMetaData metaData;
 
     /**
      * Constructor of the Snapshot class.
      *
-     * It takes a
+     * It simply saves the passed parameters in its private properties.
      *
-     * @param state
-     * @param metaData
+     * @param state the state of the Snapshot containing all its balances
+     * @param metaData the metadata of the Snapshot containing its milestone index and other properties
      */
     public Snapshot(SnapshotState state, SnapshotMetaData metaData) {
         this.state = state;
@@ -40,73 +27,121 @@ public class Snapshot {
     }
 
     /**
-     * This method is the getter of the metadata object.
+     * Getter of the metadata object.
      *
      * It simply returns the stored private property.
      *
      * @return metadata of this snapshot
      */
-    public SnapshotMetaData metaData() {
+    public SnapshotMetaData getMetaData() {
         return metaData;
     }
 
-    // OLD STUFF (NOT CLEANED UP) //////////////////////////////////////////////////////////////////////////////////////
-
-    private static final Logger log = LoggerFactory.getLogger(Snapshot.class);
-
-
-    /*
-    public static void checkInitialSnapshotIsConsistent(Map<Hash, Long> initialState) {
-        if (!isConsistent(initialState)) {
-            log.error("Initial Snapshot inconsistent.");
-            System.exit(-1);
-        }
+    /**
+     * Getter of the state object.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return metadata of this snapshot
+     */
+    public SnapshotState getState() {
+        return state;
     }
-    */
 
-    /*
-    public static void checkStateHasCorrectSupply(Map<Hash, Long> initialState) {
-        long stateValue = initialState.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
-        if (stateValue != TransactionViewModel.SUPPLY) {
-            log.error("Transaction resolves to incorrect ledger balance: {}", TransactionViewModel.SUPPLY - stateValue);
-            System.exit(-1);
-        }
+    /**
+     * Locks the complete Snapshot object for read access.
+     *
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * This is used to synchronize the access from different Threads, if both members need to be read.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void lockRead() {
+        state.lockRead();
+        metaData.lockRead();
     }
-    */
 
+    /**
+     * Locks the complete Snapshot object for write access.
+     *
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * This is used to synchronize the access from different Threads, if both members need to be modified.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void lockWrite() {
+        state.lockWrite();
+        metaData.lockWrite();
+    }
+
+    /**
+     * Unlocks the complete Snapshot object from read blocks.
+     *
+     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
+     * synchronize the access from different Threads, if both members needed to be read.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void unlockRead() {
+        state.unlockRead();
+        metaData.unlockRead();
+    }
+
+    /**
+     * Unlocks the complete Snapshot object from write blocks.
+     *
+     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
+     * synchronize the access from different Threads, if both members needed to be modified.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void unlockWrite() {
+        state.unlockWrite();
+        metaData.unlockWrite();
+    }
+
+    /**
+     * This method creates a deep clone of the Snapshot object.
+     *
+     * It can be used to make a copy of the object, that then can be modified without affecting the original object.
+     *
+     * @return deep copy of the original object
+     */
     public Snapshot clone() {
         return new Snapshot(state.clone(), metaData.clone());
     }
 
-    public Long getBalance(Hash hash) {
-        Long l;
-        readWriteLock.readLock().lock();
-        l = state.getBalance(hash);
-        readWriteLock.readLock().unlock();
-        return l;
-    }
-
-    public Map<Hash, Long> patchedDiff(Map<Hash, Long> diff) {
-        Map<Hash, Long> patch;
-        readWriteLock.readLock().lock();
-        patch = diff.entrySet().stream().map(hashLongEntry ->
-            new HashMap.SimpleEntry<>(hashLongEntry.getKey(), state.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue())
-        ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        readWriteLock.readLock().unlock();
-        return patch;
-    }
-
-    public void apply(Map<Hash, Long> patch, int newIndex) {
-        if (!patch.entrySet().stream().map(Map.Entry::getValue).reduce(Math::addExact).orElse(0L).equals(0L)) {
-            throw new RuntimeException("Diff is not consistent.");
+    public void update(SnapshotStateDiff diff, int newIndex) {
+        if(!diff.isConsistent()) {
+            throw new IllegalStateException("the snapshot state diff is not consistent");
         }
-        readWriteLock.writeLock().lock();
-        patch.entrySet().stream().forEach(hashLongEntry -> {
-            if (state.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
-                state.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
-            }
-        });
-        metaData.milestoneIndex(newIndex);
-        readWriteLock.writeLock().unlock();
+
+        // prevent other methods to write to this object while we do the updates
+        lockWrite();
+
+        // apply our changes without locking the underlying members (we already locked globally)
+        state.apply(diff, false);
+        metaData.milestoneIndex(newIndex, false);
+
+        // unlock the access to this object once we are done updating
+        unlockWrite();
+    }
+
+    /**
+     * This is a utility method for determining the balance of an address.
+     *
+     * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
+     * Snapshot itself, without having to retrieve the SnapshotState first. This is mainly to keep the code more
+     * readable, without having to manually resolve the necessary references.
+     *
+     * @param hash address that we want to check
+     * @return the balance of the given address
+     */
+    public Long getBalance(Hash hash) {
+        return state.getBalance(hash);
     }
 }

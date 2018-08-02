@@ -89,7 +89,7 @@ public class TipSelectorImpl implements TipSelector {
     @Override
     public List<Hash> getTransactionsToApprove(int depth, Optional<Hash> reference) throws Exception {
         try {
-            snapshotManager.latestSnapshot().readWriteLock.readLock().lock();
+            snapshotManager.latestSnapshot().lockRead();
 
             //preparation
             Hash entryPoint = entryPointSelector.getEntryPoint(depth);
@@ -118,7 +118,7 @@ public class TipSelectorImpl implements TipSelector {
 
             return tips;
         } finally {
-            snapshotManager.latestSnapshot().readWriteLock.readLock().unlock();
+            snapshotManager.latestSnapshot().unlockRead();
         }
     }
 
