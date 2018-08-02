@@ -16,8 +16,6 @@ import java.util.Map;
 import static org.junit.Assert.assertFalse;
 
 public class SnapshotTest {
-    private static SnapshotManager snapshotManager;
-
     private static Snapshot initSnapshot;
 
     @BeforeClass
@@ -28,10 +26,10 @@ public class SnapshotTest {
         configuration.put(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE, Configuration.MAINNET_SNAPSHOT_SIG_FILE);
         configuration.put(Configuration.DefaultConfSettings.TESTNET, "false");
 
-        snapshotManager = new SnapshotManager(new Tangle(), configuration);
-
         try {
-            initSnapshot = Snapshot.init(configuration);
+            SnapshotManager snapshotManager = new SnapshotManager(new Tangle(), configuration);
+
+            initSnapshot = snapshotManager.initialSnapshot();
         } catch (IOException e) {
             throw new UncheckedIOException("Problem initiating snapshot", e);
         }

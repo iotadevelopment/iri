@@ -1,6 +1,6 @@
 package com.iota.iri.network;
 
-import com.iota.iri.Milestone;
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.TipsViewModel;
@@ -56,7 +56,7 @@ public class Node {
     private final Tangle tangle;
     private final TipsViewModel tipsViewModel;
     private final TransactionValidator transactionValidator;
-    private final Milestone milestone;
+    private final MilestoneTracker milestone;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
 
@@ -85,7 +85,7 @@ public class Node {
                 final TransactionValidator transactionValidator,
                 final TransactionRequester transactionRequester,
                 final TipsViewModel tipsViewModel,
-                final Milestone milestone,
+                final MilestoneTracker milestone,
                 final MessageQ messageQ
     ) {
         this.configuration = configuration;

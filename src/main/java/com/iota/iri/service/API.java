@@ -17,6 +17,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.network.Neighbor;
 import com.iota.iri.service.dto.*;
 import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.impl.WalkValidatorImpl;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.IotaIOUtils;
@@ -154,7 +155,7 @@ public class API {
 
         if (!SignedFiles.isFileSignatureValid(Configuration.PREVIOUS_EPOCHS_SPENT_ADDRESSES_TXT,
                 Configuration.PREVIOUS_EPOCH_SPENT_ADDRESSES_SIG,
-                Snapshot.SNAPSHOT_PUBKEY, Snapshot.SNAPSHOT_PUBKEY_DEPTH, Snapshot.SPENT_ADDRESSES_INDEX)) {
+                SnapshotManager.SNAPSHOT_PUBKEY, SnapshotManager.SNAPSHOT_PUBKEY_DEPTH, SnapshotManager.SPENT_ADDRESSES_INDEX)) {
             throw new RuntimeException("Failed to load previousEpochsSpentAddresses - signature failed.");
         }
 
@@ -280,7 +281,7 @@ public class API {
                     return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                             Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
                             Runtime.getRuntime().totalMemory(), instance.milestone.latestMilestone, instance.milestone.latestMilestoneIndex,
-                            instance.milestone.latestSolidSubtangleMilestone, instance.milestone.latestSolidSubtangleMilestoneIndex, instance.milestone.initialSnapshot.metaData().milestoneIndex(),
+                            instance.milestone.latestSolidSubtangleMilestone, instance.milestone.latestSolidSubtangleMilestoneIndex, instance.snapshotManager.initialSnapshot().metaData().milestoneIndex(),
                             instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                             System.currentTimeMillis(), instance.tipsViewModel.size(),
                             instance.transactionRequester.numberOfTransactionsToRequest());
@@ -457,7 +458,7 @@ public class API {
         }
 
         if (state) {
-            instance.milestone.latestSnapshot.readWriteLock.readLock().lock();
+            instance.snapshotManager.latestSnapshot().readWriteLock.readLock().lock();
             try {
                 WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.ledgerValidator,
                         instance.transactionValidator, instance.milestone, instance.tipsSelector.getMaxDepth(),
@@ -471,7 +472,7 @@ public class API {
                     }
                 }
             } finally {
-                instance.milestone.latestSnapshot.readWriteLock.readLock().unlock();
+                instance.snapshotManager.latestSnapshot().readWriteLock.readLock().unlock();
             }
         }
 
@@ -863,8 +864,8 @@ public class API {
                 .collect(Collectors.toCollection(LinkedList::new));
         final List<Hash> hashes;
         final Map<Hash, Long> balances = new HashMap<>();
-        instance.milestone.latestSnapshot.readWriteLock.readLock().lock();
-        final int index = instance.milestone.latestSnapshot.metaData().milestoneIndex();
+        instance.snapshotManager.latestSnapshot().readWriteLock.readLock().lock();
+        final int index = instance.snapshotManager.latestSnapshot().metaData().milestoneIndex();
         if (tips == null || tips.size() == 0) {
             hashes = Collections.singletonList(instance.milestone.latestSolidSubtangleMilestone);
         } else {
@@ -873,7 +874,7 @@ public class API {
         }
         try {
             for (final Hash address : addresses) {
-                Long value = instance.milestone.latestSnapshot.getBalance(address);
+                Long value = instance.snapshotManager.latestSnapshot().getBalance(address);
                 if (value == null) {
                     value = 0L;
                 }
@@ -895,7 +896,7 @@ public class API {
             }
             diff.forEach((key, value) -> balances.computeIfPresent(key, (hash, aLong) -> value + aLong));
         } finally {
-            instance.milestone.latestSnapshot.readWriteLock.readLock().unlock();
+            instance.snapshotManager.latestSnapshot().readWriteLock.readLock().unlock();
         }
 
         final List<String> elements = addresses.stream().map(address -> balances.get(address).toString())

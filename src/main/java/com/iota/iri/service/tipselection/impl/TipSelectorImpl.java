@@ -1,10 +1,11 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.LedgerValidator;
-import com.iota.iri.Milestone;
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
@@ -30,7 +31,8 @@ public class TipSelectorImpl implements TipSelector {
     private final LedgerValidator ledgerValidator;
     private final TransactionValidator transactionValidator;
     private final Tangle tangle;
-    private final Milestone milestone;
+    private final SnapshotManager snapshotManager;
+    private final MilestoneTracker milestone;
     private final int belowMaxDepthTxLimit;
     private final int validatorCacheSize;
 
@@ -40,12 +42,13 @@ public class TipSelectorImpl implements TipSelector {
     }
 
     public TipSelectorImpl(Tangle tangle,
+                           SnapshotManager snapshotManager,
                            LedgerValidator ledgerValidator,
                            TransactionValidator transactionValidator,
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,
                            Walker walkerAlpha,
-                           Milestone milestone,
+                           MilestoneTracker milestone,
                            int maxDepth,
                            int belowMaxDepthTxLimit,
                            int validatorCacheSize) {
@@ -62,6 +65,7 @@ public class TipSelectorImpl implements TipSelector {
         this.ledgerValidator = ledgerValidator;
         this.transactionValidator = transactionValidator;
         this.tangle = tangle;
+        this.snapshotManager = snapshotManager;
         this.milestone = milestone;
         this.validatorCacheSize = validatorCacheSize;
     }
@@ -85,7 +89,7 @@ public class TipSelectorImpl implements TipSelector {
     @Override
     public List<Hash> getTransactionsToApprove(int depth, Optional<Hash> reference) throws Exception {
         try {
-            milestone.latestSnapshot.readWriteLock.readLock().lock();
+            snapshotManager.latestSnapshot().readWriteLock.readLock().lock();
 
             //preparation
             Hash entryPoint = entryPointSelector.getEntryPoint(depth);
@@ -114,7 +118,7 @@ public class TipSelectorImpl implements TipSelector {
 
             return tips;
         } finally {
-            milestone.latestSnapshot.readWriteLock.readLock().unlock();
+            snapshotManager.latestSnapshot().readWriteLock.readLock().unlock();
         }
     }
 

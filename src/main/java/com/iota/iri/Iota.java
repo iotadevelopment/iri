@@ -24,6 +24,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.security.SecureRandom;
 import java.util.List;
 
@@ -33,10 +35,11 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
-    public final SnapshotManager snapshotManager;
+    public Tangle tangle = null;
+    public SnapshotManager snapshotManager = null;
+
     public final LedgerValidator ledgerValidator;
-    public final Milestone milestone;
-    public final Tangle tangle;
+    public final MilestoneTracker milestone;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -62,10 +65,28 @@ public class Iota {
         udpPort = configuration.integer(Configuration.DefaultConfSettings.UDP_RECEIVER_PORT);
         tcpPort = configuration.integer(Configuration.DefaultConfSettings.TCP_RECEIVER_PORT);
 
-        // create the snapshot manager
-        snapshotManager = new SnapshotManager(this);
+        // try to initialize and start our node (any error will lead to a stop)
+        try {
+            // create the database interface
+            tangle = new Tangle();
 
-        Snapshot initialSnapshot = Snapshot.init(snapshotManager, configuration).clone();
+            // create the snapshot manager
+            snapshotManager = new SnapshotManager(tangle, configuration);
+        }
+
+        // handle initialization errors in a generic way
+        catch(Exception e) {
+            // create a string representation of the stacktrace
+            StringWriter stackTraceStringWriter = new StringWriter();
+            e.printStackTrace(new PrintWriter(stackTraceStringWriter));
+
+            // dump the error message
+            log.error("Initialization Error: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
+
+            // stop the node if a critical initialization error occurs
+            System.exit(-1);
+        }
+
         long snapshotTimestamp = configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME);
         int milestoneStartIndex = configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX);
         int numKeysMilestone = configuration.integer(Configuration.DefaultConfSettings.NUMBER_OF_KEYS_IN_A_MILESTONE);
@@ -91,7 +112,6 @@ public class Iota {
         } else {
             coordinator = new Hash(Configuration.MAINNET_COORDINATOR_ADDRESS);
         }
-        tangle = new Tangle();
         messageQ = new MessageQ(configuration.integer(Configuration.DefaultConfSettings.ZMQ_PORT),
                 configuration.string(Configuration.DefaultConfSettings.ZMQ_IPC),
                 configuration.integer(Configuration.DefaultConfSettings.ZMQ_THREADS),
@@ -101,12 +121,12 @@ public class Iota {
         transactionRequester = new TransactionRequester(tangle, messageQ);
         transactionValidator = new TransactionValidator(tangle, tipsViewModel, transactionRequester, messageQ,
                 snapshotTimestamp);
-        milestone = new Milestone(tangle, coordinator, initialSnapshot, transactionValidator, testnet, messageQ,
+        milestone = new MilestoneTracker(tangle, coordinator, snapshotManager, transactionValidator, testnet, messageQ,
                 numKeysMilestone, dontValidateMilestoneSig);
         node = new Node(configuration, tangle, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
         replicator = new Replicator(node, tcpPort, maxPeers, testnet, transactionPacketSize);
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
-        ledgerValidator = new LedgerValidator(tangle, milestone, transactionRequester, messageQ, testnet);
+        ledgerValidator = new LedgerValidator(tangle, milestone, snapshotManager, transactionRequester, messageQ, testnet);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(milestoneStartIndex, alpha, belowMaxDepthTxLimit, walkValidatorCacheSize);
     }
@@ -211,7 +231,7 @@ public class Iota {
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle);
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(alpha, new SecureRandom(), tangle, messageQ, tailFinder);
-        return new TipSelectorImpl(tangle, ledgerValidator, transactionValidator, entryPointSelector, ratingCalculator,
+        return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, transactionValidator, entryPointSelector, ratingCalculator,
                 walker, milestone, maxTipSearchDepth, belowMaxDepthTxLimit, walkValidatorCacheSize);
     }
 }

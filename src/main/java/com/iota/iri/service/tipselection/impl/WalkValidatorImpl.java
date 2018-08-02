@@ -1,7 +1,7 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.LedgerValidator;
-import com.iota.iri.Milestone;
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
@@ -38,7 +38,7 @@ public class WalkValidatorImpl implements WalkValidator {
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
     private final LedgerValidator ledgerValidator;
     private final TransactionValidator transactionValidator;
-    private final Milestone milestone;
+    private final MilestoneTracker milestone;
 
     private final int maxDepth;
 
@@ -47,7 +47,7 @@ public class WalkValidatorImpl implements WalkValidator {
     private Set<Hash> myApprovedHashes;
 
     public WalkValidatorImpl(Tangle tangle, LedgerValidator ledgerValidator, TransactionValidator transactionValidator,
-                             Milestone milestone, int maxDepth, int maxAnalyzedTxs, int cacheSize) {
+                             MilestoneTracker milestone, int maxDepth, int maxAnalyzedTxs, int cacheSize) {
         this.tangle = tangle;
         this.ledgerValidator = ledgerValidator;
         this.transactionValidator = transactionValidator;

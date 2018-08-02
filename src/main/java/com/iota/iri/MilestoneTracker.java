@@ -19,6 +19,7 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -28,9 +29,9 @@ import com.iota.iri.hash.ISS;
 import com.iota.iri.model.Hash;
 import com.iota.iri.utils.Converter;
 
-import static com.iota.iri.Milestone.Validity.*;
+import static com.iota.iri.MilestoneTracker.Validity.*;
 
-public class Milestone {
+public class MilestoneTracker {
 
     enum Validity {
         VALID,
@@ -43,7 +44,7 @@ public class Milestone {
      */
     private AtomicInteger solidMilestoneTrackerTasks;
 
-    private final Logger log = LoggerFactory.getLogger(Milestone.class);
+    private final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
     private final Tangle tangle;
     private final Hash coordinator;
     private final TransactionValidator transactionValidator;
@@ -51,8 +52,7 @@ public class Milestone {
     private final MessageQ messageQ;
     private final int numOfKeysInMilestone;
     private final boolean acceptAnyTestnetCoo;
-    public Snapshot initialSnapshot;
-    public Snapshot latestSnapshot;
+    private final SnapshotManager snapshotManager;
 
     private LedgerValidator ledgerValidator;
     public Hash latestMilestone = Hash.NULL_HASH;
@@ -63,25 +63,24 @@ public class Milestone {
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
 
-    public Milestone(final Tangle tangle,
-                     final Hash coordinator,
-                     final Snapshot initialSnapshot,
-                     final TransactionValidator transactionValidator,
-                     final boolean testnet,
-                     final MessageQ messageQ,
-                     final int numOfKeysInMilestone,
-                     final boolean acceptAnyTestnetCoo
+    public MilestoneTracker(final Tangle tangle,
+                            final Hash coordinator,
+                            final SnapshotManager snapshotManager,
+                            final TransactionValidator transactionValidator,
+                            final boolean testnet,
+                            final MessageQ messageQ,
+                            final int numOfKeysInMilestone,
+                            final boolean acceptAnyTestnetCoo
                      ) {
         this.tangle = tangle;
         this.coordinator = coordinator;
-        this.initialSnapshot = initialSnapshot;
-        this.latestSnapshot = initialSnapshot.clone();
+        this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.latestMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
-        this.latestSolidSubtangleMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
+        this.latestMilestoneIndex = snapshotManager.latestSnapshot().metaData().milestoneIndex();
+        this.latestSolidSubtangleMilestoneIndex = snapshotManager.latestSnapshot().metaData().milestoneIndex();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
@@ -238,15 +237,15 @@ public class Milestone {
 
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, currentMilestone.index(), testnet, initialSnapshot.metaData().milestoneIndex()
+                    tangle, currentMilestone.index(), testnet, snapshotManager.initialSnapshot().metaData().milestoneIndex()
                 );
             }
         } catch(Exception e) { /* do nothing */ }
 
         // reset the ledger state to the initial state
-        latestSnapshot = initialSnapshot;
+        snapshotManager.reset();
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = initialSnapshot.metaData().milestoneIndex();
+        latestSolidSubtangleMilestoneIndex = snapshotManager.latestSnapshot().metaData().milestoneIndex();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -310,7 +309,7 @@ public class Milestone {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.metaData().milestoneIndex()
+            tangle, latestSolidSubtangleMilestoneIndex, testnet, snapshotManager.initialSnapshot().metaData().milestoneIndex()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -327,7 +326,7 @@ public class Milestone {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, initialSnapshot.metaData().milestoneIndex()
+                tangle, latestSolidSubtangleMilestoneIndex, testnet, snapshotManager.initialSnapshot().metaData().milestoneIndex()
             );
         }
     }

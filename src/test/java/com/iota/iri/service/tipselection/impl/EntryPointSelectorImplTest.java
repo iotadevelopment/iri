@@ -1,6 +1,6 @@
 package com.iota.iri.service.tipselection.impl;
 
-import com.iota.iri.Milestone;
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
@@ -20,7 +20,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class EntryPointSelectorImplTest {
 
     @Mock
-    private Milestone milestone;
+    private MilestoneTracker milestone;
     @Mock
     private Tangle tangle;
 

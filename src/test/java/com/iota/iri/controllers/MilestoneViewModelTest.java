@@ -1,6 +1,5 @@
 package com.iota.iri.controllers;
 
-import com.iota.iri.Milestone;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
