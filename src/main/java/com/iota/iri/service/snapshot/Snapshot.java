@@ -3,6 +3,8 @@ package com.iota.iri.service.snapshot;
 import com.iota.iri.model.Hash;
 
 public class Snapshot {
+    // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
+
     /**
      * Holds a reference to the state of this snapshot.
      */
@@ -115,7 +117,19 @@ public class Snapshot {
         return new Snapshot(state.clone(), metaData.clone());
     }
 
+    // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * This method updates both - the balances and the index - in a single call.
+     *
+     * It first locks both child objects and then performs the corresponding updates. It is used by the MilestoneTracker
+     * to update the balances after a milestone appeared.
+     *
+     * @param diff change in the balances
+     * @param newIndex new milestone index
+     */
     public void update(SnapshotStateDiff diff, int newIndex) {
+        // check the diff before we apply the update
         if(!diff.isConsistent()) {
             throw new IllegalStateException("the snapshot state diff is not consistent");
         }
@@ -135,13 +149,26 @@ public class Snapshot {
      * This is a utility method for determining the balance of an address.
      *
      * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
-     * Snapshot itself, without having to retrieve the SnapshotState first. This is mainly to keep the code more
-     * readable, without having to manually resolve the necessary references.
+     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
+     * without having to manually traverse the necessary references.
      *
      * @param hash address that we want to check
      * @return the balance of the given address
      */
     public Long getBalance(Hash hash) {
         return state.getBalance(hash);
+    }
+
+    /**
+     * This is a utility method for determining the index of the snapshot.
+     *
+     * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
+     * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
+     * having to manually traverse the necessary references.
+     *
+     * @return the milestone index of the snapshot
+     */
+    public int getIndex() {
+        return metaData.milestoneIndex();
     }
 }
