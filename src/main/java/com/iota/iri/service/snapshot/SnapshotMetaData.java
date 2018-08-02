@@ -11,14 +11,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 public class SnapshotMetaData implements Cloneable {
+    // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
+
     public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
-     * Holds the current milestone index of this snapshot.
+     * Holds the current index of this snapshot.
      *
-     * The initial snapshot has its milestoneIndex set to the milestoneStartIndex.
+     * The initial snapshot has its index set to the start index.
      */
-    private int milestoneIndex;
+    private int index;
 
     /**
      * Set of transaction hashes that were cut off when creating the snapshot.
@@ -64,13 +66,13 @@ public class SnapshotMetaData implements Cloneable {
             )
         );
 
-        // create a variable to store the read milestoneIndex
-        int milestoneIndex;
+        // create a variable to store the read index
+        int index;
 
         // read the milestoneIndex
         String line;
         if((line = reader.readLine()) != null) {
-            milestoneIndex = Integer.parseInt(line);
+            index = Integer.parseInt(line);
         } else {
             throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
@@ -85,7 +87,7 @@ public class SnapshotMetaData implements Cloneable {
         reader.close();
 
         // create and return our SnapshotMetaData object
-        return new SnapshotMetaData(milestoneIndex, solidEntryPoints);
+        return new SnapshotMetaData(index, solidEntryPoints);
     }
 
     /**
@@ -98,7 +100,7 @@ public class SnapshotMetaData implements Cloneable {
      */
     public SnapshotMetaData(int milestoneIndex, HashSet<Hash> solidEntryPoints) {
         // store our parameters
-        this.milestoneIndex = milestoneIndex;
+        this.index = milestoneIndex;
         this.solidEntryPoints = solidEntryPoints;
     }
 
@@ -119,14 +121,14 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
-     * This method is the getter of the milestone index.
+     * This method is the getter of the index.
      *
      * It simply returns the stored private property.
      *
-     * @return current milestone index of this metadata
+     * @return current index of this metadata
      */
-    public int milestoneIndex() {
-        return this.milestoneIndex;
+    public int getIndex() {
+        return this.index;
     }
 
     /**
@@ -136,16 +138,16 @@ public class SnapshotMetaData implements Cloneable {
      *
       * @param milestoneIndex milestone index that shall be set
      */
-    public void milestoneIndex(int milestoneIndex) {
-        milestoneIndex(milestoneIndex, true);
+    public void setIndex(int milestoneIndex) {
+        setIndex(milestoneIndex, true);
     }
 
-    protected void milestoneIndex(int milestoneIndex, boolean lock) {
+    protected void setIndex(int milestoneIndex, boolean lock) {
         if(lock) {
             lockWrite();
         }
 
-        this.milestoneIndex = milestoneIndex;
+        this.index = milestoneIndex;
 
         if(lock) {
             unlockWrite();
@@ -215,7 +217,7 @@ public class SnapshotMetaData implements Cloneable {
         Files.write(
             Paths.get(metaDataFile.getAbsolutePath()),
             () -> Stream.concat(
-                Stream.of(String.valueOf(milestoneIndex)),
+                Stream.of(String.valueOf(index)),
                 solidEntryPoints.stream().<CharSequence>map(entry -> entry.toString())
             ).iterator()
         );
@@ -231,6 +233,6 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(milestoneIndex, (HashSet) solidEntryPoints.clone());
+        return new SnapshotMetaData(index, (HashSet) solidEntryPoints.clone());
     }
 }

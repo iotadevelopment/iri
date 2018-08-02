@@ -58,7 +58,6 @@ public class MilestoneTracker {
     public Hash latestSolidSubtangleMilestone = latestMilestone;
 
     public int latestMilestoneIndex;
-    public int latestSolidSubtangleMilestoneIndex;
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
 
@@ -78,8 +77,7 @@ public class MilestoneTracker {
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.latestMilestoneIndex = snapshotManager.latestSnapshot().getMetaData().milestoneIndex();
-        this.latestSolidSubtangleMilestoneIndex = snapshotManager.latestSnapshot().getMetaData().milestoneIndex();
+        this.latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
@@ -185,19 +183,19 @@ public class MilestoneTracker {
                 long scanTime = System.currentTimeMillis();
 
                 try {
-                    final int previousSolidSubtangleLatestMilestoneIndex = latestSolidSubtangleMilestoneIndex;
+                    final int previousSolidSubtangleLatestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
 
-                    if(latestSolidSubtangleMilestoneIndex < latestMilestoneIndex) {
+                    if(snapshotManager.getLatestSnapshot().getIndex() < latestMilestoneIndex) {
                         updateLatestSolidSubtangleMilestone();
                     }
 
-                    if (previousSolidSubtangleLatestMilestoneIndex != latestSolidSubtangleMilestoneIndex) {
+                    if (previousSolidSubtangleLatestMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex()) {
 
-                        messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
+                        messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
                         messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
                         log.info("Latest SOLID SUBTANGLE milestone has changed from #"
                                 + previousSolidSubtangleLatestMilestoneIndex + " to #"
-                                + latestSolidSubtangleMilestoneIndex);
+                                + snapshotManager.getLatestSnapshot().getIndex());
                     }
 
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
@@ -236,7 +234,7 @@ public class MilestoneTracker {
 
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, currentMilestone.index(), testnet, snapshotManager.initialSnapshot().getMetaData().milestoneIndex()
+                    tangle, currentMilestone.index(), testnet, snapshotManager.initialSnapshot().getIndex()
                 );
             }
         } catch(Exception e) { /* do nothing */ }
@@ -244,7 +242,6 @@ public class MilestoneTracker {
         // reset the ledger state to the initial state
         snapshotManager.reset();
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = snapshotManager.latestSnapshot().getMetaData().milestoneIndex();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -291,7 +288,7 @@ public class MilestoneTracker {
                             // milestone -> reset the ledger state and check the milestones again
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                            if(index < latestSolidSubtangleMilestoneIndex) {
+                            if(index < snapshotManager.getLatestSnapshot().getIndex()) {
                                 reset(newMilestoneViewModel);
                             }
                             return VALID;
@@ -308,7 +305,7 @@ public class MilestoneTracker {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex, testnet, snapshotManager.initialSnapshot().getMetaData().milestoneIndex()
+            tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.initialSnapshot().getIndex()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -321,11 +318,10 @@ public class MilestoneTracker {
         ) {
             // update our internal variables
             latestSolidSubtangleMilestone = nextMilestone.getHash();
-            latestSolidSubtangleMilestoneIndex = nextMilestone.index();
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, latestSolidSubtangleMilestoneIndex, testnet, snapshotManager.initialSnapshot().getMetaData().milestoneIndex()
+                tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.initialSnapshot().getIndex()
             );
         }
     }

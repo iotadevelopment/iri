@@ -5,9 +5,6 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
@@ -36,7 +33,7 @@ public class SnapshotMetaDataTest {
         SnapshotMetaData loadedMetaData = SnapshotMetaData.fromFile(metaDataFile);
 
         // perform the tests on the result
-        assertEquals("milestoneIndex should be restored correctly", loadedMetaData.milestoneIndex(), 1337);
+        assertEquals("setIndex should be restored correctly", loadedMetaData.getIndex(), 1337);
         assertEquals("amount of solidEntryPoints should be correct", loadedMetaData.solidEntryPoints().size(), 2);
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash1));
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash2));

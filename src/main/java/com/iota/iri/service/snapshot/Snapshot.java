@@ -138,8 +138,8 @@ public class Snapshot {
         lockWrite();
 
         // apply our changes without locking the underlying members (we already locked globally)
-        state.apply(diff, false);
-        metaData.milestoneIndex(newIndex, false);
+        state.applyStateDiff(diff, false);
+        metaData.setIndex(newIndex, false);
 
         // unlock the access to this object once we are done updating
         unlockWrite();
@@ -169,6 +169,6 @@ public class Snapshot {
      * @return the milestone index of the snapshot
      */
     public int getIndex() {
-        return metaData.milestoneIndex();
+        return metaData.getIndex();
     }
 }

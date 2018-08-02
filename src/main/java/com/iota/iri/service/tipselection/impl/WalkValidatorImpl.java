@@ -5,6 +5,7 @@ import com.iota.iri.MilestoneTracker;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.WalkValidator;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.impl.BoundedSetWrapper;
@@ -39,6 +40,7 @@ public class WalkValidatorImpl implements WalkValidator {
     private final LedgerValidator ledgerValidator;
     private final TransactionValidator transactionValidator;
     private final MilestoneTracker milestone;
+    private final SnapshotManager snapshotManager;
 
     private final int maxDepth;
 
@@ -47,11 +49,12 @@ public class WalkValidatorImpl implements WalkValidator {
     private Set<Hash> myApprovedHashes;
 
     public WalkValidatorImpl(Tangle tangle, LedgerValidator ledgerValidator, TransactionValidator transactionValidator,
-                             MilestoneTracker milestone, int maxDepth, int maxAnalyzedTxs, int cacheSize) {
+                             MilestoneTracker milestone, SnapshotManager snapshotManager, int maxDepth, int maxAnalyzedTxs, int cacheSize) {
         this.tangle = tangle;
         this.ledgerValidator = ledgerValidator;
         this.transactionValidator = transactionValidator;
         this.milestone = milestone;
+        this.snapshotManager = snapshotManager;
         this.maxDepth = maxDepth;
         this.maxAnalyzedTxs = maxAnalyzedTxs;
 
@@ -82,7 +85,7 @@ public class WalkValidatorImpl implements WalkValidator {
         } else if (!transactionViewModel.isSolid()) {
             log.debug("Validation failed: {} is not solid", transactionHash);
             return false;
-        } else if (belowMaxDepth(transactionViewModel.getHash(), milestone.latestSolidSubtangleMilestoneIndex - maxDepth)) {
+        } else if (belowMaxDepth(transactionViewModel.getHash(), snapshotManager.getLatestSnapshot().getIndex() - maxDepth)) {
             log.debug("Validation failed: {} is below max depth", transactionHash);
             return false;
         } else if (!ledgerValidator.updateDiff(myApprovedHashes, myDiff, transactionViewModel.getHash())) {

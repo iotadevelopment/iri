@@ -81,7 +81,7 @@ public class SnapshotManager {
      *
      * @return the Snapshot that represents the most recent "confirmed" state of the ledger
      */
-    public Snapshot latestSnapshot() {
+    public Snapshot getLatestSnapshot() {
         return latestSnapshot;
     }
 
@@ -97,7 +97,7 @@ public class SnapshotManager {
 
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws Exception {
         // check if the milestone was solidified already
-        if(targetMilestone.index() > latestSnapshot.getMetaData().milestoneIndex()) {
+        if(targetMilestone.index() > latestSnapshot.getIndex()) {
             throw new IllegalArgumentException("the milestone was not solidified yet");
         }
 
@@ -105,12 +105,12 @@ public class SnapshotManager {
         Snapshot snapshot = latestSnapshot.clone();
 
         // if the target is the latest milestone we can return immediately
-        if(targetMilestone.index() == latestSnapshot.getMetaData().milestoneIndex()) {
+        if(targetMilestone.index() == latestSnapshot.getIndex()) {
             return snapshot;
         }
 
         // retrieve the latest milestone
-        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, latestSnapshot.getMetaData().milestoneIndex());
+        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, latestSnapshot.getIndex());
 
         // this should not happen but better give a reasonable error message if it ever does
         if(currentMilestone == null) {

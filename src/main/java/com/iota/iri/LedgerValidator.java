@@ -199,7 +199,6 @@ public class LedgerValidator {
             log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
 
             milestone.latestSolidSubtangleMilestone = latestConsistentMilestone.getHash();
-            milestone.latestSolidSubtangleMilestoneIndex = latestConsistentMilestone.index();
         }
     }
 
@@ -212,7 +211,7 @@ public class LedgerValidator {
      */
     private MilestoneViewModel buildSnapshot() throws Exception {
         MilestoneViewModel consistentMilestone = null;
-        snapshotManager.latestSnapshot().lockWrite();
+        snapshotManager.getLatestSnapshot().lockWrite();
         try {
             MilestoneViewModel candidateMilestone = MilestoneViewModel.first(tangle);
             while (candidateMilestone != null) {
@@ -241,8 +240,8 @@ public class LedgerValidator {
                     if (stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
                         SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff());
 
-                        if (snapshotManager.latestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent()) {
-                            snapshotManager.latestSnapshot().update(snapshotStateDiff, candidateMilestone.index());
+                        if (snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent()) {
+                            snapshotManager.getLatestSnapshot().update(snapshotStateDiff, candidateMilestone.index());
                             consistentMilestone = candidateMilestone;
                         } else {
                             break;
@@ -252,18 +251,18 @@ public class LedgerValidator {
 
                 // iterate to the next milestone
                 candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, snapshotManager.initialSnapshot().getMetaData().milestoneIndex()
+                    tangle, candidateMilestone.index(), testnet, snapshotManager.initialSnapshot().getIndex()
                 );
             }
         } finally {
-            snapshotManager.latestSnapshot().unlockWrite();
+            snapshotManager.getLatestSnapshot().unlockWrite();
         }
         return consistentMilestone;
     }
 
     public boolean updateSnapshot(MilestoneViewModel milestoneVM) throws Exception {
         TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
-        snapshotManager.latestSnapshot().lockWrite();
+        snapshotManager.getLatestSnapshot().lockWrite();
         try {
             final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
             boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
@@ -277,9 +276,9 @@ public class LedgerValidator {
                 }
 
                 Hash tail = transactionViewModel.getHash();
-                Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, snapshotManager.latestSnapshot().getMetaData().milestoneIndex(), true);
+                Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
-                hasSnapshot = currentState != null && snapshotManager.latestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
+                hasSnapshot = currentState != null && snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
                 if (hasSnapshot) {
                     updateSnapshotMilestone(milestoneVM.getHash(), milestoneVM.index());
                     StateDiffViewModel stateDiffViewModel;
@@ -287,12 +286,12 @@ public class LedgerValidator {
                     if (currentState.size() != 0) {
                         stateDiffViewModel.store(tangle);
                     }
-                    snapshotManager.latestSnapshot().update(snapshotStateDiff, milestoneVM.index());
+                    snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index());
                 }
             }
             return hasSnapshot;
         } finally {
-            snapshotManager.latestSnapshot().unlockWrite();
+            snapshotManager.getLatestSnapshot().unlockWrite();
         }
     }
 
@@ -315,7 +314,7 @@ public class LedgerValidator {
             return true;
         }
         Set<Hash> visitedHashes = new HashSet<>(approvedHashes);
-        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, snapshotManager.latestSnapshot().getMetaData().milestoneIndex(), false);
+        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, snapshotManager.getLatestSnapshot().getIndex(), false);
         if (currentState == null) {
             return false;
         }
@@ -324,7 +323,7 @@ public class LedgerValidator {
                 currentState.putIfAbsent(key, value);
             }
         });
-        boolean isConsistent = snapshotManager.latestSnapshot().getState().patchedState(new SnapshotStateDiff(currentState)).isConsistent();
+        boolean isConsistent = snapshotManager.getLatestSnapshot().getState().patchedState(new SnapshotStateDiff(currentState)).isConsistent();
         if (isConsistent) {
             diff.putAll(currentState);
             approvedHashes.addAll(visitedHashes);

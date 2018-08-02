@@ -98,8 +98,8 @@ public class SnapshotState {
         return new SnapshotState(patch);
     }
 
-    public void apply(SnapshotStateDiff diff) {
-        apply(diff, true);
+    public void applyStateDiff(SnapshotStateDiff diff) {
+        applyStateDiff(diff, true);
     }
 
     /**
@@ -108,7 +108,7 @@ public class SnapshotState {
      * @param diff
      * @param lock
      */
-    protected void apply(SnapshotStateDiff diff, boolean lock) {
+    protected void applyStateDiff(SnapshotStateDiff diff, boolean lock) {
         if(lock) {
             lockWrite();
         }

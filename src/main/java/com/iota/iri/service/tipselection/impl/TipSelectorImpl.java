@@ -89,7 +89,7 @@ public class TipSelectorImpl implements TipSelector {
     @Override
     public List<Hash> getTransactionsToApprove(int depth, Optional<Hash> reference) throws Exception {
         try {
-            snapshotManager.latestSnapshot().lockRead();
+            snapshotManager.getLatestSnapshot().lockRead();
 
             //preparation
             Hash entryPoint = entryPointSelector.getEntryPoint(depth);
@@ -97,8 +97,10 @@ public class TipSelectorImpl implements TipSelector {
 
             //random walk
             List<Hash> tips = new LinkedList<>();
-            WalkValidator walkValidator = new WalkValidatorImpl(tangle, ledgerValidator, transactionValidator, milestone,
-                    maxDepth, belowMaxDepthTxLimit, validatorCacheSize);
+            WalkValidator walkValidator = new WalkValidatorImpl(
+                tangle, ledgerValidator, transactionValidator, milestone, snapshotManager, maxDepth,
+                belowMaxDepthTxLimit, validatorCacheSize
+            );
             Hash tip = walker.walk(entryPoint, rating, walkValidator);
             tips.add(tip);
 
@@ -118,7 +120,7 @@ public class TipSelectorImpl implements TipSelector {
 
             return tips;
         } finally {
-            snapshotManager.latestSnapshot().unlockRead();
+            snapshotManager.getLatestSnapshot().unlockRead();
         }
     }
 
