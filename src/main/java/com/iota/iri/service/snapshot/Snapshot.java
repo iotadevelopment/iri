@@ -134,12 +134,13 @@ public class Snapshot {
             throw new IllegalStateException("the snapshot state diff is not consistent");
         }
 
-        // prevent other methods to write to this object while we do the updates
+        // prevent other threads to write to this object while we do the updates
         lockWrite();
 
         // apply our changes without locking the underlying members (we already locked globally)
         state.applyStateDiff(diff, false);
         metaData.setIndex(newIndex, false);
+        metaData.setTimestamp(System.currentTimeMillis() / 1000L);
 
         // unlock the access to this object once we are done updating
         unlockWrite();

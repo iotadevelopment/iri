@@ -13,6 +13,9 @@ import java.util.stream.Stream;
 public class SnapshotMetaData implements Cloneable {
     // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Lock object allowing to block access to this object from different threads.
+     */
     public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
@@ -21,6 +24,11 @@ public class SnapshotMetaData implements Cloneable {
      * The initial snapshot has its index set to the start index.
      */
     private int index;
+
+    /**
+     * Holds the timestamp when this snapshot was created or updated the last time.
+     */
+    private long timestamp;
 
     /**
      * Set of transaction hashes that were cut off when creating the snapshot.
@@ -68,11 +76,19 @@ public class SnapshotMetaData implements Cloneable {
 
         // create a variable to store the read index
         int index;
+        long timestamp;
 
-        // read the milestoneIndex
+        // read the index
         String line;
         if((line = reader.readLine()) != null) {
             index = Integer.parseInt(line);
+        } else {
+            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+        }
+
+        // read the timestamp
+        if((line = reader.readLine()) != null) {
+            timestamp = Long.parseLong(line);
         } else {
             throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
@@ -87,7 +103,7 @@ public class SnapshotMetaData implements Cloneable {
         reader.close();
 
         // create and return our SnapshotMetaData object
-        return new SnapshotMetaData(index, solidEntryPoints);
+        return new SnapshotMetaData(index, timestamp, solidEntryPoints);
     }
 
     /**
@@ -95,29 +111,84 @@ public class SnapshotMetaData implements Cloneable {
      *
      * It simply stores the passed in parameters for later use.
      *
-     * @param milestoneIndex milestone index of the Snapshot that this metadata belongs to
+     * @param index index of the Snapshot that this metadata belongs to
      * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(int milestoneIndex, HashSet<Hash> solidEntryPoints) {
+    public SnapshotMetaData(int index, Long timestamp, HashSet<Hash> solidEntryPoints) {
         // store our parameters
-        this.index = milestoneIndex;
+        this.index = index;
+        this.timestamp = timestamp;
         this.solidEntryPoints = solidEntryPoints;
     }
 
+    /**
+     * Locks the metadata object for read access.
+     *
+     * This is used to synchronize the access from different Threads.
+     */
     public void lockRead() {
         readWriteLock.readLock().lock();
     }
 
+    /**
+     * Locks the metadata object for write access.
+     *
+     * This is used to synchronize the access from different Threads.
+     */
     public void lockWrite() {
         readWriteLock.writeLock().lock();
     }
 
+    /**
+     * Unlocks the object from read blocks.
+     *
+     * This is used to synchronize the access from different Threads.
+     */
     public void unlockRead() {
         readWriteLock.readLock().unlock();
     }
 
+    /**
+     * Unlocks the object from write blocks.
+     *
+     * This is used to synchronize the access from different Threads.
+     */
     public void unlockWrite() {
         readWriteLock.writeLock().unlock();
+    }
+
+    /**
+     * This method is the setter of the milestone index.
+     *
+     * It simply stores the passed value in the private property, with locking the object first.
+     *
+      * @param index milestone index that shall be set
+     */
+    public void setIndex(int index) {
+        setIndex(index, true);
+    }
+
+    /**
+     * This method is the setter of the milestone index.
+     *
+     * It simply stores the passed value in the private property, with optionally locking the object first.
+     *
+     * @param index index that shall be set
+     * @param lock boolean indicating if the object should be locked for other threads while writing to it
+     */
+    public void setIndex(int index, boolean lock) {
+        // prevent other threads to write to this object while we do the updates
+        if(lock) {
+            lockWrite();
+        }
+
+        // apply our changes
+        this.index = index;
+
+        // unlock the access to this object once we are done updating
+        if(lock) {
+            unlockWrite();
+        }
     }
 
     /**
@@ -132,26 +203,48 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
-     * This method is the setter of the milestone index.
+     * This method is the setter of the timestamp.
      *
-     * It simply stores the passed value in the private property.
+     * It simply stores the passed value in the private property, with locking the object first.
      *
-      * @param milestoneIndex milestone index that shall be set
+     * @param timestamp timestamp when the snapshot was created or updated
      */
-    public void setIndex(int milestoneIndex) {
-        setIndex(milestoneIndex, true);
+    public void setTimestamp(long timestamp) {
+        setTimestamp(timestamp, true);
     }
 
-    protected void setIndex(int milestoneIndex, boolean lock) {
+    /**
+     * This method is the setter of the timestamp.
+     *
+     * It simply stores the passed value in the private property, with optionally locking the object first.
+     *
+     * @param timestamp timestamp when the snapshot was created or updated
+     * @param lock boolean indicating if the object should be locked for other threads while writing to it
+     */
+    protected void setTimestamp(long timestamp, boolean lock) {
+        // prevent other threads to write to this object while we do the updates
         if(lock) {
             lockWrite();
         }
 
-        this.index = milestoneIndex;
+        // apply our changes
+        this.timestamp = timestamp;
 
+        // unlock the access to this object once we are done updating
         if(lock) {
             unlockWrite();
         }
+    }
+
+    /**
+     * This method is the getter of the timestamp.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return timestamp when the snapshot was created or updated
+     */
+    public long getTimestamp() {
+        return this.timestamp;
     }
 
     /**
@@ -168,25 +261,47 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
-     * This method is the getter of the solid entrypoints.
+     * This method is the getter of the solid entry points.
      *
      * It simply returns the stored private property.
      *
      * @return set of transaction hashes that shall be considered solid when being referenced
      */
-    public HashSet<Hash> solidEntryPoints() {
+    public HashSet<Hash> getSolidEntryPoints() {
         return solidEntryPoints;
     }
 
     /**
-     * This method is the setter of the milestone index.
+     * This method is the setter of the solid entry points.
      *
-     * It simply stores the passed value in the private property.
+     * It simply stores the passed value in the private property, with locking the object first.
      *
      * @param solidEntryPoints set of solid entry points that shall be stored
      */
-    public void solidEntryPoints(HashSet<Hash> solidEntryPoints) {
+    public void setSolidEntryPoints(HashSet<Hash> solidEntryPoints) {
+        setSolidEntryPoints(solidEntryPoints, true);
+    }
+
+    /**
+     * This method is the setter of the solid entry points.
+     *
+     * It simply stores the passed value in the private property, with optionally locking the object first.
+     *
+     * @param solidEntryPoints set of solid entry points that shall be stored
+     */
+    public void setSolidEntryPoints(HashSet<Hash> solidEntryPoints, boolean lock) {
+        // prevent other threads to write to this object while we do the updates
+        if(lock) {
+            lockWrite();
+        }
+
+        // apply our changes
         this.solidEntryPoints = solidEntryPoints;
+
+        // unlock the access to this object once we are done updating
+        if(lock) {
+            unlockWrite();
+        }
     }
 
     /**
@@ -217,7 +332,10 @@ public class SnapshotMetaData implements Cloneable {
         Files.write(
             Paths.get(metaDataFile.getAbsolutePath()),
             () -> Stream.concat(
-                Stream.of(String.valueOf(index)),
+                Stream.concat(
+                    Stream.of(String.valueOf(index)),
+                    Stream.of(String.valueOf(timestamp))
+                ),
                 solidEntryPoints.stream().<CharSequence>map(entry -> entry.toString())
             ).iterator()
         );
@@ -233,6 +351,6 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(index, (HashSet) solidEntryPoints.clone());
+        return new SnapshotMetaData(index, timestamp, (HashSet) solidEntryPoints.clone());
     }
 }

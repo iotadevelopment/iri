@@ -34,7 +34,7 @@ public class SnapshotMetaDataTest {
 
         // perform the tests on the result
         assertEquals("setIndex should be restored correctly", loadedMetaData.getIndex(), 1337);
-        assertEquals("amount of solidEntryPoints should be correct", loadedMetaData.solidEntryPoints().size(), 2);
+        assertEquals("amount of solidEntryPoints should be correct", loadedMetaData.getSolidEntryPoints().size(), 2);
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash1));
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash2));
 

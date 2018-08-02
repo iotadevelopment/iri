@@ -233,6 +233,7 @@ public class SnapshotManager {
             snapshotState,
             new SnapshotMetaData(
                 testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
+                configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME),
                 new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH))
             )
         );
