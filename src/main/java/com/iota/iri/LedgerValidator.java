@@ -213,7 +213,9 @@ public class LedgerValidator {
         MilestoneViewModel consistentMilestone = null;
         snapshotManager.getLatestSnapshot().lockWrite();
         try {
-            MilestoneViewModel candidateMilestone = MilestoneViewModel.first(tangle);
+            MilestoneViewModel candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
+                tangle, snapshotManager.getLatestSnapshot().getIndex() - 1, testnet, snapshotManager.getInitialSnapshot().getIndex()
+            );
             while (candidateMilestone != null) {
                 if (candidateMilestone.index() % 10000 == 0) {
                     StringBuilder logMessage = new StringBuilder();
