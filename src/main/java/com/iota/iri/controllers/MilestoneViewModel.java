@@ -124,7 +124,7 @@ public class MilestoneViewModel {
     public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
                                                               int milestoneStartIndex) throws Exception {
         // fallback if we provide an index that is lower than our start index
-        if(!testnet && index <= milestoneStartIndex) {
+        if(!testnet && index < milestoneStartIndex) {
             return first(tangle);
         }
 
