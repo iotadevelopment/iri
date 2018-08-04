@@ -153,6 +153,8 @@ public class SnapshotManager {
         // load necessary configuration parameters
         boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
 
+        System.out.println(localSnapshotsEnabled);
+
         // if local snapshots are enabled
         if(localSnapshotsEnabled) {
             // load the remaining configuration parameters
