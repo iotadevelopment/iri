@@ -183,8 +183,8 @@ public class Configuration {
 
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED.name(), "false");
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "100");
-        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH.name(), "snapshotMainnet.txt");
-        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH.name(), "snapshotTestnet.txt");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH.name(), "snapshotMainnet");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH.name(), "snapshotTestnet");
 
         conf.put(DefaultConfSettings.WALK_VALIDATOR_CACHE_SIZE.name(), WALK_VALIDATOR_CACHE);
     }

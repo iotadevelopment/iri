@@ -29,7 +29,7 @@ public class SnapshotTest {
         try {
             SnapshotManager snapshotManager = new SnapshotManager(new Tangle(), configuration);
 
-            initSnapshot = snapshotManager.initialSnapshot();
+            initSnapshot = snapshotManager.getInitialSnapshot();
         } catch (IOException e) {
             throw new UncheckedIOException("Problem initiating snapshot", e);
         }

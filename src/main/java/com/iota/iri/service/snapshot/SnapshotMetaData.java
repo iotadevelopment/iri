@@ -194,12 +194,38 @@ public class SnapshotMetaData implements Cloneable {
     /**
      * This method is the getter of the index.
      *
-     * It simply returns the stored private property.
+     * It simply returns the stored private property, with locking the object first.
      *
      * @return current index of this metadata
      */
     public int getIndex() {
-        return this.index;
+        return getIndex(true);
+    }
+
+    /**
+     * This method is the getter of the index.
+     *
+     * It simply returns the stored private property, with optionally locking the object first.
+     *
+     * @return current index of this metadata
+     */
+    public int getIndex(boolean lock) {
+        // lock the object for read access
+        if(lock) {
+            lockRead();
+        }
+
+        // return our value
+        try {
+            return this.index;
+        }
+
+        // unlock the object from read blocks
+        finally {
+            if(lock) {
+                unlockRead();
+            }
+        }
     }
 
     /**
@@ -239,12 +265,38 @@ public class SnapshotMetaData implements Cloneable {
     /**
      * This method is the getter of the timestamp.
      *
-     * It simply returns the stored private property.
+     * It simply returns the stored private property, with locking the object first.
      *
      * @return timestamp when the snapshot was created or updated
      */
     public long getTimestamp() {
-        return this.timestamp;
+        return getTimestamp(true);
+    }
+
+    /**
+     * This method is the getter of the timestamp.
+     *
+     * It simply returns the stored private property, with optionally locking the object first.
+     *
+     * @return timestamp when the snapshot was created or updated
+     */
+    public long getTimestamp(boolean lock) {
+        // lock the object for read access
+        if(lock) {
+            lockRead();
+        }
+
+        // return our value
+        try {
+            return this.timestamp;
+        }
+
+        // unlock the object from read blocks
+        finally {
+            if(lock) {
+                unlockRead();
+            }
+        }
     }
 
     /**

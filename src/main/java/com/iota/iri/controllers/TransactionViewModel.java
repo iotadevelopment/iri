@@ -400,7 +400,7 @@ public class TransactionViewModel {
      * @param tangle Tangle object which acts as a database interface
      * @throws Exception if something goes wrong while loading or storing transactions
      */
-    private void updateReferencedSnapshot(Tangle tangle) throws Exception {
+    public void updateReferencedSnapshot(Tangle tangle) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == 0) {
             try {

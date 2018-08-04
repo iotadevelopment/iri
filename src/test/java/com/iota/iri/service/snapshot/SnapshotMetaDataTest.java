@@ -23,8 +23,11 @@ public class SnapshotMetaDataTest {
         solidEntryPoints.add(testHash1);
         solidEntryPoints.add(testHash2);
 
+        // create a timestamp value
+        long timestamp = System.currentTimeMillis() / 1000L;
+
         // create a metadata object containing the constructed data
-        SnapshotMetaData originalMetaData = new SnapshotMetaData(1337, solidEntryPoints);
+        SnapshotMetaData originalMetaData = new SnapshotMetaData(1337, timestamp, solidEntryPoints);
 
         // dump our metadata file
         File metaDataFile = originalMetaData.writeFile("testMetaDataFile.msnap");
@@ -33,7 +36,8 @@ public class SnapshotMetaDataTest {
         SnapshotMetaData loadedMetaData = SnapshotMetaData.fromFile(metaDataFile);
 
         // perform the tests on the result
-        assertEquals("setIndex should be restored correctly", loadedMetaData.getIndex(), 1337);
+        assertEquals("index should be restored correctly", loadedMetaData.getIndex(), 1337);
+        assertEquals("timestamp should be restored correctly", loadedMetaData.getTimestamp(), timestamp);
         assertEquals("amount of solidEntryPoints should be correct", loadedMetaData.getSolidEntryPoints().size(), 2);
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash1));
         assertTrue("Hash should be contained in the solidEntryPoints", loadedMetaData.hasSolidEntryPoint(testHash2));

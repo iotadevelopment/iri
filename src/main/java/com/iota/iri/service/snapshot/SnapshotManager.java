@@ -70,7 +70,7 @@ public class SnapshotManager {
      *
      * @return the Snapshot that the node was initialized with
      */
-    public Snapshot initialSnapshot() {
+    public Snapshot getInitialSnapshot() {
         return initialSnapshot;
     }
 
@@ -91,7 +91,7 @@ public class SnapshotManager {
      * This can be used to recover from errors if the state of the Snapshot ever becomes corrupted (due to syncing or
      * processing errors).
      */
-    public void reset() {
+    public void resetLatestSnapshot() {
         latestSnapshot = initialSnapshot.clone();
     }
 
@@ -149,7 +149,7 @@ public class SnapshotManager {
         return snapshot;
     }
 
-    public Snapshot loadLocalSnapshot() throws IOException {
+    public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
         // load necessary configuration parameters
         boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
 
@@ -163,10 +163,10 @@ public class SnapshotManager {
             );
 
             // create a file handle for our snapshot file
-            File localSnapshotFile = new File(basePath + ".snap");
+            File localSnapshotFile = new File(basePath + ".snapshot.state");
 
             // create a file handle for our snapshot metadata file
-            File localSnapshotMetadDataFile = new File(basePath + ".msnap");
+            File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
 
             // if the local snapshot files exists -> load them
             if(
@@ -180,12 +180,12 @@ public class SnapshotManager {
 
                 // check the supply of the snapshot state
                 if(!snapshotState.hasCorrectSupply()) {
-                    throw new IllegalStateException("the snapshot files have an invalid supply");
+                    throw new IllegalStateException("the snapshot state file has an invalid supply");
                 }
 
-                // check the consistency of the snaphot state
+                // check the consistency of the snapshot state
                 if(!snapshotState.isConsistent()) {
-                    throw new IllegalStateException("the snapshot file is not consistent");
+                    throw new IllegalStateException("the snapshot state file is not consistent");
                 }
 
                 // retrieve the meta data to our local snapshot
@@ -200,32 +200,34 @@ public class SnapshotManager {
         return null;
     }
 
-    public Snapshot loadBuiltInSnapshot() throws IOException {
+    public Snapshot loadBuiltInSnapshot() throws IOException, IllegalStateException {
         // read the config vars for the built in snapshot files
         boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
         String snapshotPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_FILE);
         String snapshotSigPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE);
 
-        if (!testnet && !SignedFiles.isFileSignatureValid(
+        // verify the signature of the builtin snapshot file
+        if(!testnet && !SignedFiles.isFileSignatureValid(
             snapshotPath,
             snapshotSigPath,
             SNAPSHOT_PUBKEY,
             SNAPSHOT_PUBKEY_DEPTH,
             SNAPSHOT_INDEX
         )) {
-            throw new RuntimeException("Snapshot signature failed.");
+            throw new IllegalStateException("the snapshot signature is invalid");
         }
 
+        // restore the snapshot state from its file
         SnapshotState snapshotState = SnapshotState.fromFile(snapshotPath);
 
         // check the supply of the snapshot state
         if(!snapshotState.hasCorrectSupply()) {
-            throw new IllegalStateException("the snapshot files have an invalid supply");
+            throw new IllegalStateException("the snapshot state file has an invalid supply");
         }
 
         // check the consistency of the snaphot state
         if(!snapshotState.isConsistent()) {
-            throw new IllegalStateException("the snapshot file is not consistent");
+            throw new IllegalStateException("the snapshot state file is not consistent");
         }
 
         // return our snapshot
@@ -239,7 +241,46 @@ public class SnapshotManager {
         );
     }
 
-    public Snapshot writeLocalSnapshot() {
-        return null;
+    public Snapshot writeLocalSnapshot() throws SnapshotException {
+        // load necessary configuration parameters
+        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
+        String basePath = configuration.string(
+            testnet ? Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH
+                    : Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH
+        );
+        int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+
+        // determine our target milestone
+        int targetMilestoneIndex = latestSnapshot.getIndex() - snapshotDepth;
+
+        // try to load the milestone
+        MilestoneViewModel targetMilestone = null;
+        try {
+            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
+        } catch(Exception e) {
+            throw new SnapshotException("could not load the target milestone", e);
+        }
+
+        // if we couldn't find a milestone with the given index -> abort
+        if(targetMilestone == null) {
+            throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
+        }
+
+        Snapshot targetSnapshot = null;
+        try {
+            targetSnapshot = generateSnapshot(targetMilestone);
+        } catch(Exception e) {
+            throw new SnapshotException("could not generate the snapshot");
+        }
+
+
+        try {
+            targetSnapshot.getState().writeFile(basePath + ".snapshot.state");
+            targetSnapshot.getMetaData().writeFile(basePath + ".snapshot.meta");
+        } catch(IOException e) {
+            throw new SnapshotException("could not write local snapshot files", e);
+        }
+
+        return targetSnapshot;
     }
 }

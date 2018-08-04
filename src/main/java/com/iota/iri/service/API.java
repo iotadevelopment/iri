@@ -5,10 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.iota.iri.*;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.conf.Configuration.DefaultConfSettings;
-import com.iota.iri.controllers.AddressViewModel;
-import com.iota.iri.controllers.BundleViewModel;
-import com.iota.iri.controllers.TagViewModel;
-import com.iota.iri.controllers.TransactionViewModel;
+import com.iota.iri.controllers.*;
 import com.iota.iri.hash.Curl;
 import com.iota.iri.hash.PearlDiver;
 import com.iota.iri.hash.Sponge;
@@ -211,6 +208,37 @@ public class API {
             log.debug("# {} -> Requesting command '{}'", counter.incrementAndGet(), command);
 
             switch (command) {
+                case "takeSnapshot": {
+                    Snapshot localSnapshot = instance.snapshotManager.writeLocalSnapshot();
+
+                    return ErrorResponse.create("snapshot taken: " + localSnapshot.getIndex());
+                }
+                case "getTransactionDetails": {
+                    Hash transactionHash;
+                    try {
+                        transactionHash = new Hash(getParameterAsStringAndValidate(request, "transaction", HASH_SIZE));
+                    } catch(ValidationException e) {
+                        transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
+                    }
+
+                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+
+                    transaction.updateReferencedSnapshot(instance.tangle);
+
+                    String isConsistent = "" + transaction.getValidity();
+
+                    String isSolid = transaction.isSolid() ? "true" : "false";
+
+                    String isSnapshot = transaction.isSnapshot() ? "true" : "false";
+
+                    MilestoneViewModel snapshotIndexMilestone = MilestoneViewModel.get(instance.tangle, transaction.snapshotIndex());
+                    String snapshotIndex = "" + transaction.snapshotIndex() + "" + (snapshotIndexMilestone == null ? "" : " (" + snapshotIndexMilestone.getHash().toString() + ")");
+
+                    MilestoneViewModel referencedSnapshotMilestone = MilestoneViewModel.get(instance.tangle, transaction.referencedSnapshot());
+                    String referencedSnapshot = "" + transaction.referencedSnapshot() + "" + (referencedSnapshotMilestone == null ? "" : " (" + referencedSnapshotMilestone.getHash().toString() + ")");
+
+                    return ErrorResponse.create(transaction.getHash().toString() + ": isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex + "; referencedSnapshot: " + referencedSnapshot);
+                }
                 case "storeMessage": {
                     if (!testNet) {
                         return AccessLimitedResponse.create("COMMAND storeMessage is only available on testnet");
@@ -281,7 +309,7 @@ public class API {
                     return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                             Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
                             Runtime.getRuntime().totalMemory(), instance.milestone.latestMilestone, instance.milestone.latestMilestoneIndex,
-                            instance.milestone.latestSolidSubtangleMilestone, instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.initialSnapshot().getIndex(),
+                            instance.milestone.latestSolidSubtangleMilestone, instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.getInitialSnapshot().getIndex(),
                             instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                             System.currentTimeMillis(), instance.tipsViewModel.size(),
                             instance.transactionRequester.numberOfTransactionsToRequest());
@@ -506,6 +534,12 @@ public class API {
         validateParamExists(request, paramName);
         String result = (String) request.get(paramName);
         validateTrytes(paramName, size, result);
+        return result;
+    }
+
+    private String getParameterAsString(Map<String, Object> request, String paramName) throws ValidationException {
+        validateParamExists(request, paramName);
+        String result = (String) request.get(paramName);
         return result;
     }
 

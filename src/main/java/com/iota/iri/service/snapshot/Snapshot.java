@@ -51,6 +51,30 @@ public class Snapshot {
     }
 
     /**
+     * This method creates a deep clone of the Snapshot object.
+     *
+     * It can be used to make a copy of the object, that then can be modified without affecting the original object.
+     *
+     * @return deep copy of the original object
+     */
+    public Snapshot clone() {
+        // lock the object for reading
+        lockRead();
+
+        // create the clone
+        try {
+            return new Snapshot(state.clone(), metaData.clone());
+        }
+
+        // unlock the object
+        finally {
+            unlockRead();
+        }
+    }
+
+    // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
      * Locks the complete Snapshot object for read access.
      *
      * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
@@ -107,19 +131,6 @@ public class Snapshot {
     }
 
     /**
-     * This method creates a deep clone of the Snapshot object.
-     *
-     * It can be used to make a copy of the object, that then can be modified without affecting the original object.
-     *
-     * @return deep copy of the original object
-     */
-    public Snapshot clone() {
-        return new Snapshot(state.clone(), metaData.clone());
-    }
-
-    // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
-
-    /**
      * This method updates both - the balances and the index - in a single call.
      *
      * It first locks both child objects and then performs the corresponding updates. It is used by the MilestoneTracker
@@ -138,12 +149,16 @@ public class Snapshot {
         lockWrite();
 
         // apply our changes without locking the underlying members (we already locked globally)
-        state.applyStateDiff(diff, false);
-        metaData.setIndex(newIndex, false);
-        metaData.setTimestamp(System.currentTimeMillis() / 1000L);
+        try {
+            state.applyStateDiff(diff, false);
+            metaData.setIndex(newIndex, false);
+            metaData.setTimestamp(System.currentTimeMillis() / 1000L, false);
+        }
 
         // unlock the access to this object once we are done updating
-        unlockWrite();
+        finally {
+            unlockWrite();
+        }
     }
 
     /**
@@ -161,7 +176,8 @@ public class Snapshot {
     }
 
     /**
-     * This is a utility method for determining the index of the snapshot.
+     * This is a utility method for determining the index of the snapshot, with locking the underlying metadata object
+     * first.
      *
      * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
      * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
@@ -170,6 +186,49 @@ public class Snapshot {
      * @return the milestone index of the snapshot
      */
     public int getIndex() {
-        return metaData.getIndex();
+        return getIndex(true);
+    }
+
+    /**
+     * This is a utility method for determining the index of the snapshot, with optionally locking the underlying
+     * metadata object.
+     *
+     * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
+     * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
+     * having to manually traverse the necessary references.
+     *
+     * @param lock if set to true the metadata object will be read-locked for other threads
+     * @return the milestone index of the snapshot
+     */
+    public int getIndex(boolean lock) {
+        return metaData.getIndex(lock);
+    }
+
+    /**
+     * This is a utility method for determining the timestamp of the snapshot, with locking the underlying metadata
+     * object first.
+     *
+     * Even though the timestamp is not directly stored in this object, we offer the ability to read it from the
+     * Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more readable,
+     * without having to manually traverse the necessary references.
+     *
+     * @return the timestamp when the snapshot was updated or created
+     */
+    public long getTimestamp() {
+        return getTimestamp(true);
+    }
+
+    /**
+     * This is a utility method for determining the timestamp of the snapshot, with optionally locking the underlying
+     * metadata object first.
+     *
+     * Even though the timestamp is not directly stored in this object, we offer the ability to read it from the
+     * Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more readable,
+     * without having to manually traverse the necessary references.
+     *
+     * @return the timestamp when the snapshot was updated or created
+     */
+    public long getTimestamp(boolean lock) {
+        return metaData.getTimestamp(lock);
     }
 }

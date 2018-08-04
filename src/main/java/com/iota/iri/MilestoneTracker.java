@@ -234,13 +234,13 @@ public class MilestoneTracker {
 
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, currentMilestone.index(), testnet, snapshotManager.initialSnapshot().getIndex()
+                    tangle, currentMilestone.index(), testnet, snapshotManager.getInitialSnapshot().getIndex()
                 );
             }
         } catch(Exception e) { /* do nothing */ }
 
         // reset the ledger state to the initial state
-        snapshotManager.reset();
+        snapshotManager.resetLatestSnapshot();
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
@@ -305,7 +305,7 @@ public class MilestoneTracker {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.initialSnapshot().getIndex()
+            tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -321,7 +321,7 @@ public class MilestoneTracker {
 
             // iterate to the next milestone
             nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.initialSnapshot().getIndex()
+                tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
             );
         }
     }
