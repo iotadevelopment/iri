@@ -319,9 +319,13 @@ public class Milestone {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
+        // introduce some variables that help us to emit log messages while processing the milestones
+        int previousSolidSubtangleLatestMilestoneIndex = latestSolidSubtangleMilestoneIndex;
+        int milestonesProcessed = 0;
+
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, latestSolidSubtangleMilestoneIndex
+            tangle, previousSolidSubtangleLatestMilestoneIndex
         );
 
         // while we have a milestone which is solid
@@ -336,6 +340,17 @@ public class Milestone {
                 // update our internal variables
                 latestSolidSubtangleMilestone = nextMilestone.getHash();
                 latestSolidSubtangleMilestoneIndex = nextMilestone.index();
+
+                // dump a log message every 1000 milestones
+                if(milestonesProcessed++ % 1000 == 999) {
+                    messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
+                    messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
+                    log.info("Latest SOLID SUBTANGLE milestone has changed from #"
+                             + previousSolidSubtangleLatestMilestoneIndex + " to #"
+                             + latestSolidSubtangleMilestoneIndex);
+
+                    previousSolidSubtangleLatestMilestoneIndex = nextMilestone.index();
+                }
 
                 // iterate to the next milestone
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, latestSolidSubtangleMilestoneIndex);
