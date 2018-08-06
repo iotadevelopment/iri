@@ -114,7 +114,13 @@ public class Snapshot {
         return i;
     }
 
-    private Snapshot(Map<Hash, Long> initialState, int index) {
+    public void index(int newIndex) {
+        rwlock.writeLock().lock();
+        index = newIndex;
+        rwlock.writeLock().unlock();
+    }
+
+    public Snapshot(Map<Hash, Long> initialState, int index) {
         state = new HashMap<>(initialState);
         this.index = index;
     }
