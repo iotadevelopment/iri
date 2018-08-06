@@ -245,9 +245,7 @@ public class LedgerValidator {
                 }
 
                 // iterate to the next milestone
-                candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, milestone.initialSnapshot.index()
-                );
+                candidateMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, candidateMilestone.index());
             }
         } finally {
             milestone.latestSnapshot.rwlock.writeLock().unlock();

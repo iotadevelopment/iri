@@ -108,18 +108,10 @@ public class MilestoneViewModel {
      *
      * @param tangle Tangle object which acts as a database interface
      * @param index milestone index where the search shall start
-     * @param testnet boolean flag indicating if we are running in testnet or mainnet
-     * @param milestoneStartIndex start index of the milestones (changes with a global snapshot only)
      * @return the milestone which follows directly after the given index
      * @throws Exception if anything goes wrong while loading entries from the database
      */
-    public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index, boolean testnet,
-                                                              int milestoneStartIndex) throws Exception {
-        // fallback if we provide an index that is lower than our start index
-        if(!testnet && index <= milestoneStartIndex) {
-            return first(tangle);
-        }
-
+    public static MilestoneViewModel findClosestNextMilestone(Tangle tangle, int index) throws Exception {
         // create a variable that will contain our search result
         MilestoneViewModel nextMilestoneViewModel = null;
 
