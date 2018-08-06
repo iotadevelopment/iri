@@ -238,7 +238,7 @@ public class Milestone {
         } catch(Exception e) { /* do nothing */ }
 
         // reset the ledger state to the initial state
-        latestSnapshot = initialSnapshot;
+        latestSnapshot = initialSnapshot.clone();
         latestSolidSubtangleMilestone = Hash.NULL_HASH;
         latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
 
@@ -314,6 +314,7 @@ public class Milestone {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
+            // if we can update the ledger state with our current milestone
             if(ledgerValidator.updateSnapshot(nextMilestone)) {
                 // update our internal variables
                 latestSolidSubtangleMilestone = nextMilestone.getHash();
@@ -321,10 +322,15 @@ public class Milestone {
 
                 // iterate to the next milestone
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, latestSolidSubtangleMilestoneIndex);
-            } else {
-                reset(MilestoneViewModel.get(tangle, initialSnapshot.index()));
+            }
 
-                nextMilestone = null;
+            // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
+            else if(latestSnapshot.index() != initialSnapshot.index()) {
+                // reset the ledger to the initial snapshot and rebuild everything
+                reset(MilestoneViewModel.findClosestNextMilestone(tangle, initialSnapshot.index()));
+
+                // and abort our loop
+                break;
             }
         }
     }
