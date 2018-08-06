@@ -49,7 +49,6 @@ public class Configuration {
     public static final String REQ_HASH_SIZE = "46";
     public static final String TESTNET_REQ_HASH_SIZE = "49";
     public static final String BELOW_MAX_DEPTH_LIMIT = "20000";
-    public static final String WALK_VALIDATOR_CACHE = "200000";
 
 
 
@@ -111,9 +110,7 @@ public class Configuration {
         LOCAL_SNAPSHOTS_ENABLED,
         LOCAL_SNAPSHOTS_DEPTH,
         LOCAL_SNAPSHOTS_MAINNET_BASE_PATH,
-        LOCAL_SNAPSHOTS_TESTNET_BASE_PATH,
-
-        WALK_VALIDATOR_CACHE_SIZE
+        LOCAL_SNAPSHOTS_TESTNET_BASE_PATH
     }
 
 
@@ -185,8 +182,6 @@ public class Configuration {
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "100");
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH.name(), "snapshotMainnet");
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH.name(), "snapshotTestnet");
-
-        conf.put(DefaultConfSettings.WALK_VALIDATOR_CACHE_SIZE.name(), WALK_VALIDATOR_CACHE);
     }
 
     public boolean init() throws IOException {

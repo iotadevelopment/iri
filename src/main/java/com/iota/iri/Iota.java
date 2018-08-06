@@ -92,7 +92,6 @@ public class Iota {
         double alpha = configuration.doubling(Configuration.DefaultConfSettings.TIPSELECTION_ALPHA.name());
         int belowMaxDepthTxLimit = configuration.integer(
                 Configuration.DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT);
-        int walkValidatorCacheSize = configuration.integer(Configuration.DefaultConfSettings.WALK_VALIDATOR_CACHE_SIZE);
 
         boolean dontValidateMilestoneSig = configuration.booling(Configuration.DefaultConfSettings
                 .DONT_VALIDATE_TESTNET_MILESTONE_SIG);
@@ -127,7 +126,7 @@ public class Iota {
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
         ledgerValidator = new LedgerValidator(tangle, milestone, snapshotManager, transactionRequester, messageQ, testnet);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
-        tipsSelector = createTipSelector(milestoneStartIndex, alpha, belowMaxDepthTxLimit, walkValidatorCacheSize);
+        tipsSelector = createTipSelector(milestoneStartIndex, alpha, belowMaxDepthTxLimit);
     }
 
     public void init() throws Exception {
@@ -224,13 +223,12 @@ public class Iota {
         }
     }
 
-    private TipSelector createTipSelector(int milestoneStartIndex, double alpha, int belowMaxDepthTxLimit,
-                                          int walkValidatorCacheSize) {
+    private TipSelector createTipSelector(int milestoneStartIndex, double alpha, int belowMaxDepthTxLimit) {
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, snapshotManager);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle);
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(alpha, new SecureRandom(), tangle, messageQ, tailFinder);
         return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, transactionValidator, entryPointSelector, ratingCalculator,
-                walker, milestone, maxTipSearchDepth, belowMaxDepthTxLimit, walkValidatorCacheSize);
+                walker, milestone, maxTipSearchDepth, belowMaxDepthTxLimit);
     }
 }

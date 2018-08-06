@@ -490,8 +490,7 @@ public class API {
             try {
                 WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.ledgerValidator,
                         instance.transactionValidator, instance.milestone, instance.snapshotManager, instance.tipsSelector.getMaxDepth(),
-                        instance.configuration.integer(DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT),
-                        instance.configuration.integer(DefaultConfSettings.WALK_VALIDATOR_CACHE_SIZE));
+                        instance.configuration.integer(DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT));
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
                         state = false;
