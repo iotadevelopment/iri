@@ -122,7 +122,7 @@ public class SnapshotManager {
             // retrieve the balance diff from the db
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
 
-            // if we have a diff apply it
+            // if we have a diff apply it (with inverted values)
             if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
                 // create the SnapshotStateDiff object for our changes
                 SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff().entrySet().stream().map(
@@ -144,6 +144,9 @@ public class SnapshotManager {
                 throw new IllegalStateException("could not reach the target milestone - missing links in the database");
             }
         }
+
+        // set the snapshot index to our target milestone
+        snapshot.getMetaData().setIndex(targetMilestone.index());
 
         // return the result
         return snapshot;
