@@ -288,9 +288,9 @@ public class WalkValidatorImplTest {
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), tx2.getHash()))
                 .thenReturn(true);
 
-        milestoneTracker.latestSolidSubtangleMilestoneIndex = 100;
+        snapshotManager.getLatestSnapshot().getMetaData().setIndex(100);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, ledgerValidator, transactionValidator,
-                milestoneTracker, 15, maxAnalyzedTxs);
+                milestoneTracker, snapshotManager, 15, maxAnalyzedTxs);
         Assert.assertFalse("Validation of tx4 succeeded but should have failed since tx is below max depth",
                 walkValidator.isValid(tx4.getHash()));
         Assert.assertTrue("Validation of tx2 failed but should have succeeded since tx is above max depth",
@@ -332,9 +332,9 @@ public class WalkValidatorImplTest {
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), tx4.getHash()))
                 .thenReturn(true);
 
-        milestoneTracker.latestSolidSubtangleMilestoneIndex = 100;
+        snapshotManager.getLatestSnapshot().getMetaData().setIndex(100);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, ledgerValidator, transactionValidator,
-                milestoneTracker, 15, maxAnalyzedTxs);
+                milestoneTracker, snapshotManager, 15, maxAnalyzedTxs);
         Assert.assertFalse("Validation of tx4 succeeded but should have failed since tx is below max depth",
                 walkValidator.isValid(tx4.getHash()));
 
