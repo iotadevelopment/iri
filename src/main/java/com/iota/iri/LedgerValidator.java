@@ -257,19 +257,19 @@ public class LedgerValidator {
 
     public boolean updateSnapshot(MilestoneViewModel milestoneVM) throws Exception {
         TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
-        milestone.latestSnapshot.rwlock.writeLock().lock();
-        try {
-            final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
-            boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
-            if (!hasSnapshot) {
-                // if the snapshotIndex of our transaction was set already, we have processed our milestones in
-                // the wrong order (i.e. while rescanning the db)
-                if(transactionSnapshotIndex != 0) {
-                    milestone.reset(milestoneVM);
+        final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
+        boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
+        if (!hasSnapshot) {
+            // if the snapshotIndex of our transaction was set already, we have processed our milestones in
+            // the wrong order (i.e. while rescanning the db)
+            if(transactionSnapshotIndex != 0) {
+                milestone.reset(milestoneVM);
 
-                    return false;
-                }
+                return false;
+            }
 
+            milestone.latestSnapshot.rwlock.writeLock().lock();
+            try {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, milestone.latestSnapshot.index(), true);
                 hasSnapshot = currentState != null && Snapshot.isConsistent(milestone.latestSnapshot.patchedDiff(currentState));
@@ -282,11 +282,11 @@ public class LedgerValidator {
                     }
                     milestone.latestSnapshot.apply(currentState, milestoneVM.index());
                 }
+            } finally {
+                milestone.latestSnapshot.rwlock.writeLock().unlock();
             }
-            return hasSnapshot;
-        } finally {
-            milestone.latestSnapshot.rwlock.writeLock().unlock();
         }
+        return hasSnapshot;
     }
 
     public boolean checkConsistency(List<Hash> hashes) throws Exception {
