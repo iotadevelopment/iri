@@ -181,23 +181,11 @@ public class Milestone {
                 long scanTime = System.currentTimeMillis();
 
                 try {
-                    final int previousSolidSubtangleLatestMilestoneIndex = latestSolidSubtangleMilestoneIndex;
-
                     if(latestSolidSubtangleMilestoneIndex < latestMilestoneIndex) {
                         updateLatestSolidSubtangleMilestone();
                     }
 
-                    if (previousSolidSubtangleLatestMilestoneIndex != latestSolidSubtangleMilestoneIndex) {
-
-                        messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
-                        messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
-                        log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                                + previousSolidSubtangleLatestMilestoneIndex + " to #"
-                                + latestSolidSubtangleMilestoneIndex);
-                    }
-
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
-
                 } catch (final Exception e) {
                     log.error("Error during Solid Milestone updating", e);
                 }
@@ -321,7 +309,7 @@ public class Milestone {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // introduce some variables that help us to emit log messages while processing the milestones
         int previousSolidSubtangleLatestMilestoneIndex = latestSolidSubtangleMilestoneIndex;
-        int milestonesProcessed = 0;
+        long scanStart = System.currentTimeMillis() / 1000L;
 
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
@@ -341,14 +329,15 @@ public class Milestone {
                 latestSolidSubtangleMilestone = nextMilestone.getHash();
                 latestSolidSubtangleMilestoneIndex = nextMilestone.index();
 
-                // dump a log message every 1000 milestones
-                if(milestonesProcessed++ % 1000 == 999) {
+                // dump a log message every second
+                if((System.currentTimeMillis() / 1000L) - scanStart >= 1) {
                     messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
                     messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
                     log.info("Latest SOLID SUBTANGLE milestone has changed from #"
                              + previousSolidSubtangleLatestMilestoneIndex + " to #"
                              + latestSolidSubtangleMilestoneIndex);
 
+                    scanStart = System.currentTimeMillis() / 1000L;
                     previousSolidSubtangleLatestMilestoneIndex = nextMilestone.index();
                 }
 
@@ -364,6 +353,15 @@ public class Milestone {
                 // and abort our loop
                 break;
             }
+        }
+
+        // dump a final log message when we are done
+        if (previousSolidSubtangleLatestMilestoneIndex != latestSolidSubtangleMilestoneIndex) {
+            messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
+            messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
+            log.info("Latest SOLID SUBTANGLE milestone has changed from #"
+                     + previousSolidSubtangleLatestMilestoneIndex + " to #"
+                     + latestSolidSubtangleMilestoneIndex);
         }
     }
 
