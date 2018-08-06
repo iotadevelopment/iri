@@ -1,8 +1,6 @@
 package com.iota.iri;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -219,12 +217,21 @@ public class MilestoneTracker {
      *
      * @param currentMilestone the last correct milestone
      */
-    public void reset(MilestoneViewModel currentMilestone) {
+    public void reset(MilestoneViewModel targetMilestone) {
+        // ignore errors due to old milestones
+        if(targetMilestone == null || targetMilestone.index() < snapshotManager.getInitialSnapshot().getIndex()) {
+            return;
+        }
+
         // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.incrementAndGet();
 
+        // log a message when we are resetting
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ...");
+
         // prune all potentially invalid database fields
         try {
+            MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null) {
                 // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
                 TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
@@ -237,7 +244,17 @@ public class MilestoneTracker {
                     tangle, currentMilestone.index(), testnet, snapshotManager.getInitialSnapshot().getIndex()
                 );
             }
-        } catch(Exception e) { /* do nothing */ }
+        }
+
+        // and inform us if sth goes wrong
+        catch(Exception e) {
+            // create a string representation of the stacktrace
+            StringWriter stackTraceStringWriter = new StringWriter();
+            e.printStackTrace(new PrintWriter(stackTraceStringWriter));
+
+            // dump the error message
+            log.error("Error while resetting the ledger: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
+        }
 
         // reset the ledger state to the initial state
         snapshotManager.resetLatestSnapshot();
@@ -245,6 +262,9 @@ public class MilestoneTracker {
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
+
+        // dump message when we are done
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ... done");
     }
 
     private Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
@@ -313,16 +333,22 @@ public class MilestoneTracker {
             solidMilestoneTrackerTasks.get() == 0 &&
             !shuttingDown &&
             nextMilestone != null &&
-            transactionValidator.checkSolidity(nextMilestone.getHash(), true) &&
-            ledgerValidator.updateSnapshot(nextMilestone)
+            transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
-            // update our internal variables
-            latestSolidSubtangleMilestone = nextMilestone.getHash();
+            if(ledgerValidator.updateSnapshot(nextMilestone)) {
+                // update our internal variables
+                latestSolidSubtangleMilestone = nextMilestone.getHash();
+                snapshotManager.getLatestSnapshot().getMetaData().setIndex(nextMilestone.index());
 
-            // iterate to the next milestone
-            nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
-            );
+                // iterate to the next milestone
+                nextMilestone = MilestoneViewModel.findClosestNextMilestone(
+                    tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
+                );
+            } else {
+                reset(MilestoneViewModel.get(tangle, snapshotManager.getInitialSnapshot().getIndex()));
+
+                nextMilestone = null;
+            }
         }
     }
 
