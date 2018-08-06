@@ -1,8 +1,6 @@
 package com.iota.iri;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -79,8 +77,8 @@ public class Milestone {
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.latestMilestoneIndex = initialSnapshot.index();
-        this.latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
+        this.latestMilestoneIndex = latestSnapshot.index();
+        this.latestSolidSubtangleMilestoneIndex = latestSnapshot.index();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
     }
 
@@ -130,7 +128,7 @@ public class Milestone {
                                                 }
                                                 break;
                                             case INCOMPLETE:
-                                                // issue a solidity check to solidify unsolid milestones
+                                                // issue a solidity check to solidify incomplete milestones
                                                 // Note: otherwise a milestone that was followed by a coo-snapshot might
                                                 //       never get solidifed again since it doesnt have connections to
                                                 //       the tips
@@ -217,14 +215,23 @@ public class Milestone {
      * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
      * us to recover from the invalid ledger state without repairing or pruning the database.
      *
-     * @param currentMilestone the last correct milestone
+     * @param targetMilestone the last correct milestone
      */
-    public void reset(MilestoneViewModel currentMilestone) {
+    public void reset(MilestoneViewModel targetMilestone) {
+        // ignore errors due to old milestones
+        if(targetMilestone == null || targetMilestone.index() < initialSnapshot.index()) {
+            return;
+        }
+
         // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.incrementAndGet();
 
+        // log a message when we are resetting
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ...");
+
         // prune all potentially invalid database fields
         try {
+            MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null) {
                 // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
                 TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
@@ -235,7 +242,14 @@ public class Milestone {
                 // iterate to the next milestone
                 currentMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index());
             }
-        } catch(Exception e) { /* do nothing */ }
+        } catch(Exception e) {
+            // create a string representation of the stacktrace
+            StringWriter stackTraceStringWriter = new StringWriter();
+            e.printStackTrace(new PrintWriter(stackTraceStringWriter));
+
+            // dump the error message
+            log.error("Error while resetting the ledger: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
+        }
 
         // reset the ledger state to the initial state
         latestSnapshot = initialSnapshot.clone();
@@ -244,6 +258,9 @@ public class Milestone {
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
+
+        // dump message when we are done
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ... done");
     }
 
     private Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
