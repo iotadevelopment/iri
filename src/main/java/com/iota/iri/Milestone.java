@@ -217,7 +217,7 @@ public class Milestone {
      *
      * @param targetMilestone the last correct milestone
      */
-    public void reset(MilestoneViewModel targetMilestone) {
+    public void reset(MilestoneViewModel targetMilestone, String reason) {
         // ignore errors due to old milestones
         if(targetMilestone == null || targetMilestone.index() < initialSnapshot.index()) {
             return;
@@ -227,7 +227,7 @@ public class Milestone {
         solidMilestoneTrackerTasks.incrementAndGet();
 
         // log a message when we are resetting
-        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ...");
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to: " + reason + " ...");
 
         // prune all potentially invalid database fields
         try {
@@ -260,7 +260,7 @@ public class Milestone {
         solidMilestoneTrackerTasks.decrementAndGet();
 
         // dump message when we are done
-        log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to invalid state ... done");
+        log.info("Resetting ledger to milestone " + targetMilestone.index() + " ... done");
     }
 
     private Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
@@ -305,7 +305,7 @@ public class Milestone {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
-                                reset(newMilestoneViewModel);
+                                reset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {
@@ -344,7 +344,7 @@ public class Milestone {
             // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
             else if(latestSnapshot.index() != initialSnapshot.index()) {
                 // reset the ledger to the initial snapshot and rebuild everything
-                reset(MilestoneViewModel.findClosestNextMilestone(tangle, initialSnapshot.index()));
+                reset(MilestoneViewModel.findClosestNextMilestone(tangle, initialSnapshot.index()), "failed to update ledger");
 
                 // and abort our loop
                 break;
