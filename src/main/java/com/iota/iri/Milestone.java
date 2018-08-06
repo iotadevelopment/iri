@@ -324,7 +324,7 @@ public class Milestone {
             tangle, latestSolidSubtangleMilestoneIndex
         );
 
-        // while we have a milestone which is solid and which was updated + verified
+        // while we have a milestone which is solid
         while(
             solidMilestoneTrackerTasks.get() == 0 &&
             !shuttingDown &&
