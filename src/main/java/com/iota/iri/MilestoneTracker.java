@@ -215,7 +215,7 @@ public class MilestoneTracker {
      * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
      * us to recover from the invalid ledger state without repairing or pruning the database.
      *
-     * @param currentMilestone the last correct milestone
+     * @param targetMilestone the last correct milestone
      */
     public void reset(MilestoneViewModel targetMilestone) {
         // ignore errors due to old milestones
@@ -240,9 +240,7 @@ public class MilestoneTracker {
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
 
                 // iterate to the next milestone
-                currentMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, currentMilestone.index(), testnet, snapshotManager.getInitialSnapshot().getIndex()
-                );
+                currentMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index());
             }
         }
 
@@ -325,7 +323,7 @@ public class MilestoneTracker {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
+            tangle, snapshotManager.getLatestSnapshot().getIndex()
         );
 
         // while we have a milestone which is solid and which was updated + verified
@@ -342,7 +340,7 @@ public class MilestoneTracker {
 
                 // iterate to the next milestone
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
+                    tangle, snapshotManager.getLatestSnapshot().getIndex()
                 );
             } else {
                 reset(MilestoneViewModel.get(tangle, snapshotManager.getInitialSnapshot().getIndex()));

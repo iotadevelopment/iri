@@ -17,23 +17,18 @@ public class EntryPointSelectorImpl implements EntryPointSelector {
     private final Tangle tangle;
     private final MilestoneTracker milestone;
     private final SnapshotManager snapshotManager;
-    private final boolean testnet;
-    private final int milestoneStartIndex;
 
-    public EntryPointSelectorImpl(Tangle tangle, MilestoneTracker milestone, SnapshotManager snapshotManager, boolean testnet, int milestoneStartIndex) {
+    public EntryPointSelectorImpl(Tangle tangle, MilestoneTracker milestone, SnapshotManager snapshotManager) {
         this.tangle = tangle;
         this.milestone = milestone;
         this.snapshotManager = snapshotManager;
-
-        this.testnet = testnet;
-        this.milestoneStartIndex = milestoneStartIndex;
     }
 
     @Override
     public Hash getEntryPoint(int depth) throws Exception {
-        int milestoneIndex = Math.max(snapshotManager.getLatestSnapshot().getIndex() - depth - 1, 0);
+        int milestoneIndex = Math.max(snapshotManager.getLatestSnapshot().getIndex() - depth - 1, -1);
         MilestoneViewModel milestoneViewModel =
-                MilestoneViewModel.findClosestNextMilestone(tangle, milestoneIndex, testnet, milestoneStartIndex);
+                MilestoneViewModel.findClosestNextMilestone(tangle, milestoneIndex);
         if (milestoneViewModel != null && milestoneViewModel.getHash() != null) {
             return milestoneViewModel.getHash();
         }

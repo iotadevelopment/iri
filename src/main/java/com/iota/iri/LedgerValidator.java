@@ -214,7 +214,7 @@ public class LedgerValidator {
         snapshotManager.getLatestSnapshot().lockWrite();
         try {
             MilestoneViewModel candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, snapshotManager.getLatestSnapshot().getIndex(), testnet, snapshotManager.getInitialSnapshot().getIndex()
+                tangle, snapshotManager.getLatestSnapshot().getIndex()
             );
             System.out.println("AT " + candidateMilestone.index() + " FROM " + snapshotManager.getInitialSnapshot().getIndex());
             while (candidateMilestone != null) {
@@ -254,7 +254,7 @@ public class LedgerValidator {
 
                 // iterate to the next milestone
                 candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, candidateMilestone.index(), testnet, snapshotManager.getInitialSnapshot().getIndex()
+                    tangle, candidateMilestone.index()
                 );
             }
         } finally {
