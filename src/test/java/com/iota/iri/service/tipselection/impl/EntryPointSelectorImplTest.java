@@ -36,6 +36,7 @@ public class EntryPointSelectorImplTest {
     @BeforeClass
     public static void setUp() throws Exception {
         Configuration configuration = new Configuration();
+        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
         tangle = new Tangle();
         snapshotManager = new SnapshotManager(tangle, configuration);
         dbFolder.create();

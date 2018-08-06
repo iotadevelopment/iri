@@ -156,8 +156,6 @@ public class SnapshotManager {
         // load necessary configuration parameters
         boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
 
-        System.out.println(localSnapshotsEnabled);
-
         // if local snapshots are enabled
         if(localSnapshotsEnabled) {
             // load the remaining configuration parameters
@@ -195,6 +193,8 @@ public class SnapshotManager {
 
                 // retrieve the meta data to our local snapshot
                 SnapshotMetaData snapshotMetaData = SnapshotMetaData.fromFile(localSnapshotMetadDataFile);
+
+                log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
 
                 // return our Snapshot
                 return new Snapshot(snapshotState, snapshotMetaData);
