@@ -199,7 +199,7 @@ public class Iota {
     }
 
     private TipSelector createTipSelector(int milestoneStartIndex, double alpha, int belowMaxDepthTxLimit) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, testnet, milestoneStartIndex);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle);
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(alpha, new SecureRandom(), tangle, messageQ, tailFinder);

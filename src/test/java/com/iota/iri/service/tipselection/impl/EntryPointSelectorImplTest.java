@@ -18,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.HashMap;
-import java.util.Map;
 
 @RunWith(MockitoJUnitRunner.class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -32,7 +31,6 @@ public class EntryPointSelectorImplTest {
 
     @BeforeClass
     public static void setUp() throws Exception {
-        Configuration configuration = new Configuration();
         tangle = new Tangle();
         dbFolder.create();
         logFolder.create();
@@ -50,22 +48,22 @@ public class EntryPointSelectorImplTest {
     }
 
     @Test
-    public void testEntryPoint_A_WithoutTangleData() throws Exception {
+    public void testEntryPointAWithoutTangleData() throws Exception {
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, false, 0);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
     }
 
     @Test
-    public void testEntryPoint_B_WithTangleData() throws Exception {
+    public void testEntryPointBWithTangleData() throws Exception {
         Hash milestoneHash = Hash.calculate(SpongeFactory.Mode.CURLP81, new byte[]{1});
         mockTangleBehavior(milestoneHash);
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, false, 0);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);

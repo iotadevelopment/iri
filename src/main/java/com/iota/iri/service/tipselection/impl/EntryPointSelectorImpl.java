@@ -15,15 +15,10 @@ public class EntryPointSelectorImpl implements EntryPointSelector {
 
     private final Tangle tangle;
     private final Milestone milestone;
-    private final boolean testnet;
-    private final int milestoneStartIndex;
 
-    public EntryPointSelectorImpl(Tangle tangle, Milestone milestone, boolean testnet, int milestoneStartIndex) {
+    public EntryPointSelectorImpl(Tangle tangle, Milestone milestone) {
         this.tangle = tangle;
         this.milestone = milestone;
-
-        this.testnet = testnet;
-        this.milestoneStartIndex = milestoneStartIndex;
     }
 
     @Override

@@ -356,7 +356,7 @@ public class Milestone {
         }
 
         // dump a final log message when we are done
-        if (previousSolidSubtangleLatestMilestoneIndex != latestSolidSubtangleMilestoneIndex) {
+        if(previousSolidSubtangleLatestMilestoneIndex != latestSolidSubtangleMilestoneIndex) {
             messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, latestSolidSubtangleMilestoneIndex);
             messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
             log.info("Latest SOLID SUBTANGLE milestone has changed from #"
