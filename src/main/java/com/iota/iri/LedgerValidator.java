@@ -24,15 +24,13 @@ public class LedgerValidator {
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
-    private boolean testnet;
 
-    public LedgerValidator(Tangle tangle, MilestoneTracker milestone, SnapshotManager snapshotManager, TransactionRequester transactionRequester, MessageQ messageQ, boolean testnet) {
+    public LedgerValidator(Tangle tangle, MilestoneTracker milestone, SnapshotManager snapshotManager, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.milestone = milestone;
         this.snapshotManager = snapshotManager;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
-        this.testnet = testnet;
     }
 
     /**
@@ -265,19 +263,19 @@ public class LedgerValidator {
 
     public boolean updateSnapshot(MilestoneViewModel milestoneVM) throws Exception {
         TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
-        snapshotManager.getLatestSnapshot().lockWrite();
-        try {
-            final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
-            boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
-            if (!hasSnapshot) {
-                // if the snapshotIndex of our transaction was set already, we have processed our milestones in
-                // the wrong order (i.e. while rescanning the db)
-                if(transactionSnapshotIndex != 0) {
-                    milestone.reset(milestoneVM);
+        final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
+        boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
+        if (!hasSnapshot) {
+            // if the snapshotIndex of our transaction was set already, we have processed our milestones in
+            // the wrong order (i.e. while rescanning the db)
+            if(transactionSnapshotIndex != 0) {
+                milestone.reset(milestoneVM, "milestones processed in the wrong order (#" + transactionSnapshotIndex +" before #" + milestoneVM.index() + ")");
 
-                    return false;
-                }
+                return false;
+            }
 
+            snapshotManager.getLatestSnapshot().lockWrite();
+            try {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
@@ -291,11 +289,12 @@ public class LedgerValidator {
                     }
                     snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index());
                 }
+            } finally {
+                snapshotManager.getLatestSnapshot().unlockWrite();
             }
-            return hasSnapshot;
-        } finally {
-            snapshotManager.getLatestSnapshot().unlockWrite();
         }
+        return hasSnapshot;
+
     }
 
     public boolean checkConsistency(List<Hash> hashes) throws Exception {

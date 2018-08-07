@@ -53,7 +53,17 @@ public class EntryPointSelectorImplTest {
     }
 
     @Test
-    public void testEntryPoint2WithTangleData() throws Exception {
+    public void testEntryPointAWithoutTangleData() throws Exception {
+        mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
+
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, snapshotManager);
+        Hash entryPoint = entryPointSelector.getEntryPoint(10);
+
+        Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
+    }
+
+    @Test
+    public void testEntryPointBWithTangleData() throws Exception {
         Hash milestoneHash = Hash.calculate(SpongeFactory.Mode.CURLP81, new byte[]{1});
         mockTangleBehavior(milestoneHash);
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
@@ -63,17 +73,6 @@ public class EntryPointSelectorImplTest {
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);
     }
-
-    @Test
-    public void testEntryPoint1WithoutTangleData() throws Exception {
-        mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
-
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, snapshotManager);
-        Hash entryPoint = entryPointSelector.getEntryPoint(10);
-
-        Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
-    }
-
 
     private void mockMilestoneTrackerBehavior(int latestSolidSubtangleMilestoneIndex, Hash latestSolidSubtangleMilestone) {
         snapshotManager.getLatestSnapshot().getMetaData().setIndex(latestSolidSubtangleMilestoneIndex);
