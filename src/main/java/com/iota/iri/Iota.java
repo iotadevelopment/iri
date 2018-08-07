@@ -101,7 +101,7 @@ public class Iota {
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
         ledgerValidator = new LedgerValidator(tangle, milestone, transactionRequester, messageQ);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
-        tipsSelector = createTipSelector(milestoneStartIndex, alpha, belowMaxDepthTxLimit);
+        tipsSelector = createTipSelector(alpha, belowMaxDepthTxLimit);
     }
 
     public void init() throws Exception {
@@ -198,7 +198,7 @@ public class Iota {
         }
     }
 
-    private TipSelector createTipSelector(int milestoneStartIndex, double alpha, int belowMaxDepthTxLimit) {
+    private TipSelector createTipSelector(double alpha, int belowMaxDepthTxLimit) {
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle);
         TailFinder tailFinder = new TailFinderImpl(tangle);
