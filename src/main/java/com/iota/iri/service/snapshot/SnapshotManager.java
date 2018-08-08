@@ -139,7 +139,8 @@ public class SnapshotManager {
         }
 
         // iterate through the milestones to our target
-        while(currentMilestone.index() > targetMilestone.index()) {
+        while(generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? currentMilestone.index() < targetMilestone.index()
+                                                               : currentMilestone.index() > targetMilestone.index()) {
             // retrieve the balance diff from the db
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
 
