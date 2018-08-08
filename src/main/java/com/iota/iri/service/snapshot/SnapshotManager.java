@@ -4,6 +4,7 @@ import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
+import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -19,6 +20,10 @@ import java.util.stream.Collectors;
 
 public class SnapshotManager {
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
+
+    public static int GENERATE_SNAPSHOT_FROM_INITIAL = 1;
+
+    public static int GENERATE_SNAPSHOT_FROM_LATEST = -1;
 
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
@@ -98,36 +103,58 @@ public class SnapshotManager {
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws Exception {
         // check if the milestone was solidified already
         if(targetMilestone.index() > latestSnapshot.getIndex()) {
-            throw new IllegalArgumentException("the milestone was not solidified yet");
+            throw new IllegalArgumentException("the target milestone was not solidified yet");
         }
 
-        // clone the current snapshot state
-        Snapshot snapshot = latestSnapshot.clone();
+        // check if the milestone came after our initial one
+        if(targetMilestone.index() < initialSnapshot.getIndex()) {
+            throw new IllegalArgumentException("the target milestone is too old");
+        }
 
-        // if the target is the latest milestone we can return immediately
-        if(targetMilestone.index() == latestSnapshot.getIndex()) {
+        // determine the distance of our target snapshot from our two snapshots (initial / latest)
+        int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
+        int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
+
+        // determine which generation mode is the fastest one
+        int generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
+                           ? GENERATE_SNAPSHOT_FROM_INITIAL
+                           : GENERATE_SNAPSHOT_FROM_LATEST;
+
+        // clone the corresponding snapshot state
+        Snapshot snapshot = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
+                          ? initialSnapshot.clone()
+                          : latestSnapshot.clone();
+
+        // if the target is the selected milestone we can return immediately
+        if(targetMilestone.index() == snapshot.getIndex()) {
             return snapshot;
         }
 
-        // retrieve the latest milestone
-        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, latestSnapshot.getIndex());
+        // retrieve the first milestone for our snapshot generation
+        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, snapshot.getIndex());
 
         // this should not happen but better give a reasonable error message if it ever does
         if(currentMilestone == null) {
-            throw new IllegalStateException("could not load the latest milestone from the database");
+            throw new IllegalStateException("could not load the starting milestone for generating our snapshot");
         }
 
-        // descend the milestones down to our target
+        // iterate through the milestones to our target
         while(currentMilestone.index() > targetMilestone.index()) {
             // retrieve the balance diff from the db
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
 
-            // if we have a diff apply it (with inverted values)
+            // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
             if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
                 // create the SnapshotStateDiff object for our changes
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff().entrySet().stream().map(
-                    hashLongEntry -> new HashMap.SimpleEntry<>(hashLongEntry.getKey(), -hashLongEntry.getValue())
-                ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
+                    stateDiffViewModel.getDiff().entrySet().stream().map(
+                        hashLongEntry -> new HashMap.SimpleEntry<>(
+                            hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
+                        )
+                    ).collect(
+                        Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                    )
+                );
 
                 // apply the balance changes to the snapshot (with inverted values)
                 snapshot.update(
@@ -137,7 +164,9 @@ public class SnapshotManager {
             }
 
             // iterate to the next milestone
-            currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+            currentMilestone = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
+                             ? MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index())
+                             : MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
 
             // this should not happen but better give a reasonable error message if it ever does
             if(currentMilestone == null) {
@@ -145,8 +174,9 @@ public class SnapshotManager {
             }
         }
 
-        // set the snapshot index to our target milestone
+        // set the snapshot index and timestamp to that of our target milestone
         snapshot.getMetaData().setIndex(targetMilestone.index());
+        snapshot.getMetaData().setTimestamp(TransactionViewModel.fromHash(tangle, targetMilestone.getHash()).getTimestamp());
 
         // return the result
         return snapshot;
