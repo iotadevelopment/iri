@@ -101,86 +101,101 @@ public class SnapshotManager {
     }
 
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws Exception {
-        // check if the milestone was solidified already
-        if(targetMilestone.index() > latestSnapshot.getIndex()) {
-            throw new IllegalArgumentException("the target milestone was not solidified yet");
-        }
+        // acquire locks for our snapshots
+        initialSnapshot.lockWrite();
+        latestSnapshot.lockWrite();
 
-        // check if the milestone came after our initial one
-        if(targetMilestone.index() < initialSnapshot.getIndex()) {
-            throw new IllegalArgumentException("the target milestone is too old");
-        }
-
-        // determine the distance of our target snapshot from our two snapshots (initial / latest)
-        int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
-        int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
-
-        // determine which generation mode is the fastest one
-        int generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
-                           ? GENERATE_SNAPSHOT_FROM_INITIAL
-                           : GENERATE_SNAPSHOT_FROM_LATEST;
-
-        // clone the corresponding snapshot state
-        Snapshot snapshot = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
-                          ? initialSnapshot.clone()
-                          : latestSnapshot.clone();
-
-        // if the target is the selected milestone we can return immediately
-        if(targetMilestone.index() == snapshot.getIndex()) {
-            return snapshot;
-        }
-
-        // retrieve the first milestone for our snapshot generation
-        MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, snapshot.getIndex());
-
-        // this should not happen but better give a reasonable error message if it ever does
-        if(currentMilestone == null) {
-            throw new IllegalStateException("could not load the starting milestone for generating our snapshot");
-        }
-
-        // iterate through the milestones to our target
-        while(generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? currentMilestone.index() < targetMilestone.index()
-                                                               : currentMilestone.index() > targetMilestone.index()) {
-            // retrieve the balance diff from the db
-            StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
-
-            // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
-            if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                // create the SnapshotStateDiff object for our changes
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
-                    stateDiffViewModel.getDiff().entrySet().stream().map(
-                        hashLongEntry -> new HashMap.SimpleEntry<>(
-                            hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
-                        )
-                    ).collect(
-                        Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-                    )
-                );
-
-                // apply the balance changes to the snapshot (with inverted values)
-                snapshot.update(
-                    snapshotStateDiff,
-                    currentMilestone.index()
-                );
+        try {
+            // check if the milestone was solidified already
+            if(targetMilestone.index() > latestSnapshot.getIndex()) {
+                throw new IllegalArgumentException("the target milestone was not solidified yet");
             }
 
-            // iterate to the next milestone
-            currentMilestone = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
-                             ? MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index())
-                             : MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+            // check if the milestone came after our initial one
+            if(targetMilestone.index() < initialSnapshot.getIndex()) {
+                throw new IllegalArgumentException("the target milestone is too old");
+            }
+
+            // determine the distance of our target snapshot from our two snapshots (initial / latest)
+            int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
+
+            System.out.println(distanceFromInitialSnapshot);
+            System.out.println(distanceFromLatestSnapshot);
+
+            // determine which generation mode is the fastest one
+            int generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
+                                 ? GENERATE_SNAPSHOT_FROM_INITIAL
+                                 : GENERATE_SNAPSHOT_FROM_LATEST;
+
+            System.out.println(generationMode);
+
+            // clone the corresponding snapshot state
+            Snapshot snapshot = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
+                                ? initialSnapshot.clone()
+                                : latestSnapshot.clone();
+
+            // if the target is the selected milestone we can return immediately
+            if(targetMilestone.index() == snapshot.getIndex()) {
+                return snapshot;
+            }
+
+            // retrieve the first milestone for our snapshot generation
+            MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, snapshot.getIndex());
 
             // this should not happen but better give a reasonable error message if it ever does
             if(currentMilestone == null) {
-                throw new IllegalStateException("could not reach the target milestone - missing links in the database");
+                throw new IllegalStateException("could not load the starting milestone for generating our snapshot");
             }
+
+            // iterate through the milestones to our target
+            while(generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? currentMilestone.index() < targetMilestone.index()
+                                                                   : currentMilestone.index() > targetMilestone.index()) {
+                // retrieve the balance diff from the db
+                StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
+
+                // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
+                if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                    // create the SnapshotStateDiff object for our changes
+                    SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
+                        stateDiffViewModel.getDiff().entrySet().stream().map(
+                            hashLongEntry -> new HashMap.SimpleEntry<>(
+                                hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
+                            )
+                        ).collect(
+                            Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                        )
+                    );
+
+                    // apply the balance changes to the snapshot (with inverted values)
+                    snapshot.update(
+                    snapshotStateDiff,
+                    currentMilestone.index()
+                    );
+                }
+
+                // iterate to the next milestone
+                currentMilestone = generationMode == GENERATE_SNAPSHOT_FROM_INITIAL
+                                   ? MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index())
+                                   : MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+
+                // this should not happen but better give a reasonable error message if it ever does
+                if(currentMilestone == null) {
+                    throw new IllegalStateException("could not reach the target milestone - missing links in the database");
+                }
+            }
+
+            // set the snapshot index and timestamp to that of our target milestone
+            snapshot.getMetaData().setIndex(targetMilestone.index());
+            snapshot.getMetaData().setTimestamp(TransactionViewModel.fromHash(tangle, targetMilestone.getHash()).getTimestamp());
+
+            // return the result
+            return snapshot;
+        } finally {
+            // release locks for our snapshots
+            initialSnapshot.unlockWrite();
+            latestSnapshot.unlockWrite();
         }
-
-        // set the snapshot index and timestamp to that of our target milestone
-        snapshot.getMetaData().setIndex(targetMilestone.index());
-        snapshot.getMetaData().setTimestamp(TransactionViewModel.fromHash(tangle, targetMilestone.getHash()).getTimestamp());
-
-        // return the result
-        return snapshot;
     }
 
     public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
