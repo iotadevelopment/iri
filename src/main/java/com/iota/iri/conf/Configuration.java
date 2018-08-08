@@ -179,7 +179,7 @@ public class Configuration {
         conf.put(DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT.name(), BELOW_MAX_DEPTH_LIMIT);
 
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED.name(), "false");
-        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "100");
+        conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH.name(), "1000");
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH.name(), "snapshotMainnet");
         conf.put(DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH.name(), "snapshotTestnet");
     }
