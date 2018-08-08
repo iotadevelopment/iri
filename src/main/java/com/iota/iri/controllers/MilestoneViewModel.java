@@ -150,4 +150,8 @@ public class MilestoneViewModel {
         tangle.delete(Milestone.class, milestone.index);
     }
 
+    @Override
+    public String toString() {
+        return "milestone #" + index() + " (" + getHash().toString() + ")";
+    }
 }
