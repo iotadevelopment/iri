@@ -141,7 +141,10 @@ public class SnapshotManager {
             }
 
             // retrieve the first milestone for our snapshot generation
-            MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, snapshot.getIndex());
+            MilestoneViewModel currentMilestone = MilestoneViewModel.get(
+                tangle,
+                snapshot.getIndex() + (generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? 1 : 0)
+            );
 
             // this should not happen but better give a reasonable error message if it ever does
             if(currentMilestone == null) {
@@ -149,7 +152,7 @@ public class SnapshotManager {
             }
 
             // iterate through the milestones to our target
-            while(generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? currentMilestone.index() < targetMilestone.index()
+            while(generationMode == GENERATE_SNAPSHOT_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index()
                                                                    : currentMilestone.index() > targetMilestone.index()) {
                 // retrieve the balance diff from the db
                 StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
@@ -169,8 +172,8 @@ public class SnapshotManager {
 
                     // apply the balance changes to the snapshot (with inverted values)
                     snapshot.update(
-                    snapshotStateDiff,
-                    currentMilestone.index()
+                        snapshotStateDiff,
+                        currentMilestone.index()
                     );
                 }
 
