@@ -316,6 +316,8 @@ public class SnapshotManager {
             throw new SnapshotException("could not write local snapshot files", e);
         }
 
+        initialSnapshot = targetSnapshot;
+
         return targetSnapshot;
     }
 }
