@@ -262,7 +262,7 @@ public class SnapshotManager {
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null && ++outerShellSize <= 100) {
+        while(currentMilestone != null && ++outerShellSize <= 200) {
             // create a set where we collect the solid entry points
             Set<Hash> seenApprovers = new HashSet<>();
 
@@ -312,6 +312,7 @@ public class SnapshotManager {
 
                             // check if the approver was referenced by another milestone in the future
                             if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
+                                System.out.println(approverHash.toString());
                                 solidEntryPoints.add(approverHash);
                             }
                         }
