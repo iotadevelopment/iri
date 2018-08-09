@@ -246,10 +246,10 @@ public class SnapshotManager {
 
             solidEntryPoints.put(Hash.NULL_HASH, 590000);
 
-            // remove the solid entry points which are "expired"
+            // copy the old solid entry points which are still valid
             snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
                 if(solidEntryPoint.getValue() > targetMilestone.index()) {
-                    solidEntryPoints.remove(solidEntryPoint.getKey());
+                    solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
                 }
             });
 
