@@ -301,9 +301,12 @@ public class SnapshotManager {
         // create a set where we collect the solid entry points
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
+        // create a counter to keep track of the outer shell
+        int outerShellSize = 0;
+
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
+        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex && ++outerShellSize < 20) {
             // create a set where we collect the solid entry points
             Set<Hash> seenMilestoneTransactions = new HashSet<>();
 
