@@ -370,6 +370,8 @@ public class SnapshotManager {
             // dump some debug messages
             if(previousSize != solidEntryPoints.size()) {
                 System.out.println(solidEntryPoints.size() + " / " + currentMilestone.index() + " => " + (targetMilestone.index() - currentMilestone.index()));
+            } else {
+                System.out.println(currentMilestone.index());
             }
         }
 
