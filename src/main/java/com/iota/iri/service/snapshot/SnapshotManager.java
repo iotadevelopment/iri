@@ -253,19 +253,51 @@ public class SnapshotManager {
         }
     }
 
+    public boolean isSolidEntryPoint(TransactionViewModel transaction, MilestoneViewModel targetMilestone) throws SnapshotException {
+        // create a set where we collect the solid entry points
+        Set<Hash> seenApprovers = new HashSet<>();
+
+        // retrieve the approvers of our transaction
+        ApproveeViewModel approvers;
+        try {
+            approvers = transaction.getApprovers(tangle);
+        } catch(Exception e) {
+            throw new SnapshotException("could not get the approvers of " + transaction.toString(), e);
+        }
+
+        // examine the parents of our transaction
+        for(Hash approverHash : approvers.getHashes()) {
+            // only process transactions that we haven't seen yet
+            if(seenApprovers.add(approverHash)) {
+                // retrieve the transaction belonging to our approver hash
+                TransactionViewModel approverTransaction;
+                try {
+                    approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
+                } catch(Exception e) {
+                    throw new SnapshotException(
+                        "could not retrieve the transaction belonging to hash " + approverHash.toString(),
+                        e
+                    );
+                }
+
+                // check if the approver was referenced by another milestone in the future
+                if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
+                    return true;
+                }
+            }
+        }
+
+        // return false if we didnt find a referenced transaction
+        return false;
+    }
+
     public void generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
         // create a set where we collect the solid entry points
         Set<Hash> solidEntryPoints = new HashSet<>();
 
-        // define how big the outer shell should be
-        int outerShellSize = 0;
-
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null && ++outerShellSize <= 200) {
-            // create a set where we collect the solid entry points
-            Set<Hash> seenApprovers = new HashSet<>();
-
+        while(currentMilestone != null) {
             // create a set where we collect the solid entry points
             Set<Hash> seenMilestoneTransactions = new HashSet<>();
 
@@ -287,35 +319,9 @@ public class SnapshotManager {
             while((currentTransaction = transactionsToExamine.poll()) != null) {
                 // only process transactions that we haven't seen yet
                 if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
-                    // retrieve the approvers of our transaction
-                    ApproveeViewModel approvers;
-                    try {
-                        approvers = currentTransaction.getApprovers(tangle);
-                    } catch(Exception e) {
-                        throw new SnapshotException("could not get the approvers of " + currentTransaction.toString(), e);
-                    }
-
-                    // examine the parents of our transaction (and check if they are solid entry points)
-                    for(Hash approverHash : approvers.getHashes()) {
-                        // only process transactions that we haven't seen yet
-                        if(seenApprovers.add(approverHash)) {
-                            // retrieve the transaction belonging to our approver hash
-                            TransactionViewModel approverTransaction;
-                            try {
-                                approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
-                            } catch(Exception e) {
-                                throw new SnapshotException(
-                                    "could not retrieve the transaction belonging to hash " + approverHash.toString(),
-                                    e
-                                );
-                            }
-
-                            // check if the approver was referenced by another milestone in the future
-                            if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
-                                System.out.println(approverHash.toString());
-                                solidEntryPoints.add(approverHash);
-                            }
-                        }
+                    // if the transaction is a solid entry point -> add it to our list
+                    if(!solidEntryPoints.contains(currentTransaction.getHash()) && isSolidEntryPoint(currentTransaction, targetMilestone)) {
+                        solidEntryPoints.add(currentTransaction.getHash());
                     }
 
                     // retrieve the branch transaction of our current transaction
@@ -331,7 +337,7 @@ public class SnapshotManager {
 
                     // if the branch transaction is still approved by our current milestone -> add it to our queue
                     if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToExamine.offer(branchTransaction);
+                        transactionsToExamine.add(branchTransaction);
                     }
 
                     // retrieve the trunk transaction of our current transaction
@@ -347,7 +353,7 @@ public class SnapshotManager {
 
                     // if the trunk transaction is still approved by our current milestone -> add it to our queue
                     if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToExamine.offer(trunkTransaction);
+                        transactionsToExamine.add(trunkTransaction);
                     }
                 }
             }
@@ -360,7 +366,7 @@ public class SnapshotManager {
             }
 
             // dump some debug messages
-            System.out.println(solidEntryPoints.size());
+            System.out.println(solidEntryPoints.size() + " / " + currentMilestone.index());
         }
 
         // dump some debug messages
