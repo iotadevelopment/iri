@@ -210,7 +210,7 @@ public class API {
             switch (command) {
                 case "generateSolidEntryPoints": {
                     instance.snapshotManager.generateSolidEntryPoints(
-                        MilestoneViewModel.get(instance.tangle, instance.snapshotManager.getLatestSnapshot().getIndex() - 50)
+                        MilestoneViewModel.get(instance.tangle, instance.snapshotManager.getLatestSnapshot().getIndex() - 1000)
                     );
 
                     return ErrorResponse.create("sth happened");
