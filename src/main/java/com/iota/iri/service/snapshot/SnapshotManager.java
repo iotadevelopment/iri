@@ -345,10 +345,12 @@ public class SnapshotManager {
             } catch(Exception e) {
                 throw new SnapshotException("could not iterate to the previous milestone", e);
             }
+
+            // dump some debug messages
+            System.out.println(solidEntryPoints.size());
         }
 
         // dump some debug messages
-        System.out.println(solidEntryPoints.size());
         System.out.println(solidEntryPoints.toString());
     }
 
