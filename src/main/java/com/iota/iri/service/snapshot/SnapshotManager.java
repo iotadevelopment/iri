@@ -263,6 +263,12 @@ public class SnapshotManager {
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
         while(currentMilestone != null && ++outerShellSize <= 100) {
+            // create a set where we collect the solid entry points
+            Set<Hash> seenApprovers = new HashSet<>();
+
+            // create a set where we collect the solid entry points
+            Set<Hash> seenMilestoneTransactions = new HashSet<>();
+
             // retrieve the transaction belonging to our current milestone
             TransactionViewModel milestoneTransaction;
             try {
@@ -279,63 +285,69 @@ public class SnapshotManager {
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
             while((currentTransaction = transactionsToExamine.poll()) != null) {
-                // retrieve the approvers of our transaction
-                ApproveeViewModel approvers;
-                try {
-                    approvers = currentTransaction.getApprovers(tangle);
-                } catch(Exception e) {
-                    throw new SnapshotException("could not get the approvers of " + currentTransaction.toString(), e);
-                }
-
-                // examine the parents of our transaction (and check if they are solid entry points)
-                for(Hash approverHash: approvers.getHashes()) {
-                    // retrieve the transaction belonging to our approver hash
-                    TransactionViewModel approverTransaction;
+                // only process transactions that we haven't seen yet
+                if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
+                    // retrieve the approvers of our transaction
+                    ApproveeViewModel approvers;
                     try {
-                        approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
+                        approvers = currentTransaction.getApprovers(tangle);
+                    } catch(Exception e) {
+                        throw new SnapshotException("could not get the approvers of " + currentTransaction.toString(), e);
+                    }
+
+                    // examine the parents of our transaction (and check if they are solid entry points)
+                    for(Hash approverHash : approvers.getHashes()) {
+                        // only process transactions that we haven't seen yet
+                        if(seenApprovers.add(approverHash)) {
+                            // retrieve the transaction belonging to our approver hash
+                            TransactionViewModel approverTransaction;
+                            try {
+                                approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
+                            } catch(Exception e) {
+                                throw new SnapshotException(
+                                    "could not retrieve the transaction belonging to hash " + approverHash.toString(),
+                                    e
+                                );
+                            }
+
+                            // check if the approver was referenced by another milestone in the future
+                            if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
+                                solidEntryPoints.add(approverHash);
+                            }
+                        }
+                    }
+
+                    // retrieve the branch transaction of our current transaction
+                    TransactionViewModel branchTransaction;
+                    try {
+                        branchTransaction = currentTransaction.getBranchTransaction(tangle);
                     } catch(Exception e) {
                         throw new SnapshotException(
-                            "could not retrieve the transaction belonging to hash " + approverHash.toString(),
+                            "could not retrieve the branch transaction of " + currentTransaction.toString(),
                             e
                         );
                     }
 
-                    // check if the approver was referenced by another milestone in the future
-                    if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
-                        solidEntryPoints.add(approverHash);
+                    // if the branch transaction is still approved by our current milestone -> add it to our queue
+                    if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
+                        transactionsToExamine.offer(branchTransaction);
                     }
-                }
 
-                // retrieve the branch transaction of our current transaction
-                TransactionViewModel branchTransaction;
-                try {
-                    branchTransaction = currentTransaction.getBranchTransaction(tangle);
-                } catch(Exception e) {
-                    throw new SnapshotException(
-                        "could not retrieve the branch transaction of " + currentTransaction.toString(),
-                        e
-                    );
-                }
+                    // retrieve the trunk transaction of our current transaction
+                    TransactionViewModel trunkTransaction;
+                    try {
+                        trunkTransaction = currentTransaction.getTrunkTransaction(tangle);
+                    } catch(Exception e) {
+                        throw new SnapshotException(
+                            "could not retrieve the trunk transaction of " + currentTransaction.toString(),
+                            e
+                        );
+                    }
 
-                // if the branch transaction is still approved by our current milestone -> add it to our queue
-                if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
-                    transactionsToExamine.offer(branchTransaction);
-                }
-
-                // retrieve the trunk transaction of our current transaction
-                TransactionViewModel trunkTransaction;
-                try {
-                    trunkTransaction = currentTransaction.getTrunkTransaction(tangle);
-                } catch(Exception e) {
-                    throw new SnapshotException(
-                        "could not retrieve the trunk transaction of " + currentTransaction.toString(),
-                        e
-                    );
-                }
-
-                // if the trunk transaction is still approved by our current milestone -> add it to our queue
-                if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
-                    transactionsToExamine.offer(trunkTransaction);
+                    // if the trunk transaction is still approved by our current milestone -> add it to our queue
+                    if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
+                        transactionsToExamine.offer(trunkTransaction);
+                    }
                 }
             }
 
