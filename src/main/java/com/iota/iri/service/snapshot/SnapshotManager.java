@@ -257,9 +257,12 @@ public class SnapshotManager {
         // create a set where we collect the solid entry points
         Set<Hash> solidEntryPoints = new HashSet<>();
 
+        // define how big the outer shell should be
+        int outerShellSize = 0;
+
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null) {
+        while(currentMilestone != null && ++outerShellSize <= 100) {
             // retrieve the transaction belonging to our current milestone
             TransactionViewModel milestoneTransaction;
             try {
@@ -273,12 +276,9 @@ public class SnapshotManager {
                 Collections.singleton(milestoneTransaction)
             );
 
-            // define how big the outer shell should be
-            int outerShellSize = 0;
-
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
-            while((currentTransaction = transactionsToExamine.poll()) != null && ++outerShellSize <= 100) {
+            while((currentTransaction = transactionsToExamine.poll()) != null) {
                 // retrieve the approvers of our transaction
                 ApproveeViewModel approvers;
                 try {
