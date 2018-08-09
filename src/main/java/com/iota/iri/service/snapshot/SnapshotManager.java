@@ -241,6 +241,22 @@ public class SnapshotManager {
             snapshot.getMetaData().setIndex(targetMilestone.index());
             snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
 
+            // retrieve the solid entry points of our snapshot
+            HashMap<Hash, Integer> solidEntryPoints = generateSolidEntryPoints(targetMilestone);
+
+            solidEntryPoints.put(Hash.NULL_HASH, 590000);
+
+            // remove the solid entry points which are "expired"
+            snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
+                if(solidEntryPoint.getValue() > targetMilestone.index()) {
+                    solidEntryPoints.remove(solidEntryPoint.getKey());
+                }
+            });
+
+            snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
+
+            System.out.println(snapshot.getMetaData().getSolidEntryPoints().size());
+
             // return the result
             return snapshot;
         }
@@ -294,7 +310,7 @@ public class SnapshotManager {
         return result;
     }
 
-    public void generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
+    public HashMap<Hash, Integer> generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
         // determine the initial snapshot index
         int initialSnapshotIndex = initialSnapshot.getIndex();
 
@@ -389,6 +405,9 @@ public class SnapshotManager {
 
         // dump some debug messages
         System.out.println(solidEntryPoints.toString());
+
+        // return our result
+        return solidEntryPoints;
     }
 
     public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
