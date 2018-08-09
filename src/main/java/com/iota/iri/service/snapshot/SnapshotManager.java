@@ -341,7 +341,7 @@ public class SnapshotManager {
 
             // iterate to the previous milestone
             try {
-                currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index())
+                currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
             } catch(Exception e) {
                 throw new SnapshotException("could not iterate to the previous milestone", e);
             }
