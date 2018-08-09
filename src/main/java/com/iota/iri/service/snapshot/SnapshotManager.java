@@ -253,7 +253,7 @@ public class SnapshotManager {
         }
     }
 
-    public boolean isSolidEntryPoint(TransactionViewModel transaction, MilestoneViewModel targetMilestone) throws SnapshotException {
+    public int getSolidEntryPointIndex(TransactionViewModel transaction, MilestoneViewModel targetMilestone) throws SnapshotException {
         // create a set where we collect the solid entry points
         Set<Hash> seenApprovers = new HashSet<>();
 
@@ -264,6 +264,9 @@ public class SnapshotManager {
         } catch(Exception e) {
             throw new SnapshotException("could not get the approvers of " + transaction.toString(), e);
         }
+
+        // create a variable for our result
+        int result = -1;
 
         // examine the parents of our transaction
         for(Hash approverHash : approvers.getHashes()) {
@@ -282,13 +285,13 @@ public class SnapshotManager {
 
                 // check if the approver was referenced by another milestone in the future
                 if(approverTransaction.snapshotIndex() > targetMilestone.index()) {
-                    return true;
+                    result = Math.max(result, approverTransaction.snapshotIndex());
                 }
             }
         }
 
         // return false if we didnt find a referenced transaction
-        return false;
+        return result;
     }
 
     public void generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
@@ -296,7 +299,7 @@ public class SnapshotManager {
         int initialSnapshotIndex = initialSnapshot.getIndex();
 
         // create a set where we collect the solid entry points
-        Set<Hash> solidEntryPoints = new HashSet<>();
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
@@ -324,9 +327,12 @@ public class SnapshotManager {
             while((currentTransaction = transactionsToExamine.poll()) != null) {
                 // only process transactions that we haven't seen yet
                 if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
+                    // determine the index that belongs to the current solid entry point
+                    int solidEntryPointIndex = getSolidEntryPointIndex(currentTransaction, targetMilestone);
+
                     // if the transaction is a solid entry point -> add it to our list
-                    if(!solidEntryPoints.contains(currentTransaction.getHash()) && isSolidEntryPoint(currentTransaction, targetMilestone)) {
-                        solidEntryPoints.add(currentTransaction.getHash());
+                    if(!solidEntryPoints.containsKey(currentTransaction.getHash()) && solidEntryPointIndex != -1) {
+                        solidEntryPoints.put(currentTransaction.getHash(), solidEntryPointIndex);
                     }
 
                     // retrieve the branch transaction of our current transaction
