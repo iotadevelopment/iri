@@ -314,6 +314,8 @@ public class SnapshotManager {
                 Collections.singleton(milestoneTransaction)
             );
 
+            int previousSize = solidEntryPoints.size();
+
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
             while((currentTransaction = transactionsToExamine.poll()) != null) {
@@ -366,7 +368,9 @@ public class SnapshotManager {
             }
 
             // dump some debug messages
-            System.out.println(solidEntryPoints.size() + " / " + currentMilestone.index());
+            if(previousSize != solidEntryPoints.size()) {
+                System.out.println(solidEntryPoints.size() + " / " + currentMilestone.index() + " => " + (targetMilestone.index() - currentMilestone.index()));
+            }
         }
 
         // dump some debug messages
