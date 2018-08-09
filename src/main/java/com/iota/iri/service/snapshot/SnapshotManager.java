@@ -273,9 +273,12 @@ public class SnapshotManager {
                 Collections.singleton(milestoneTransaction)
             );
 
+            // define how big the outer shell should be
+            int outerShellSize = 0;
+
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
-            while((currentTransaction = transactionsToExamine.poll()) != null) {
+            while((currentTransaction = transactionsToExamine.poll()) != null && ++outerShellSize <= 100) {
                 // retrieve the approvers of our transaction
                 ApproveeViewModel approvers;
                 try {
@@ -336,9 +339,16 @@ public class SnapshotManager {
                 }
             }
 
-            currentMilestone = null;
+            // iterate to the previous milestone
+            try {
+                currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index())
+            } catch(Exception e) {
+                throw new SnapshotException("could not iterate to the previous milestone", e);
+            }
         }
 
+        // dump some debug messages
+        System.out.println(solidEntryPoints.size());
         System.out.println(solidEntryPoints.toString());
     }
 
