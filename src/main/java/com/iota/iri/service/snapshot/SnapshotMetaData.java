@@ -5,7 +5,7 @@ import com.iota.iri.model.Hash;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
@@ -36,7 +36,7 @@ public class SnapshotMetaData implements Cloneable {
      * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
      * in this Set.
      */
-    private HashSet<Hash> solidEntryPoints;
+    private HashMap<Hash, Integer> solidEntryPoints;
 
     /**
      * This method retrieves the meta data of a snapshot from a file.
@@ -94,9 +94,12 @@ public class SnapshotMetaData implements Cloneable {
         }
 
         // read the solid entry points from our file
-        HashSet<Hash> solidEntryPoints = new HashSet<Hash>();
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
         while((line = reader.readLine()) != null) {
-            solidEntryPoints.add(new Hash(line));
+            String[] parts = line.split(";", 2);
+            if(parts.length >= 2) {
+                solidEntryPoints.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
+            }
         }
 
         // close the reader
@@ -114,7 +117,7 @@ public class SnapshotMetaData implements Cloneable {
      * @param index index of the Snapshot that this metadata belongs to
      * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(int index, Long timestamp, HashSet<Hash> solidEntryPoints) {
+    public SnapshotMetaData(int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints) {
         // store our parameters
         this.index = index;
         this.timestamp = timestamp;
@@ -309,7 +312,7 @@ public class SnapshotMetaData implements Cloneable {
      * @return true if the hash is a solid entry point and false otherwise
      */
     public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return solidEntryPoints.contains(solidEntrypoint);
+        return solidEntryPoints.containsKey(solidEntrypoint);
     }
 
     /**
@@ -319,7 +322,7 @@ public class SnapshotMetaData implements Cloneable {
      *
      * @return set of transaction hashes that shall be considered solid when being referenced
      */
-    public HashSet<Hash> getSolidEntryPoints() {
+    public HashMap<Hash, Integer> getSolidEntryPoints() {
         return solidEntryPoints;
     }
 
@@ -330,7 +333,7 @@ public class SnapshotMetaData implements Cloneable {
      *
      * @param solidEntryPoints set of solid entry points that shall be stored
      */
-    public void setSolidEntryPoints(HashSet<Hash> solidEntryPoints) {
+    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
         setSolidEntryPoints(solidEntryPoints, true);
     }
 
@@ -341,7 +344,7 @@ public class SnapshotMetaData implements Cloneable {
      *
      * @param solidEntryPoints set of solid entry points that shall be stored
      */
-    public void setSolidEntryPoints(HashSet<Hash> solidEntryPoints, boolean lock) {
+    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints, boolean lock) {
         // prevent other threads to write to this object while we do the updates
         if(lock) {
             lockWrite();
@@ -388,7 +391,7 @@ public class SnapshotMetaData implements Cloneable {
                     Stream.of(String.valueOf(index)),
                     Stream.of(String.valueOf(timestamp))
                 ),
-                solidEntryPoints.stream().<CharSequence>map(entry -> entry.toString())
+                solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
             ).iterator()
         );
 
@@ -403,6 +406,6 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(index, timestamp, (HashSet) solidEntryPoints.clone());
+        return new SnapshotMetaData(index, timestamp, (HashMap) solidEntryPoints.clone());
     }
 }

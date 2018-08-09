@@ -292,12 +292,15 @@ public class SnapshotManager {
     }
 
     public void generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
+        // determine the initial snapshot index
+        int initialSnapshotIndex = initialSnapshot.getIndex();
+
         // create a set where we collect the solid entry points
         Set<Hash> solidEntryPoints = new HashSet<>();
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null) {
+        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
             // create a set where we collect the solid entry points
             Set<Hash> seenMilestoneTransactions = new HashSet<>();
 
@@ -437,6 +440,7 @@ public class SnapshotManager {
         boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
         String snapshotPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_FILE);
         String snapshotSigPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE);
+        int milestoneStartIndex = testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX);
 
         // verify the signature of the builtin snapshot file
         if(!testnet && !SignedFiles.isFileSignatureValid(
@@ -462,13 +466,17 @@ public class SnapshotManager {
             throw new IllegalStateException("the snapshot state file is not consistent");
         }
 
+        // create solid entry points
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(Hash.NULL_HASH, milestoneStartIndex);
+
         // return our snapshot
         return new Snapshot(
             snapshotState,
             new SnapshotMetaData(
                 testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
                 configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME),
-                new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH))
+                solidEntryPoints
             )
         );
     }

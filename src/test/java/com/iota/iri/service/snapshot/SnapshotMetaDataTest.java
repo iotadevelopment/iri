@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
@@ -19,9 +20,9 @@ public class SnapshotMetaDataTest {
         Hash testHash2 = Hash.NULL_HASH;
 
         // create a hashset with our hashes
-        HashSet<Hash> solidEntryPoints = new HashSet<>();
-        solidEntryPoints.add(testHash1);
-        solidEntryPoints.add(testHash2);
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(testHash1, 1);
+        solidEntryPoints.put(testHash2, 2);
 
         // create a timestamp value
         long timestamp = System.currentTimeMillis() / 1000L;
