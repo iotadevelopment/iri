@@ -112,7 +112,7 @@ public class MilestoneTracker {
                         { // find new milestones
                             for(Hash hash: hashes) {
                                 if(firstRun && (System.currentTimeMillis() - lastLogTime) >= 5000) {
-                                    log.info("Scanning milestones: " + ((analyzedMilestoneCandidates.size() / hashes.size()) * 100) + "% done ...");
+                                    log.info("Scanning milestones: " + (((double) analyzedMilestoneCandidates.size() / (double) hashes.size()) * 100) + "% done ...");
 
                                     lastLogTime = System.currentTimeMillis();
                                 }
