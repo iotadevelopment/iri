@@ -351,7 +351,7 @@ public class MilestoneTracker {
             // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
             else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
                 // reset the ledger to the initial snapshot and rebuild everything
-                reset(MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getInitialSnapshot().getIndex()), "failed to update ledger");
+                //reset(MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getInitialSnapshot().getIndex()), "failed to update ledger");
 
                 // and abort our loop
                 break;
