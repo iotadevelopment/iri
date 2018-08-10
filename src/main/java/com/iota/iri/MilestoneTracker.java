@@ -78,7 +78,7 @@ public class MilestoneTracker {
     }
 
     private boolean shuttingDown;
-    private static int RESCAN_INTERVAL = 5000;
+    private static int RESCAN_INTERVAL = 500;
 
     public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
         // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize

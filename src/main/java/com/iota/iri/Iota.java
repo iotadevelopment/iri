@@ -150,6 +150,7 @@ public class Iota {
         udpReceiver.init();
         replicator.init();
         node.init();
+        snapshotManager.init();
     }
 
     private void rescan_db() throws Exception {
@@ -186,6 +187,7 @@ public class Iota {
         transactionValidator.shutdown();
         tangle.shutdown();
         messageQ.shutdown();
+        snapshotManager.shutDown();
     }
 
     private void initializeTangle() {

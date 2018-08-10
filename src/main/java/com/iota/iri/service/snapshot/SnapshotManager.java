@@ -39,6 +39,10 @@ public class SnapshotManager {
 
     private Snapshot latestSnapshot;
 
+    private boolean shuttingDown;
+
+    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 5000;
+
     /**
      * This methdd is the constructor of the SnapshotManager.
      *
@@ -64,6 +68,45 @@ public class SnapshotManager {
 
         // make a working copy of the initial snapshot that keeps track of the latest state
         latestSnapshot = initialSnapshot.clone();
+    }
+
+    public void init() {
+        // load necessary configuration parameters
+        boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
+
+        if(localSnapshotsEnabled) {
+            (new Thread(() -> {
+                log.info("Local Snapshot Manager started ...");
+
+                // load necessary configuration parameters
+                int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+                int LOCAL_SNAPSHOT_INTERVAL = 30;
+
+                while(!shuttingDown) {
+                    long scanStart = System.currentTimeMillis();
+
+                    if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                        try {
+                            writeLocalSnapshot();
+                        } catch(SnapshotException e) {
+                            log.error("Error while taking local snapshot: " + e.getMessage());
+                        }
+                    }
+
+                    try {
+                        Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
+                    } catch(InterruptedException e) {
+                        log.info("Local Snapshot Manager stopped ...");
+
+                        shuttingDown = true;
+                    }
+                }
+            }, "Local Snapshot Manager")).start();
+        }
+    }
+
+    public void shutDown() {
+        shuttingDown = true;
     }
 
     /**
@@ -510,6 +553,8 @@ public class SnapshotManager {
     }
 
     public Snapshot writeLocalSnapshot() throws SnapshotException {
+        log.info("Taking local snapshot ...");
+
         // load necessary configuration parameters
         boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
         String basePath = configuration.string(
