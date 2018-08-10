@@ -278,16 +278,18 @@ public class LedgerValidator {
             try {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
-                hasSnapshot = currentState != null && snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
-                if (hasSnapshot) {
-                    updateSnapshotMilestone(milestoneVM.getHash(), milestoneVM.index());
-                    StateDiffViewModel stateDiffViewModel;
-                    stateDiffViewModel = new StateDiffViewModel(currentState, milestoneVM.getHash());
-                    if (currentState.size() != 0) {
-                        stateDiffViewModel.store(tangle);
+                hasSnapshot = currentState != null;
+                if(hasSnapshot) {
+                    SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
+                    hasSnapshot = snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
+                    if(hasSnapshot) {
+                        updateSnapshotMilestone(milestoneVM.getHash(), milestoneVM.index());
+                        StateDiffViewModel stateDiffViewModel = new StateDiffViewModel(currentState, milestoneVM.getHash());
+                        if(currentState.size() != 0) {
+                            stateDiffViewModel.store(tangle);
+                        }
+                        snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index());
                     }
-                    snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index());
                 }
             } finally {
                 snapshotManager.getLatestSnapshot().unlockWrite();

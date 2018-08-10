@@ -4,10 +4,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,6 +14,7 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotStateDiff;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -350,9 +348,13 @@ public class MilestoneTracker {
 
             // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
             else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
+                /*
+                Map<Hash, Long> currentState = ledgerValidator.getLatestDiff(new HashSet<>(), nextMilestone.getHash(), snapshotManager.getLatestSnapshot().getIndex(), true);
+                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
+                hasSnapshot = currentState != null && snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
                 // reset the ledger to the initial snapshot and rebuild everything
                 //reset(MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getInitialSnapshot().getIndex()), "failed to update ledger");
-
+                */
                 // and abort our loop
                 break;
             }
