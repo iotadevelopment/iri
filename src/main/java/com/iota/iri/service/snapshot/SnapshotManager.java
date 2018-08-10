@@ -80,7 +80,7 @@ public class SnapshotManager {
 
                 // load necessary configuration parameters
                 int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
-                int LOCAL_SNAPSHOT_INTERVAL = 30;
+                int LOCAL_SNAPSHOT_INTERVAL = 1000;
 
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
