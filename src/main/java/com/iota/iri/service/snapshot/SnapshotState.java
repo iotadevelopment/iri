@@ -3,6 +3,7 @@ package com.iota.iri.service.snapshot;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.utils.IotaIOUtils;
+import com.iota.iri.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,6 +11,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -139,9 +141,12 @@ public class SnapshotState {
         }
     }
 
-    public boolean isConsistent() {
+    public HashMap<Hash, Long> getInconsistentAddresses() {
         // lock while we are reading
         lockRead();
+
+        // create variable for our result
+        HashMap<Hash, Long> result = new HashMap<Hash, Long>();
 
         // cycle through our balances and check if they are positive (dump a message if sth is not consistent)
         try {
@@ -152,20 +157,24 @@ public class SnapshotState {
                     if(entry.getValue() < 0) {
                         log.info("skipping negative value for address " + entry.getKey() + ": " + entry.getValue());
 
-                        return false;
+                        result.put(entry.getKey(), entry.getValue());
                     }
 
                     stateIterator.remove();
                 }
             }
 
-            return true;
+            return result;
         }
 
         // unlock when we are done
         finally {
             unlockRead();
         }
+    }
+
+    public boolean isConsistent() {
+        return getInconsistentAddresses().size() == 0;
     }
 
     public boolean hasCorrectSupply() {

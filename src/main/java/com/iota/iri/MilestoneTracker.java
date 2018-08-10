@@ -346,15 +346,22 @@ public class MilestoneTracker {
                 );
             }
 
-            // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
+            // otherwise if we didn't reset yet in the updateSnapshot method ... (try to actively repair)
             else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
-                /*
+                // retrieve the latest diff that failed to get applied
                 Map<Hash, Long> currentState = ledgerValidator.getLatestDiff(new HashSet<>(), nextMilestone.getHash(), snapshotManager.getLatestSnapshot().getIndex(), true);
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(currentState);
-                hasSnapshot = currentState != null && snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent();
-                // reset the ledger to the initial snapshot and rebuild everything
-                //reset(MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getInitialSnapshot().getIndex()), "failed to update ledger");
-                */
+
+                // if we can retrieve a diff ...
+                if(currentState != null) {
+                    // ... try to apply it and determine the addresses that failed it
+                    HashMap<Hash, Long> inconsistentAddresses = snapshotManager.getLatestSnapshot().getState().patchedState(new SnapshotStateDiff(currentState)).getInconsistentAddresses();
+
+                    // cycle through all addresses
+                    if(inconsistentAddresses.size() >= 1) {
+                        // TODO: REAPIR
+                    }
+                }
+
                 // and abort our loop
                 break;
             }
