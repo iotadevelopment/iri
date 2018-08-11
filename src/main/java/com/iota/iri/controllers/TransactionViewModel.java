@@ -394,9 +394,9 @@ public class TransactionViewModel {
     /**
      * This method updates the referencedSnapshot value of this transaction.
      *
-     * It get's called once a transaction becomes solid (by updateSolidTransactions) and traverses the graph in an
-     * iterative post-order way, until it finds a well defined snapshotIndex. It then updates all the found transactions
-     * and stores the calculated values.
+     * It get's called once a transaction becomes solid (by updateSolidTransactions or quickSetSolid) and traverses the
+     * graph in an iterative post-order way, until it finds a well defined snapshotIndex. It then updates all the found
+     * transactions and stores the calculated values.
      *
      * @param tangle Tangle object which acts as a database interface
      * @throws Exception if something goes wrong while loading or storing transactions
