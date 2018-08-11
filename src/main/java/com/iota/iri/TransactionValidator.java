@@ -246,6 +246,7 @@ public class TransactionValidator {
             if(solid) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.updateHeights(tangle);
+                transactionViewModel.updateReferencedSnapshot(tangle);
                 return true;
             }
         }
