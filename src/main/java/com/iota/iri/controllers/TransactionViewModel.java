@@ -405,70 +405,103 @@ public class TransactionViewModel {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == 0) {
             try {
-                // initialize our stack for graph traversal
-                LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
+                // we maintain a stack with the steps (to reduce the memory consumption, we "abort" if we go too deep
+                // and continue with fresh data structures allowing the garbage collector to clean up)
+                LinkedList<Hash> stepsStack = new LinkedList<Hash>();
 
-                // create a set of seen transactions that we do not want to traverse anymore (NULL HASH by default)
-                HashSet<Hash> seenTransactions = new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH));
+                // start by adding this transaction to our stack
+                stepsStack.push(this.getHash());
 
-                // add our traversal root
-                seenTransactions.add(this.getHash());
-                stack.push(this);
+                // while we still have steps that need to be calculated
+                while(stepsStack.size() > 0) {
+                    // determine the root of our sub-graph that we are processing now
+                    TransactionViewModel root = TransactionViewModel.fromHash(tangle, stepsStack.pop());
 
-                // perform our iterative post-order traversal
-                TransactionViewModel previousTransaction = null;
-                while(stack.size() > 0) {
-                    // retrieve the current transaction from the stack (leave it there)
-                    TransactionViewModel currentTransaction = stack.peek();
+                    // initialize our stack for graph traversal
+                    LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
 
-                    // if we are traversing down ...
-                    if(
+                    // create a set of seen transactions that we do not want to traverse anymore (NULL HASH by default)
+                    HashSet<Hash> seenTransactions = new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH));
+
+                    // add our traversal root
+                    seenTransactions.add(root.getHash());
+                    stack.push(root);
+
+                    // initialize our counter to determine when to abort and start a new step
+                    int processedTransactions = 0;
+
+                    // perform our iterative post-order traversal
+                    TransactionViewModel previousTransaction = null;
+                    while(stack.size() > 0) {
+                        // retrieve the current transaction from the stack (leave it there)
+                        TransactionViewModel currentTransaction = stack.peek();
+
+                        // if we didn't finish within a given amount of steps, we abort our traversal at the current
+                        // level, push the root and our current transaction back to our steps stack and continue from
+                        // there (effectively processing the task in chunks and limiting its memory consumption and
+                        // doing a memory <=> runtime trade off).
+                        if(processedTransactions >= 5000) {
+                            stepsStack.push(root.getHash());
+                            stepsStack.push(currentTransaction.getHash());
+
+                            break;
+                        }
+
+                        // if we are traversing down ...
+                        if(
                         previousTransaction == null ||
                         previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
                         previousTransaction.getTrunkTransaction(tangle) == currentTransaction
-                    ) {
-                        // if we have a branch to traverse (that we haven't seen yet) -> do it ...
-                        if(seenTransactions.add(currentTransaction.getBranchTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
-                            stack.push(currentTransaction.getBranchTransaction(tangle));
+                        ) {
+                            // if we have a branch to traverse (that we haven't seen yet) -> do it ...
+                            if(seenTransactions.add(currentTransaction.getBranchTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
+                                stack.push(currentTransaction.getBranchTransaction(tangle));
+
+                                processedTransactions++;
+                            }
+
+                            // ... or if we have a trunk to traverse (that we haven't seen yet) -> do it ...
+                            else if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                                stack.push(currentTransaction.getTrunkTransaction(tangle));
+
+                                processedTransactions++;
+                            }
+
+                            // ... otherwise update the referencedSnapshot since we arrived at an end
+                            else {
+                                stack.pop();
+
+                                updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                            }
                         }
 
-                        // ... or if we have a trunk to traverse (that we haven't seen yet) -> do it ...
-                        else if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                            stack.push(currentTransaction.getTrunkTransaction(tangle));
+                        // if we are traversing up from the branch ...
+                        else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
+                            // if we have a trunk to traverse (that we haven't seen yet) -> do it
+                            if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
+                                stack.push(currentTransaction.getTrunkTransaction(tangle));
+
+                                processedTransactions++;
+                            }
+
+                            // otherwise -> update the referenced transaction
+                            else {
+                                stack.pop();
+
+                                updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                            }
                         }
 
-                        // ... otherwise update the referencedSnapshot since we arrived at an end
-                        else {
+                        // if we are traversing up from the trunk -> update the referenced transaction
+                        else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
                             stack.pop();
 
                             updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
                         }
+
+                        // remember the currentTransaction to determine which way we are traversing
+                        previousTransaction = currentTransaction;
                     }
-
-                    // if we are traversing up from the branch ...
-                    else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
-                        // if we have a trunk to traverse (that we haven't seen yet) -> do it
-                        if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                            stack.push(currentTransaction.getTrunkTransaction(tangle));
-                        }
-
-                        // otherwise -> update the referenced transaction
-                        else {
-                            stack.pop();
-
-                            updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
-                        }
-                    }
-
-                    // if we are traversing up from the trunk -> update the referenced transaction
-                    else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
-                        stack.pop();
-
-                        updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
-                    }
-
-                    // remember the currentTransaction to determine which way we are traversing
-                    previousTransaction = currentTransaction;
                 }
             } catch(ReferencedSnapshotNotProcessedYetException e) {
                 /* ignore this and try again later */
