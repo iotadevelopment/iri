@@ -1,7 +1,5 @@
 package com.iota.iri.controllers;
 
-import java.util.*;
-
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.model.*;
 import com.iota.iri.storage.Indexable;
