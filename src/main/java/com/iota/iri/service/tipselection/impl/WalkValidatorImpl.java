@@ -1,10 +1,10 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.LedgerValidator;
+import com.iota.iri.Milestone;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.Milestone;
 import com.iota.iri.service.tipselection.WalkValidator;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -26,6 +26,8 @@ import java.util.*;
  */
 public class WalkValidatorImpl implements WalkValidator {
 
+    private int maxAnalyzedTxs;
+
     private final Tangle tangle;
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
     private final LedgerValidator ledgerValidator;
@@ -39,12 +41,13 @@ public class WalkValidatorImpl implements WalkValidator {
     private Set<Hash> myApprovedHashes;
 
     public WalkValidatorImpl(Tangle tangle, LedgerValidator ledgerValidator, TransactionValidator transactionValidator,
-                             Milestone milestone, int maxDepth) {
+                             Milestone milestone, int maxDepth, int maxAnalyzedTxs) {
         this.tangle = tangle;
         this.ledgerValidator = ledgerValidator;
         this.transactionValidator = transactionValidator;
         this.milestone = milestone;
         this.maxDepth = maxDepth;
+        this.maxAnalyzedTxs = maxAnalyzedTxs;
 
         maxDepthOkMemoization = new HashSet<>();
         myDiff = new HashMap<>();
@@ -55,14 +58,13 @@ public class WalkValidatorImpl implements WalkValidator {
     public boolean isValid(Hash transactionHash) throws Exception {
 
         TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionHash);
-
         if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
             log.debug("Validation failed: {} is missing in db", transactionHash);
             return false;
         } else if (transactionViewModel.getCurrentIndex() != 0) {
             log.debug("Validation failed: {} not a tail", transactionHash);
             return false;
-        } else if (!transactionValidator.checkSolidity(transactionViewModel.getHash(), false)) {
+        } else if (!transactionViewModel.isSolid()) {
             log.debug("Validation failed: {} is not solid", transactionHash);
             return false;
         } else if (belowMaxDepth(transactionViewModel.getHash(), milestone.latestSolidSubtangleMilestoneIndex - maxDepth)) {
@@ -75,9 +77,9 @@ public class WalkValidatorImpl implements WalkValidator {
         return true;
     }
 
-    private boolean belowMaxDepth(Hash tip, int depth) throws Exception {
+    private boolean belowMaxDepth(Hash tip, int lowerAllowedSnapshotIndex) throws Exception {
         //if tip is confirmed stop
-        if (TransactionViewModel.fromHash(tangle, tip).snapshotIndex() >= depth) {
+        if (TransactionViewModel.fromHash(tangle, tip).snapshotIndex() >= lowerAllowedSnapshotIndex) {
             return false;
         }
         //if tip unconfirmed, check if any referenced tx is confirmed below maxDepth
@@ -85,9 +87,18 @@ public class WalkValidatorImpl implements WalkValidator {
         Set<Hash> analyzedTransactions = new HashSet<>();
         Hash hash;
         while ((hash = nonAnalyzedTransactions.poll()) != null) {
+            if (analyzedTransactions.size() == maxAnalyzedTxs) {
+                log.debug("failed below max depth because of exceeding max threshold of {} analyzed transactions",
+                        maxAnalyzedTxs);
+                return true;
+            }
+
             if (analyzedTransactions.add(hash)) {
                 TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hash);
-                if (transaction.snapshotIndex() != 0 && transaction.snapshotIndex() < depth) {
+                if ((transaction.snapshotIndex() != 0 || Objects.equals(Hash.NULL_HASH, transaction.getHash()))
+                        && transaction.snapshotIndex() < lowerAllowedSnapshotIndex) {
+                    log.debug("failed below max depth because of reaching a tx below the allowed snapshot index {}",
+                            lowerAllowedSnapshotIndex);
                     return true;
                 }
                 if (transaction.snapshotIndex() == 0) {

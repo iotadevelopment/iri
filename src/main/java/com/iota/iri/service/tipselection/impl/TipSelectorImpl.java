@@ -8,11 +8,11 @@ import com.iota.iri.model.HashId;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
-import com.iota.iri.zmq.MessageQ;
 
 import java.security.InvalidAlgorithmParameterException;
-import java.security.SecureRandom;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of <tt>TipSelector</tt> that selects 2 tips,
@@ -33,6 +33,7 @@ public class TipSelectorImpl implements TipSelector {
     private final TransactionValidator transactionValidator;
     private final Tangle tangle;
     private final Milestone milestone;
+    private final int belowMaxDepthTxLimit;
 
     @Override
     public int getMaxDepth() {
@@ -46,7 +47,9 @@ public class TipSelectorImpl implements TipSelector {
                            RatingCalculator ratingCalculator,
                            Walker walkerAlpha,
                            Milestone milestone,
-                           int maxDepth) {
+                           int maxDepth,
+                           int belowMaxDepthTxLimit) {
+
 
         this.entryPointSelector = entryPointSelector;
         this.ratingCalculator = ratingCalculator;
@@ -55,6 +58,7 @@ public class TipSelectorImpl implements TipSelector {
 
         //used by walkValidator
         this.maxDepth = maxDepth;
+        this.belowMaxDepthTxLimit = belowMaxDepthTxLimit;
         this.ledgerValidator = ledgerValidator;
         this.transactionValidator = transactionValidator;
         this.tangle = tangle;
@@ -89,7 +93,7 @@ public class TipSelectorImpl implements TipSelector {
             //random walk
             List<Hash> tips = new LinkedList<>();
             WalkValidator walkValidator = new WalkValidatorImpl(tangle, ledgerValidator, transactionValidator, milestone,
-                    maxDepth);
+                    maxDepth, belowMaxDepthTxLimit);
             Hash tip = walker.walk(entryPoint, rating, walkValidator);
             tips.add(tip);
 

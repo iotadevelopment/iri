@@ -22,7 +22,7 @@ public class IRI {
 
     public static final String MAINNET_NAME = "IRI";
     public static final String TESTNET_NAME = "IRI Testnet";
-    public static final String VERSION = "1.5.1";
+    public static final String VERSION = "1.5.3";
 
     public static void main(String[] args) throws Exception {
         // Logging is configured first before any references to Logger or LoggerFactory.
@@ -154,7 +154,7 @@ public class IRI {
             final Option<Integer> milestoneStartIndex = parser.addIntegerOption("milestone-start");
             final Option<Integer> milestoneKeys = parser.addIntegerOption("milestone-keys");
             final Option<Long> snapshotTime = parser.addLongOption("snapshot-timestamp");
-
+            final Option<Integer> belowMaxDepthTxLimit = parser.addIntegerOption("max-depth-tx-limit");
 
             try {
                 parser.parse(args);
@@ -330,6 +330,7 @@ public class IRI {
             if (vmaxPeers != null) {
                 configuration.put(DefaultConfSettings.MAX_PEERS, vmaxPeers);
             }
+
             return true;
         }
 
