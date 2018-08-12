@@ -404,6 +404,18 @@ public class TransactionViewModel {
     public void updateReferencedSnapshot(Tangle tangle) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == 0) {
+            // cover the trivial case first -> for faster bottom up propagation
+            if(
+                (Hash.NULL_HASH.equals(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this)) &&
+                (Hash.NULL_HASH.equals(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this))
+            ) {
+                // calculate the correct value ...
+                updateReferencedSnapshotOfLeaf(tangle, this);
+
+                // ... and return
+                return;
+            }
+
             try {
                 // we maintain a stack with the steps (to reduce the memory consumption, we "abort" if we go too deep
                 // and continue with fresh data structures allowing the garbage collector to clean up)
@@ -525,7 +537,7 @@ public class TransactionViewModel {
     private void updateReferencedSnapshotOfLeaf(Tangle tangle, TransactionViewModel transaction) throws Exception {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
-        if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
+        if(Hash.NULL_HASH.equals(transaction.getBranchTransactionHash())) {
             referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
@@ -543,7 +555,7 @@ public class TransactionViewModel {
 
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
-        if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
+        if(Hash.NULL_HASH.equals(transaction.getTrunkTransactionHash())) {
             referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
