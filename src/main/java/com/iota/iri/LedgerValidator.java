@@ -259,7 +259,7 @@ public class LedgerValidator {
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
-                milestone.reset(milestoneVM, "milestones processed in the wrong order (#" + transactionSnapshotIndex +" before #" + milestoneVM.index() + ")");
+                milestone.hardReset(milestoneVM, "milestones processed in the wrong order (#" + transactionSnapshotIndex +" before #" + milestoneVM.index() + ")");
 
                 return false;
             }

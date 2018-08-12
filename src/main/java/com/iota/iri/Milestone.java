@@ -196,8 +196,27 @@ public class Milestone {
     }
 
     /**
-     * This method allows us to reset the ledger state in case we detect, that  milestones were processed in the wrong
-     * order.
+     * This method allows us to soft reset the ledger state, in case we face an inconsistent SnapshotState.
+     *
+     * It simply resets the latest snapshot to the initial one and rebuilds the ledger state. This will also make the
+     * updateLatestSolidSubtangleMilestone trigger again and give it a chance to detect corruptions.
+     */
+    public void softReset() {
+        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.incrementAndGet();
+
+        // reset the ledger state to the initial state
+        latestSnapshot = initialSnapshot.clone();
+        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
+
+        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.decrementAndGet();
+    }
+
+    /**
+     * This method allows us to hard reset the ledger state, in case we detect that  milestones were processed in the
+     * wrong order.
      *
      * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
      * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
@@ -205,7 +224,7 @@ public class Milestone {
      *
      * @param targetMilestone the last correct milestone
      */
-    public void reset(MilestoneViewModel targetMilestone, String reason) {
+    public void hardReset(MilestoneViewModel targetMilestone, String reason) {
         // ignore errors due to old milestones
         if(targetMilestone == null || targetMilestone.index() < initialSnapshot.index()) {
             return;
@@ -239,10 +258,8 @@ public class Milestone {
             log.error("Error while resetting the ledger: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
         }
 
-        // reset the ledger state to the initial state
-        latestSnapshot = initialSnapshot.clone();
-        latestSolidSubtangleMilestone = Hash.NULL_HASH;
-        latestSolidSubtangleMilestoneIndex = initialSnapshot.index();
+        // after we have cleaned up the database we do a soft reset to rescan
+        softReset();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -293,7 +310,7 @@ public class Milestone {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < latestSolidSubtangleMilestoneIndex) {
-                                reset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
+                                hardReset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {
@@ -347,8 +364,8 @@ public class Milestone {
 
             // otherwise if we didn't reset yet in the updateSnapshot method ... (fallback of last resort)
             else if(latestSnapshot.index() != initialSnapshot.index()) {
-                // reset the ledger to the initial snapshot and rebuild everything
-                reset(MilestoneViewModel.findClosestNextMilestone(tangle, initialSnapshot.index()), "failed to update ledger");
+                // reset the ledger to the initial snapshot and rescan
+                softReset();
 
                 // and abort our loop
                 break;
