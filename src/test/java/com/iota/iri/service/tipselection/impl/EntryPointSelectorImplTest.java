@@ -8,17 +8,17 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.EntryPointSelector;
-import com.iota.iri.storage.Indexable;
-import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
-import com.iota.iri.utils.Pair;
+
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+
+import java.util.HashMap;
 
 @RunWith(MockitoJUnitRunner.class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -50,6 +50,7 @@ public class EntryPointSelectorImplTest {
     public static void tearDown() throws Exception {
         tangle.shutdown();
         dbFolder.delete();
+        logFolder.delete();
     }
 
     @Test
@@ -83,7 +84,6 @@ public class EntryPointSelectorImplTest {
         com.iota.iri.model.Milestone milestoneModel = new com.iota.iri.model.Milestone();
         milestoneModel.index = new IntegerIndex(0);
         milestoneModel.hash = milestoneModelHash;
-        Pair<Indexable, Persistable> indexMilestoneModel = new Pair<>(new IntegerIndex(0), milestoneModel);
         tangle.save(milestoneModel, new IntegerIndex(0));
     }
 }

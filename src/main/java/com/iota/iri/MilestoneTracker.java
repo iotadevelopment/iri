@@ -191,7 +191,6 @@ public class MilestoneTracker {
                     }
 
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
-
                 } catch (final Exception e) {
                     log.error("Error during Solid Milestone updating", e);
                 }
@@ -202,8 +201,26 @@ public class MilestoneTracker {
     }
 
     /**
-     * This method allows us to reset the ledger state in case we detect, that  milestones were processed in the wrong
-     * order.
+     * This method allows us to soft reset the ledger state, in case we face an inconsistent SnapshotState.
+     *
+     * It simply resets the latest snapshot to the initial one and rebuilds the ledger state. This will also make the
+     * updateLatestSolidSubtangleMilestone trigger again and give it a chance to detect corruptions.
+     */
+    public void softReset() {
+        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.incrementAndGet();
+
+        // reset the ledger state to the initial state
+        snapshotManager.resetLatestSnapshot();
+        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+
+        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
+        solidMilestoneTrackerTasks.decrementAndGet();
+    }
+
+    /**
+     * This method allows us to hard reset the ledger state, in case we detect that  milestones were processed in the
+     * wrong order.
      *
      * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
      * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
@@ -211,7 +228,7 @@ public class MilestoneTracker {
      *
      * @param targetMilestone the last correct milestone
      */
-    public void reset(MilestoneViewModel targetMilestone, String reason) {
+    public void hardReset(MilestoneViewModel targetMilestone, String reason) {
         // ignore errors due to old milestones
         if(targetMilestone == null || targetMilestone.index() < snapshotManager.getInitialSnapshot().getIndex()) {
             return;
@@ -248,9 +265,8 @@ public class MilestoneTracker {
             log.error("Error while resetting the ledger: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
         }
 
-        // reset the ledger state to the initial state
-        snapshotManager.resetLatestSnapshot();
-        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        // after we have cleaned up the database we do a soft reset to rescan
+        softReset();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();
@@ -301,7 +317,7 @@ public class MilestoneTracker {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotManager.getLatestSnapshot().getIndex()) {
-                                reset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
+                                hardReset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {
@@ -324,7 +340,7 @@ public class MilestoneTracker {
             tangle, previousSolidSubtangleLatestMilestoneIndex
         );
 
-        // while we have a milestone which is solid and which was updated + verified
+        // while we have a milestone which is solid
         while(
             solidMilestoneTrackerTasks.get() == 0 &&
             !shuttingDown &&
@@ -355,19 +371,8 @@ public class MilestoneTracker {
 
             // otherwise if we didn't reset yet in the updateSnapshot method ... (try to actively repair)
             else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
-                // retrieve the latest diff that failed to get applied
-                Map<Hash, Long> currentState = ledgerValidator.getLatestDiff(new HashSet<>(), nextMilestone.getHash(), snapshotManager.getLatestSnapshot().getIndex(), true);
-
-                // if we can retrieve a diff ...
-                if(currentState != null) {
-                    // ... try to apply it and determine the addresses that failed it
-                    HashMap<Hash, Long> inconsistentAddresses = snapshotManager.getLatestSnapshot().getState().patchedState(new SnapshotStateDiff(currentState)).getInconsistentAddresses();
-
-                    // cycle through all addresses
-                    if(inconsistentAddresses.size() >= 1) {
-                        // TODO: REAPIR
-                    }
-                }
+                // reset the ledger to the initial snapshot and rescan
+                softReset();
 
                 // and abort our loop
                 break;
