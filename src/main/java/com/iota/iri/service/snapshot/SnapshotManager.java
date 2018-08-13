@@ -81,7 +81,7 @@ public class SnapshotManager {
 
                 // load necessary configuration parameters
                 int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
-                int LOCAL_SNAPSHOT_INTERVAL = 1000;
+                int LOCAL_SNAPSHOT_INTERVAL = 10;
 
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
@@ -171,6 +171,8 @@ public class SnapshotManager {
             // abort
             throw new SnapshotException("the target " + targetMilestone.toString() + " is too old");
         }
+
+        log.info("Taking local snapshot [1/3 calculating snapshot state]: 0%");
 
         // determine the distance of our target snapshot from our two snapshots (initial / latest)
         int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
