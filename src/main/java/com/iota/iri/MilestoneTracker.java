@@ -111,7 +111,8 @@ public class MilestoneTracker {
                     { // Update Milestone
                         { // find new milestones
                             for(Hash hash: hashes) {
-                                if(firstRun && (System.currentTimeMillis() - lastLogTime) >= 1000) {
+                                // show the scanning progress, since the first scan can potentially take a lot of time
+                                if(firstRun && (System.currentTimeMillis() - lastLogTime) >= 5000) {
                                     log.info("Scanning milestones: " + ((int) (((double) analyzedMilestoneCandidates.size() / (double) hashes.size()) * 100)) + "% done ...");
 
                                     lastLogTime = System.currentTimeMillis();
@@ -219,7 +220,7 @@ public class MilestoneTracker {
     }
 
     /**
-     * This method allows us to hard reset the ledger state, in case we detect that  milestones were processed in the
+     * This method allows us to hard reset the ledger state, in case we detect that milestones were processed in the
      * wrong order.
      *
      * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
@@ -333,7 +334,7 @@ public class MilestoneTracker {
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // introduce some variables that help us to emit log messages while processing the milestones
         int previousSolidSubtangleLatestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-        long scanStart = System.currentTimeMillis() / 1000L;
+        long scanStart = System.currentTimeMillis();
 
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
@@ -352,14 +353,14 @@ public class MilestoneTracker {
                 latestSolidSubtangleMilestone = nextMilestone.getHash();
                 snapshotManager.getLatestSnapshot().getMetaData().setIndex(nextMilestone.index());
 
-                // dump a log message every second
-                if((System.currentTimeMillis() / 1000L) - scanStart >= 1) {
+                // dump a log message every 5 seconds
+                if(System.currentTimeMillis() - scanStart >= 5000) {
                     messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, nextMilestone.index());
                     messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
                     log.info("Latest SOLID SUBTANGLE milestone has changed from #"
                              + previousSolidSubtangleLatestMilestoneIndex + " to #"
                              + nextMilestone.index());
-                    scanStart = System.currentTimeMillis() / 1000L;
+                    scanStart = System.currentTimeMillis();
                     previousSolidSubtangleLatestMilestoneIndex = nextMilestone.index();
                 }
 
