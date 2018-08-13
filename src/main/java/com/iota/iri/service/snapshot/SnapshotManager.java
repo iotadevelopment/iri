@@ -172,7 +172,7 @@ public class SnapshotManager {
             throw new SnapshotException("the target " + targetMilestone.toString() + " is too old");
         }
 
-        log.info("Taking local snapshot [1/3 calculating snapshot state]: 0%");
+        dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", 0, 1);
 
         // determine the distance of our target snapshot from our two snapshots (initial / latest)
         int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
@@ -290,7 +290,7 @@ public class SnapshotManager {
             }
 
             // dump the progress after every step
-            log.info("Taking local snapshot [1/3 calculating snapshot state]: " + (int) (((double) ++stepCounter / (double) amountOfMilestonesToProcess) * 100) + "%");
+            dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", ++stepCounter, amountOfMilestonesToProcess);
 
             // iterate to the the next milestone
             currentMilestone = nextMilestone;
@@ -383,6 +383,8 @@ public class SnapshotManager {
         int amountOfMilestonesToProcess = targetMilestone.index() - initialSnapshotIndex;
         int stepCounter = 0;
 
+        dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", stepCounter, amountOfMilestonesToProcess);
+
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
         while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
@@ -456,12 +458,28 @@ public class SnapshotManager {
                 throw new SnapshotException("could not iterate to the previous milestone", e);
             }
 
+            dumpLogMessage("Taking local snapshot", "2/3 generating solid entry points", ++stepCounter, amountOfMilestonesToProcess);
             // dump the progress after every step
-            log.info("Taking local snapshot [2/3 generating solid entry points]: " + (int) (((double) ++stepCounter / (double) amountOfMilestonesToProcess) * 100) + "%");
+
         }
 
         // return our result
         return solidEntryPoints;
+    }
+
+    long lastDumpTime = System.currentTimeMillis();
+
+    String lastLogMessage;
+
+    public void dumpLogMessage(String job, String task, int currentStep, int maxSteps) {
+        String logMessage = job + " [" + task + "]: " + (int) (((double) currentStep / (double) maxSteps) * 100) + "%";
+
+        if(!logMessage.equals(lastLogMessage) && (System.currentTimeMillis() - lastDumpTime >= 5000 || currentStep == 1 || currentStep == maxSteps)) {
+            log.info(logMessage);
+
+            lastLogMessage = logMessage;
+            lastDumpTime = System.currentTimeMillis();
+        }
     }
 
     public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
@@ -564,8 +582,6 @@ public class SnapshotManager {
     }
 
     public Snapshot takeLocalSnapshot() throws SnapshotException {
-        log.info("Taking local snapshot ...");
-
         // load necessary configuration parameters
         boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
         String basePath = configuration.string(
