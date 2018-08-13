@@ -183,6 +183,11 @@ public class SnapshotManager {
                            ? GENERATE_FROM_INITIAL
                            : GENERATE_FROM_LATEST;
 
+        // store how many milestones has to be processed to generate the ledger state (for reasonable debug messages)
+        int amountOfMilestonesToProcess = generationMode == GENERATE_FROM_INITIAL
+                                        ? distanceFromInitialSnapshot
+                                        : distanceFromLatestSnapshot;
+
         // clone the corresponding snapshot state
         Snapshot snapshot = generationMode == GENERATE_FROM_INITIAL
                           ? initialSnapshot.clone()
@@ -214,6 +219,9 @@ public class SnapshotManager {
         if(currentMilestone == null) {
             throw new SnapshotException("could not retrieve the milestone #" + startingMilestoneIndex);
         }
+
+        // introduce a step counter (for reasonable progress messages)
+        int stepCounter = 0;
 
         // iterate through the milestones to our target
         while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index()
@@ -280,6 +288,9 @@ public class SnapshotManager {
                     "could not iterate to the next milestone from " + currentMilestone.toString()
                 );
             }
+
+            // dump the progress after every step
+            log.info("Taking local snapshot [1/3 calculating snapshot state]: " + (int) (((double) ++stepCounter / (double) amountOfMilestonesToProcess) * 100) + "%");
 
             // iterate to the the next milestone
             currentMilestone = nextMilestone;
