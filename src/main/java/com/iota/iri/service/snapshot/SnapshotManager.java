@@ -380,12 +380,12 @@ public class SnapshotManager {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
         solidEntryPoints.put(Hash.NULL_HASH, 590000);
 
-        // create a counter to keep track of the outer shell
-        int outerShellSize = 0;
+        int amountOfMilestonesToProcess = targetMilestone.index() - initialSnapshotIndex;
+        int stepCounter = 0;
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex && ++outerShellSize < 20) {
+        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
             // create a set where we collect the solid entry points
             Set<Hash> seenMilestoneTransactions = new HashSet<>();
 
@@ -401,8 +401,6 @@ public class SnapshotManager {
             final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(
                 Collections.singleton(milestoneTransaction)
             );
-
-            int previousSize = solidEntryPoints.size();
 
             // iterate through our queue and process all elements (while we iterate we add more)
             TransactionViewModel currentTransaction;
@@ -458,12 +456,8 @@ public class SnapshotManager {
                 throw new SnapshotException("could not iterate to the previous milestone", e);
             }
 
-            // dump some debug messages
-            if(previousSize != solidEntryPoints.size()) {
-                System.out.println(solidEntryPoints.size() + " / " + currentMilestone.index() + " => " + (targetMilestone.index() - currentMilestone.index()));
-            } else {
-                System.out.println(currentMilestone.index());
-            }
+            // dump the progress after every step
+            log.info("Taking local snapshot [2/3 generating solid entry points]: " + (int) (((double) ++stepCounter / (double) amountOfMilestonesToProcess) * 100) + "%");
         }
 
         // return our result
