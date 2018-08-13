@@ -216,7 +216,7 @@ public class API {
                     return ErrorResponse.create("sth happened");
                 }
                 case "takeSnapshot": {
-                    Snapshot localSnapshot = instance.snapshotManager.writeLocalSnapshot();
+                    Snapshot localSnapshot = instance.snapshotManager.takeLocalSnapshot();
 
                     return ErrorResponse.create("snapshot taken: " + localSnapshot.getIndex());
                 }

@@ -88,7 +88,7 @@ public class SnapshotManager {
 
                     if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                         try {
-                            writeLocalSnapshot();
+                            takeLocalSnapshot();
                         } catch(SnapshotException e) {
                             log.error("Error while taking local snapshot: " + e.getMessage());
                         }
@@ -302,8 +302,6 @@ public class SnapshotManager {
         // retrieve the solid entry points of our snapshot
         HashMap<Hash, Integer> solidEntryPoints = generateSolidEntryPoints(targetMilestone);
 
-        solidEntryPoints.put(Hash.NULL_HASH, 590000);
-
         // copy the old solid entry points which are still valid
         snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
             if(solidEntryPoint.getValue() > targetMilestone.index()) {
@@ -311,9 +309,12 @@ public class SnapshotManager {
             }
         });
 
+        // save the updated solid entry points
         snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
 
+        // dump some debug messages
         System.out.println(snapshot.getMetaData().getSolidEntryPoints().size());
+        System.out.println(snapshot.getMetaData().getSolidEntryPoints().toString());
 
         // return the result
         return snapshot;
@@ -366,6 +367,7 @@ public class SnapshotManager {
 
         // create a set where we collect the solid entry points
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(Hash.NULL_HASH, 590000);
 
         // create a counter to keep track of the outer shell
         int outerShellSize = 0;
@@ -452,9 +454,6 @@ public class SnapshotManager {
                 System.out.println(currentMilestone.index());
             }
         }
-
-        // dump some debug messages
-        System.out.println(solidEntryPoints.toString());
 
         // return our result
         return solidEntryPoints;
@@ -559,7 +558,7 @@ public class SnapshotManager {
         );
     }
 
-    public Snapshot writeLocalSnapshot() throws SnapshotException {
+    public Snapshot takeLocalSnapshot() throws SnapshotException {
         log.info("Taking local snapshot ...");
 
         // load necessary configuration parameters
