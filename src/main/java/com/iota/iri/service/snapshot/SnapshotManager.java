@@ -142,65 +142,112 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
     }
 
-    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
-        // check if the milestone is not null
-        if(targetMilestone == null) {
-            throw new SnapshotException("the target milestone must not be null");
+    public void calculateSnapshotState(Snapshot snapshot, MilestoneViewModel currentMilestone, int generationMode) throws SnapshotException {
+        // retrieve the balance diff from the db
+        StateDiffViewModel stateDiffViewModel;
+        try {
+            stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
+        } catch(Exception e) {
+            throw new SnapshotException("could not retrieve the StateDiff for " + currentMilestone.toString(), e);
         }
+
+        // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
+        if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+            // create the SnapshotStateDiff object for our changes
+            SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
+                stateDiffViewModel.getDiff().entrySet().stream().map(
+                    hashLongEntry -> new HashMap.SimpleEntry<>(
+                        hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
+                    )
+                ).collect(
+                    Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                )
+            );
+
+            // this should never happen since we check the StateDiffs already when applying them in the
+            // MilestoneTracker but better give a reasonable error message if it ever does
+            if(!snapshotStateDiff.isConsistent()) {
+                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent");
+            }
+
+            // apply the balance changes to the snapshot
+            snapshot.update(
+                snapshotStateDiff,
+                currentMilestone.index()
+            );
+
+            // this should never happen since we check the snapshots already when applying them but better give
+            // a reasonable error message if it ever does
+            if(!snapshot.getState().hasCorrectSupply() || !snapshot.getState().isConsistent()) {
+                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() +" leads to an invalid supply");
+            }
+        }
+    }
+
+    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+        // variables used by the snapshot generation process
+        Snapshot snapshot;
+        int generationMode;
+
+        // variables to keep track of the progress of the tasks in this method
+        int amountOfMilestonesToProcess;
+        int stepCounter;
+
+        //region SANITIZE PARAMETERS AND DETERMINE WHICH SNAPSHOT TO WORK FROM /////////////////////////////////////
 
         // acquire locks for our snapshots
         initialSnapshot.lockRead();
         latestSnapshot.lockRead();
 
-        // check if the milestone was solidified already
-        if(targetMilestone.index() > latestSnapshot.getIndex()) {
-            // unlock our snapshots
-            initialSnapshot.unlockRead();
-            latestSnapshot.unlockRead();
+        // handle the following block in a try to be able to always unlock the snapshots
+        try {
+            // check if the milestone is not null
+            if(targetMilestone == null) {
+                throw new SnapshotException("the target milestone must not be null");
+            }
 
-            // abort
-            throw new SnapshotException("the target " + targetMilestone + " was not solidified yet");
-        }
+            // check if the milestone was solidified already
+            if(targetMilestone.index() > latestSnapshot.getIndex()) {
+                throw new SnapshotException("the target " + targetMilestone + " was not solidified yet");
+            }
 
-        // check if the milestone came after our initial one
-        if(targetMilestone.index() < initialSnapshot.getIndex()) {
-            // unlock our snapshots
-            initialSnapshot.unlockRead();
-            latestSnapshot.unlockRead();
+            // check if the milestone came after our initial one
+            if(targetMilestone.index() < initialSnapshot.getIndex()) {
+                throw new SnapshotException("the target " + targetMilestone.toString() + " is too old");
+            }
 
-            // abort
-            throw new SnapshotException("the target " + targetMilestone.toString() + " is too old");
-        }
+            // determine the distance of our target snapshot from our two snapshots (initial / latest)
+            int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
 
-        dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", 0, 1);
-
-        // determine the distance of our target snapshot from our two snapshots (initial / latest)
-        int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
-        int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
-
-        // determine which generation mode is the fastest one
-        int generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
+            // determine which generation mode is the fastest one
+            generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
                            ? GENERATE_FROM_INITIAL
                            : GENERATE_FROM_LATEST;
 
-        // store how many milestones has to be processed to generate the ledger state (for reasonable debug messages)
-        int amountOfMilestonesToProcess = generationMode == GENERATE_FROM_INITIAL
+            // store how many milestones has to be processed to generate the ledger state (for reasonable debug messages)
+            amountOfMilestonesToProcess = generationMode == GENERATE_FROM_INITIAL
                                         ? distanceFromInitialSnapshot
                                         : distanceFromLatestSnapshot;
 
-        // clone the corresponding snapshot state
-        Snapshot snapshot = generationMode == GENERATE_FROM_INITIAL
-                          ? initialSnapshot.clone()
-                          : latestSnapshot.clone();
+            // clone the corresponding snapshot state
+            snapshot = generationMode == GENERATE_FROM_INITIAL
+                                ? initialSnapshot.clone()
+                                : latestSnapshot.clone();
+        } finally {
+            // unlock our snapshots
+            initialSnapshot.unlockRead();
+            latestSnapshot.unlockRead();
+        }
 
-        // unlock our snapshots
-        initialSnapshot.unlockRead();
-        latestSnapshot.unlockRead();
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        // if the target is the selected milestone we can return immediately
+        // if the target snapshot is our starting point we can return immediately
         if(targetMilestone.index() == snapshot.getIndex()) {
             return snapshot;
         }
+
+        //region GENERATE THE SNAPSHOT STATE ///////////////////////////////////////////////////////////////////////////
 
         // calculate the starting point for our snapshot generation
         int startingMilestoneIndex = snapshot.getIndex() + (generationMode == GENERATE_FROM_INITIAL ? 1 : 0);
@@ -210,65 +257,19 @@ public class SnapshotManager {
         try {
              currentMilestone = MilestoneViewModel.get(tangle, startingMilestoneIndex);
         } catch(Exception e) {
-            throw new SnapshotException(
-                "could not retrieve the milestone #" + startingMilestoneIndex, e
-            );
+            throw new SnapshotException("could not retrieve the milestone #" + startingMilestoneIndex, e);
         }
-
-        // this should not happen but better give a reasonable error message if it ever does
         if(currentMilestone == null) {
             throw new SnapshotException("could not retrieve the milestone #" + startingMilestoneIndex);
         }
 
-        // introduce a step counter (for reasonable progress messages)
-        int stepCounter = 0;
+        // dump a progress message before we start
+        dumpLogMessage("Taking local snapshot", "1/2 calculating snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
 
         // iterate through the milestones to our target
-        while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index()
-                                                      : currentMilestone.index() > targetMilestone.index()) {
-            // retrieve the balance diff from the db
-            StateDiffViewModel stateDiffViewModel;
-            try {
-                stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
-            } catch(Exception e) {
-                throw new SnapshotException("could not retrieve the StateDiff for " + currentMilestone.toString(), e);
-            }
-
-            // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
-            if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                // create the SnapshotStateDiff object for our changes
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
-                    stateDiffViewModel.getDiff().entrySet().stream().map(
-                        hashLongEntry -> new HashMap.SimpleEntry<>(
-                            hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
-                        )
-                    ).collect(
-                        Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-                    )
-                );
-
-                // this should never happen since we check the StateDiffs already when applying them in the
-                // MilestoneTracker but better give a reasonable error message if it ever does
-                if(!snapshotStateDiff.isConsistent()) {
-                    throw new SnapshotException(
-                        "the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent"
-                    );
-                }
-
-                // apply the balance changes to the snapshot
-                snapshot.update(
-                    snapshotStateDiff,
-                    currentMilestone.index()
-                );
-
-                // this should never happen since we check the snapshots already when applying them but better give
-                // a reasonable error message if it ever does
-                if(!snapshot.getState().hasCorrectSupply() || !snapshot.getState().isConsistent()) {
-                    throw new SnapshotException(
-                        "the StateDiff belonging to " + currentMilestone.toString() +" leads to an invalid supply"
-                    );
-                }
-            }
+        while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index() : currentMilestone.index() > targetMilestone.index()) {
+            // calculate the correct ledger state based on our current milestone
+            calculateSnapshotState(snapshot, currentMilestone, generationMode);
 
             // retrieve the next milestone
             MilestoneViewModel nextMilestone;
@@ -277,41 +278,29 @@ public class SnapshotManager {
                               ? MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index())
                               : MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
             } catch(Exception e) {
-                throw new SnapshotException(
-                    "could not iterate to the next milestone from " + currentMilestone.toString(), e
-                );
+                throw new SnapshotException("could not iterate to the next milestone from " + currentMilestone.toString(), e);
             }
-
-            // this should not happen but better give a reasonable error message if it ever does
-            if(currentMilestone == null) {
-                throw new SnapshotException(
-                    "could not iterate to the next milestone from " + currentMilestone.toString()
-                );
+            if(nextMilestone == null) {
+                throw new SnapshotException("could not iterate to the next milestone from " + currentMilestone.toString());
             }
-
-            // dump the progress after every step
-            dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", ++stepCounter, amountOfMilestonesToProcess);
 
             // iterate to the the next milestone
             currentMilestone = nextMilestone;
+
+            // dump a progress message after every step
+            dumpLogMessage("Taking local snapshot", "1/2 calculating snapshot state", ++stepCounter, amountOfMilestonesToProcess);
         }
 
-        // retrieve the transaction belonging to our targetMilestone
-        TransactionViewModel targetMilestoneTransaction;
-        try {
-            targetMilestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
-        } catch(Exception e) {
-            throw new SnapshotException(
-                "could not retrieve the transaction belonging to " + targetMilestone.toString(), e
-            );
-        }
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        // set the snapshot index and timestamp to that of our target milestone transaction
-        snapshot.getMetaData().setIndex(targetMilestone.index());
-        snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
+        //region ANALYZE OLD TRANSACTIONS THAT CAN BE PRUNED //////////////////////////////////////////////////////////
 
-        // retrieve the solid entry points of our snapshot
-        HashMap<Hash, Integer> solidEntryPoints = generateSolidEntryPoints(targetMilestone);
+        // determine the initial snapshot index
+        int initialSnapshotIndex = initialSnapshot.getIndex();
+
+        // create a set where we collect the solid entry points
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(Hash.NULL_HASH, 590000);
 
         // copy the old solid entry points which are still valid
         snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
@@ -320,12 +309,112 @@ public class SnapshotManager {
             }
         });
 
-        // save the updated solid entry points
+        // dump a progress message before we start
+        dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", stepCounter = 0, amountOfMilestonesToProcess = targetMilestone.index() - initialSnapshotIndex);
+
+        // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
+        currentMilestone = targetMilestone;
+        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
+            // create a set where we collect the solid entry points
+            Set<Hash> seenMilestoneTransactions = new HashSet<>();
+
+            // retrieve the transaction belonging to our current milestone
+            TransactionViewModel milestoneTransaction;
+            try {
+                milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
+            } catch(Exception e) {
+                throw new SnapshotException("could not retrieve the transaction belonging to " + currentMilestone.toString(), e);
+            }
+            if(milestoneTransaction == null) {
+                throw new SnapshotException("could not retrieve the transaction belonging to " + currentMilestone.toString());
+            }
+
+            // create a queue where we collect the transactions that shall be examined (starting with our milestone)
+            final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(Collections.singleton(milestoneTransaction));
+
+            // iterate through our queue and process all elements (while we iterate we add more)
+            TransactionViewModel currentTransaction;
+            while((currentTransaction = transactionsToExamine.poll()) != null) {
+                // only process transactions that we haven't seen yet
+                if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
+                    // if the transaction is a solid entry point -> add it to our list
+                    int solidEntryPointIndex = getSolidEntryPointIndex(currentTransaction, targetMilestone);
+                    if(!solidEntryPoints.containsKey(currentTransaction.getHash()) && solidEntryPointIndex != -1) {
+                        solidEntryPoints.put(currentTransaction.getHash(), solidEntryPointIndex);
+                    }
+
+                    // only examine transactions that are not part of the solid entry points
+                    if(!initialSnapshot.getMetaData().hasSolidEntryPoint(currentTransaction.getBranchTransactionHash())) {
+                        // retrieve the branch transaction of our current transaction
+                        TransactionViewModel branchTransaction;
+                        try {
+                            branchTransaction = currentTransaction.getBranchTransaction(tangle);
+                        } catch(Exception e) {
+                            throw new SnapshotException("could not retrieve the branch transaction of " + currentTransaction.toString(), e);
+                        }
+                        if(branchTransaction == null) {
+                            throw new SnapshotException("could not retrieve the branch transaction of " + currentTransaction.toString());
+                        }
+
+                        // if the branch transaction is still approved by our current milestone -> add it to our queue
+                        if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
+                            transactionsToExamine.add(branchTransaction);
+                        }
+                    }
+
+                    // only examine transactions that are not part of the solid entry points
+                    if(!initialSnapshot.getMetaData().hasSolidEntryPoint(currentTransaction.getTrunkTransactionHash())) {
+                        // retrieve the trunk transaction of our current transaction
+                        TransactionViewModel trunkTransaction;
+                        try {
+                            trunkTransaction = currentTransaction.getTrunkTransaction(tangle);
+                        } catch(Exception e) {
+                            throw new SnapshotException("could not retrieve the trunk transaction of " + currentTransaction.toString(), e);
+                        }
+                        if(trunkTransaction == null) {
+                            throw new SnapshotException("could not retrieve the trunk transaction of " + currentTransaction.toString());
+                        }
+
+                        // if the trunk transaction is still approved by our current milestone -> add it to our queue
+                        if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
+                            transactionsToExamine.add(trunkTransaction);
+                        }
+                    }
+                }
+            }
+
+            // iterate to the previous milestone
+            try {
+                currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+            } catch(Exception e) {
+                throw new SnapshotException("could not iterate to the previous milestone", e);
+            }
+
+            // dump the progress after every step
+            dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", ++stepCounter, amountOfMilestonesToProcess);
+        }
+
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        //region UPDATE THE SCALAR METADATA VALUES OF THE NEW SNAPSHOT  ////////////////////////////////////////////////
+
+        // retrieve the transaction belonging to our targetMilestone
+        TransactionViewModel targetMilestoneTransaction;
+        try {
+            targetMilestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
+        } catch(Exception e) {
+            throw new SnapshotException("could not retrieve the transaction belonging to " + targetMilestone.toString(), e);
+        }
+        if(targetMilestoneTransaction == null) {
+            throw new SnapshotException("could not retrieve the transaction belonging to " + targetMilestone.toString());
+        }
+
+        // set the snapshot index, timestamp and solid entry points to that of our target milestone transaction
+        snapshot.getMetaData().setIndex(targetMilestone.index());
+        snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
         snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
 
-        // dump some debug messages
-        System.out.println(snapshot.getMetaData().getSolidEntryPoints().size());
-        System.out.println(snapshot.getMetaData().getSolidEntryPoints().toString());
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
         // return the result
         return snapshot;
@@ -370,101 +459,6 @@ public class SnapshotManager {
 
         // return false if we didnt find a referenced transaction
         return result;
-    }
-
-    public HashMap<Hash, Integer> generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
-        // determine the initial snapshot index
-        int initialSnapshotIndex = initialSnapshot.getIndex();
-
-        // create a set where we collect the solid entry points
-        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        solidEntryPoints.put(Hash.NULL_HASH, 590000);
-
-        int amountOfMilestonesToProcess = targetMilestone.index() - initialSnapshotIndex;
-        int stepCounter = 0;
-
-        dumpLogMessage("Taking local snapshot", "1/3 calculating snapshot state", stepCounter, amountOfMilestonesToProcess);
-
-        // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
-        MilestoneViewModel currentMilestone = targetMilestone;
-        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
-            // create a set where we collect the solid entry points
-            Set<Hash> seenMilestoneTransactions = new HashSet<>();
-
-            // retrieve the transaction belonging to our current milestone
-            TransactionViewModel milestoneTransaction;
-            try {
-                milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-            } catch(Exception e) {
-                throw new SnapshotException("could not retrieve the transaction belonging to " + currentMilestone.toString(), e);
-            }
-
-            // create a queue where we collect the transactions that shall be examined (starting with our milestone)
-            final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(
-                Collections.singleton(milestoneTransaction)
-            );
-
-            // iterate through our queue and process all elements (while we iterate we add more)
-            TransactionViewModel currentTransaction;
-            while((currentTransaction = transactionsToExamine.poll()) != null) {
-                // only process transactions that we haven't seen yet
-                if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
-                    // determine the index that belongs to the current solid entry point
-                    int solidEntryPointIndex = getSolidEntryPointIndex(currentTransaction, targetMilestone);
-
-                    // if the transaction is a solid entry point -> add it to our list
-                    if(!solidEntryPoints.containsKey(currentTransaction.getHash()) && solidEntryPointIndex != -1) {
-                        solidEntryPoints.put(currentTransaction.getHash(), solidEntryPointIndex);
-                    }
-
-                    // retrieve the branch transaction of our current transaction
-                    TransactionViewModel branchTransaction;
-                    try {
-                        branchTransaction = currentTransaction.getBranchTransaction(tangle);
-                    } catch(Exception e) {
-                        throw new SnapshotException(
-                            "could not retrieve the branch transaction of " + currentTransaction.toString(),
-                            e
-                        );
-                    }
-
-                    // if the branch transaction is still approved by our current milestone -> add it to our queue
-                    if(branchTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToExamine.add(branchTransaction);
-                    }
-
-                    // retrieve the trunk transaction of our current transaction
-                    TransactionViewModel trunkTransaction;
-                    try {
-                        trunkTransaction = currentTransaction.getTrunkTransaction(tangle);
-                    } catch(Exception e) {
-                        throw new SnapshotException(
-                            "could not retrieve the trunk transaction of " + currentTransaction.toString(),
-                            e
-                        );
-                    }
-
-                    // if the trunk transaction is still approved by our current milestone -> add it to our queue
-                    if(trunkTransaction.snapshotIndex() == currentMilestone.index()) {
-                        transactionsToExamine.add(trunkTransaction);
-                    }
-                }
-            }
-
-            // iterate to the previous milestone
-            try {
-                currentMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
-            } catch(Exception e) {
-                throw new SnapshotException("could not iterate to the previous milestone", e);
-            }
-
-            dumpLogMessage("Taking local snapshot", "2/3 generating solid entry points", ++stepCounter, amountOfMilestonesToProcess);
-            // dump the progress after every step
-
-        }
-
-        // return our result
-        return solidEntryPoints;
     }
 
     long lastDumpTime = System.currentTimeMillis();

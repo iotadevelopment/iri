@@ -208,18 +208,6 @@ public class API {
             log.debug("# {} -> Requesting command '{}'", counter.incrementAndGet(), command);
 
             switch (command) {
-                case "generateSolidEntryPoints": {
-                    instance.snapshotManager.generateSolidEntryPoints(
-                        MilestoneViewModel.get(instance.tangle, instance.snapshotManager.getLatestSnapshot().getIndex() - 1000)
-                    );
-
-                    return ErrorResponse.create("sth happened");
-                }
-                case "takeSnapshot": {
-                    Snapshot localSnapshot = instance.snapshotManager.takeLocalSnapshot();
-
-                    return ErrorResponse.create("snapshot taken: " + localSnapshot.getIndex());
-                }
                 case "getTransactionDetails": {
                     Hash transactionHash;
                     try {
