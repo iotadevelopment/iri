@@ -7,6 +7,7 @@ import com.iota.iri.hash.Sponge;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import static com.iota.iri.controllers.TransactionViewModel.*;
 public class TransactionValidator {
     private final Logger log = LoggerFactory.getLogger(TransactionValidator.class);
     private final Tangle tangle;
+    private final SnapshotManager snapshotManager;
     private final TipsViewModel tipsViewModel;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
@@ -41,9 +43,10 @@ public class TransactionValidator {
     private final Set<Hash> newSolidTransactionsOne = new LinkedHashSet<>();
     private final Set<Hash> newSolidTransactionsTwo = new LinkedHashSet<>();
 
-    public TransactionValidator(Tangle tangle, TipsViewModel tipsViewModel, TransactionRequester transactionRequester,
+    public TransactionValidator(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel, TransactionRequester transactionRequester,
                                 MessageQ messageQ, long snapshotTimestamp) {
         this.tangle = tangle;
+        this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
@@ -83,7 +86,7 @@ public class TransactionValidator {
         }
 
         if (transactionViewModel.getAttachmentTimestamp() == 0) {
-            return transactionViewModel.getTimestamp() < snapshotTimestamp && !Objects.equals(transactionViewModel.getHash(), Hash.NULL_HASH)
+            return transactionViewModel.getTimestamp() < snapshotTimestamp && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionViewModel.getHash())
                     || transactionViewModel.getTimestamp() > (System.currentTimeMillis() / 1000) + MAX_TIMESTAMP_FUTURE;
         }
         return transactionViewModel.getAttachmentTimestamp() < snapshotTimestampMs
@@ -131,7 +134,7 @@ public class TransactionValidator {
     private final AtomicInteger nextSubSolidGroup = new AtomicInteger(1);
 
     public boolean checkSolidity(Hash hash, boolean milestone) throws Exception {
-        if(TransactionViewModel.fromHash(tangle, hash).isSolid()) {
+        if(TransactionViewModel.fromHash(tangle, snapshotManager, hash).isSolid()) {
             return true;
         }
         Set<Hash> analyzedHashes = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
@@ -140,7 +143,7 @@ public class TransactionValidator {
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
-                final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
+                final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !hashPointer.equals(Hash.NULL_HASH)) {
                         transactionRequester.requestTransaction(hashPointer, milestone);
@@ -156,7 +159,7 @@ public class TransactionValidator {
             }
         }
         if (solid) {
-            TransactionViewModel.updateSolidTransactions(tangle, analyzedHashes);
+            TransactionViewModel.updateSolidTransactions(tangle, snapshotManager, analyzedHashes);
         }
         analyzedHashes.clear();
         return solid;
@@ -202,10 +205,10 @@ public class TransactionValidator {
         while(cascadeIterator.hasNext() && !shuttingDown.get()) {
             try {
                 Hash hash = cascadeIterator.next();
-                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hash);
+                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
                 Set<Hash> approvers = transaction.getApprovers(tangle).getHashes();
                 for(Hash h: approvers) {
-                    TransactionViewModel tx = TransactionViewModel.fromHash(tangle, h);
+                    TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, h);
                     if(quietQuickSetSolid(tx)) {
                         tx.update(tangle, "solid");
                         addSolidTransaction(h);

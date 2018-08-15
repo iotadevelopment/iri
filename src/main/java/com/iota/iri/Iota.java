@@ -117,7 +117,7 @@ public class Iota {
                 );
         tipsViewModel = new TipsViewModel();
         transactionRequester = new TransactionRequester(tangle, messageQ);
-        transactionValidator = new TransactionValidator(tangle, tipsViewModel, transactionRequester, messageQ,
+        transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester, messageQ,
                 snapshotManager.getInitialSnapshot().getMetaData().getTimestamp());
         milestone = new MilestoneTracker(tangle, coordinator, snapshotManager, transactionValidator, testnet, messageQ,
                 numKeysMilestone, dontValidateMilestoneSig);

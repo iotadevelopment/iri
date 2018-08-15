@@ -57,9 +57,12 @@ public class LedgerValidator {
     public Map<Hash,Long> getLatestDiff(final Set<Hash> visitedNonMilestoneSubtangleHashes, Hash tip, int latestSnapshotIndex, boolean milestone) throws Exception {
         Map<Hash, Long> state = new HashMap<>();
         int numberOfAnalyzedTransactions = 0;
-        Set<Hash> countedTx = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+        Set<Hash> countedTx = new HashSet<>();
 
-        visitedNonMilestoneSubtangleHashes.add(Hash.NULL_HASH);
+        snapshotManager.getInitialSnapshot().getMetaData().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+            visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);
+            countedTx.add(solidEntryPointHash);
+        });
 
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
         Hash transactionPointer;

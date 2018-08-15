@@ -2,6 +2,7 @@ package com.iota.iri.controllers;
 
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.model.*;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
@@ -56,8 +57,8 @@ public class TransactionViewModel {
     private byte[] trits;
     public int weightMagnitude;
 
-    public static void fillMetadata(Tangle tangle, TransactionViewModel transactionViewModel) throws Exception {
-        if (Hash.NULL_HASH.equals(transactionViewModel.getHash())) {
+    public static void fillMetadata(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel transactionViewModel) throws Exception {
+        if (snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionViewModel.getHash())) {
             return;
         }
         if(transactionViewModel.getType() == FILLED_SLOT && !transactionViewModel.transaction.parsed) {
@@ -65,15 +66,15 @@ public class TransactionViewModel {
         }
     }
 
-    public static TransactionViewModel find(Tangle tangle, byte[] hash) throws Exception {
+    public static TransactionViewModel find(Tangle tangle, SnapshotManager snapshotManager, byte[] hash) throws Exception {
         TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.find(Transaction.class, hash), new Hash(hash));
-        fillMetadata(tangle, transactionViewModel);
+        fillMetadata(tangle, snapshotManager, transactionViewModel);
         return transactionViewModel;
     }
 
-    public static TransactionViewModel fromHash(Tangle tangle, final Hash hash) throws Exception {
+    public static TransactionViewModel fromHash(Tangle tangle, SnapshotManager snapshotManager, final Hash hash) throws Exception {
         TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
-        fillMetadata(tangle, transactionViewModel);
+        fillMetadata(tangle, snapshotManager, transactionViewModel);
         return transactionViewModel;
     }
 
@@ -131,16 +132,16 @@ public class TransactionViewModel {
         return tangle.update(transaction, hash, item);
     }
 
-    public TransactionViewModel getBranchTransaction(Tangle tangle) throws Exception {
+    public TransactionViewModel getBranchTransaction(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
         if(branch == null) {
-            branch = TransactionViewModel.fromHash(tangle, getBranchTransactionHash());
+            branch = TransactionViewModel.fromHash(tangle, snapshotManager, getBranchTransactionHash());
         }
         return branch;
     }
 
-    public TransactionViewModel getTrunkTransaction(Tangle tangle) throws Exception {
+    public TransactionViewModel getTrunkTransaction(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
         if(trunk == null) {
-            trunk = TransactionViewModel.fromHash(tangle, getTrunkTransactionHash());
+            trunk = TransactionViewModel.fromHash(tangle, snapshotManager, getTrunkTransactionHash());
         }
         return trunk;
     }
@@ -373,16 +374,16 @@ public class TransactionViewModel {
         return tangle.keysWithMissingReferences(Approvee.class, Transaction.class);
     }
 
-    public static void updateSolidTransactions(Tangle tangle, final Set<Hash> analyzedHashes) throws Exception {
+    public static void updateSolidTransactions(Tangle tangle, SnapshotManager snapshotManager, final Set<Hash> analyzedHashes) throws Exception {
         Iterator<Hash> hashIterator = analyzedHashes.iterator();
         TransactionViewModel transactionViewModel;
         while(hashIterator.hasNext()) {
-            transactionViewModel = TransactionViewModel.fromHash(tangle, hashIterator.next());
+            transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, hashIterator.next());
 
-            transactionViewModel.updateHeights(tangle);
+            transactionViewModel.updateHeights(tangle, snapshotManager);
 
             // recursively update the referenced snapshots field of the transaction
-            transactionViewModel.updateReferencedSnapshot(tangle);
+            transactionViewModel.updateReferencedSnapshot(tangle, snapshotManager);
 
             if(!transactionViewModel.isSolid()) {
                 transactionViewModel.updateSolid(true);
@@ -401,7 +402,7 @@ public class TransactionViewModel {
      * @param tangle Tangle object which acts as a database interface
      * @throws Exception if something goes wrong while loading or storing transactions
      */
-    public void updateReferencedSnapshot(Tangle tangle) throws Exception {
+    public void updateReferencedSnapshot(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == 0) {
             try {
@@ -424,47 +425,47 @@ public class TransactionViewModel {
                     // if we are traversing down ...
                     if(
                         previousTransaction == null ||
-                        previousTransaction.getBranchTransaction(tangle) == currentTransaction ||
-                        previousTransaction.getTrunkTransaction(tangle) == currentTransaction
+                        previousTransaction.getBranchTransaction(tangle, snapshotManager) == currentTransaction ||
+                        previousTransaction.getTrunkTransaction(tangle, snapshotManager) == currentTransaction
                     ) {
                         // if we have a branch to traverse (that we haven't seen yet) -> do it ...
-                        if(seenTransactions.add(currentTransaction.getBranchTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle))) {
-                            stack.push(currentTransaction.getBranchTransaction(tangle));
+                        if(seenTransactions.add(currentTransaction.getBranchTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getBranchTransaction(tangle, snapshotManager))) {
+                            stack.push(currentTransaction.getBranchTransaction(tangle, snapshotManager));
                         }
 
                         // ... or if we have a trunk to traverse (that we haven't seen yet) -> do it ...
-                        else if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                            stack.push(currentTransaction.getTrunkTransaction(tangle));
+                        else if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle, snapshotManager))) {
+                            stack.push(currentTransaction.getTrunkTransaction(tangle, snapshotManager));
                         }
 
                         // ... otherwise update the referencedSnapshot since we arrived at an end
                         else {
                             stack.pop();
 
-                            updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                            updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
                         }
                     }
 
                     // if we are traversing up from the branch ...
-                    else if(currentTransaction.getBranchTransaction(tangle) == previousTransaction) {
+                    else if(currentTransaction.getBranchTransaction(tangle, snapshotManager) == previousTransaction) {
                         // if we have a trunk to traverse (that we haven't seen yet) -> do it
-                        if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle))) {
-                            stack.push(currentTransaction.getTrunkTransaction(tangle));
+                        if(seenTransactions.add(currentTransaction.getTrunkTransactionHash()) && !isReferencedSnapshotLeaf(currentTransaction.getTrunkTransaction(tangle, snapshotManager))) {
+                            stack.push(currentTransaction.getTrunkTransaction(tangle, snapshotManager));
                         }
 
                         // otherwise -> update the referenced transaction
                         else {
                             stack.pop();
 
-                            updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                            updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
                         }
                     }
 
                     // if we are traversing up from the trunk -> update the referenced transaction
-                    else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
+                    else if(currentTransaction.getTrunkTransaction(tangle, snapshotManager) == previousTransaction) {
                         stack.pop();
 
-                        updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+                        updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
                     }
 
                     // remember the currentTransaction to determine which way we are traversing
@@ -489,13 +490,13 @@ public class TransactionViewModel {
      * @throws Exception if something goes wrong while loading or storing transactions or if we face a snapshot
      *                   that doesn't know it's own snapshotIndex
      */
-    private void updateReferencedSnapshotOfLeaf(Tangle tangle, TransactionViewModel transaction) throws Exception {
+    private void updateReferencedSnapshotOfLeaf(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel transaction) throws Exception {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
         if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
             referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
-            TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
+            TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 
             if(branchTransaction.isSnapshot()) {
                 if(branchTransaction.snapshotIndex() == 0) {
@@ -513,7 +514,7 @@ public class TransactionViewModel {
         if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
             referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
-            TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
+            TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 
             if(trunkTransaction.isSnapshot()) {
                 if(trunkTransaction.snapshotIndex() == 0) {
@@ -627,17 +628,17 @@ public class TransactionViewModel {
         transaction.height = height;
     }
 
-    public void updateHeights(Tangle tangle) throws Exception {
-        TransactionViewModel transactionVM = this, trunk = this.getTrunkTransaction(tangle);
+    public void updateHeights(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
+        TransactionViewModel transactionVM = this, trunk = this.getTrunkTransaction(tangle, snapshotManager);
         Stack<Hash> transactionViewModels = new Stack<>();
         transactionViewModels.push(transactionVM.getHash());
         while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !trunk.getHash().equals(Hash.NULL_HASH)) {
             transactionVM = trunk;
-            trunk = transactionVM.getTrunkTransaction(tangle);
+            trunk = transactionVM.getTrunkTransaction(tangle, snapshotManager);
             transactionViewModels.push(transactionVM.getHash());
         }
         while(transactionViewModels.size() != 0) {
-            transactionVM = TransactionViewModel.fromHash(tangle, transactionViewModels.pop());
+            transactionVM = TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModels.pop());
             long currentHeight = transactionVM.getHeight();
             if(Hash.NULL_HASH.equals(trunk.getHash()) && trunk.getHeight() == 0
                     && !Hash.NULL_HASH.equals(transactionVM.getHash())) {

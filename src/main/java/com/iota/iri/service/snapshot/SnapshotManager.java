@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class SnapshotManager {
@@ -42,6 +43,8 @@ public class SnapshotManager {
     private boolean shuttingDown;
 
     private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 5000;
+
+    private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
 
     /**
      * This method is the constructor of the SnapshotManager.
@@ -77,7 +80,7 @@ public class SnapshotManager {
         // if local sna
         if(localSnapshotsEnabled) {
             (new Thread(() -> {
-                log.info("Local Snapshot Manager started ...");
+                log.info("Local Snapshot Monitor started ...");
 
                 // load necessary configuration parameters
                 int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
@@ -97,12 +100,37 @@ public class SnapshotManager {
                     try {
                         Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
                     } catch(InterruptedException e) {
-                        log.info("Local Snapshot Manager stopped ...");
+                        log.info("Local Snapshot Monitor stopped ...");
 
                         shuttingDown = true;
                     }
                 }
-            }, "Local Snapshot Manager")).start();
+            }, "Local Snapshot Monitor")).start();
+
+            (new Thread(() -> {
+                log.info("Local Snapshot Garbage Collector started ...");
+
+                // load necessary configuration parameters
+                int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+                int LOCAL_SNAPSHOT_INTERVAL = 10;
+
+                while(!shuttingDown) {
+                    long scanStart = System.currentTimeMillis();
+
+                    // remove all orphaned approvers
+                    orphanedApprovers.forEach((k, v) -> {
+
+                    });
+
+                    try {
+                        Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
+                    } catch(InterruptedException e) {
+                        log.info("Local Snapshot Monitor stopped ...");
+
+                        shuttingDown = true;
+                    }
+                }
+            }, "Local Snapshot Garbage Collector")).start();
         }
     }
 
@@ -264,7 +292,7 @@ public class SnapshotManager {
         }
 
         // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "1/2 calculating snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
+        dumpLogMessage("Taking local snapshot", "1/2 calculating new snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
 
         // iterate through the milestones to our target
         while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index() : currentMilestone.index() > targetMilestone.index()) {
@@ -288,7 +316,7 @@ public class SnapshotManager {
             currentMilestone = nextMilestone;
 
             // dump a progress message after every step
-            dumpLogMessage("Taking local snapshot", "1/2 calculating snapshot state", ++stepCounter, amountOfMilestonesToProcess);
+            dumpLogMessage("Taking local snapshot", "1/2 calculating new snapshot state", ++stepCounter, amountOfMilestonesToProcess);
         }
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -444,10 +472,7 @@ public class SnapshotManager {
                 try {
                     approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
                 } catch(Exception e) {
-                    throw new SnapshotException(
-                        "could not retrieve the transaction belonging to hash " + approverHash.toString(),
-                        e
-                    );
+                    throw new SnapshotException("could not retrieve the transaction belonging to hash " + approverHash.toString(), e);
                 }
 
                 // check if the approver was referenced by another milestone in the future

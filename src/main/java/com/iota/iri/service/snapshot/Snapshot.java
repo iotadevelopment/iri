@@ -2,8 +2,16 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 public class Snapshot {
     // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Lock object allowing to block access to this object from different threads.
+     */
+    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
      * Holds a reference to the state of this snapshot.
@@ -29,6 +37,70 @@ public class Snapshot {
     }
 
     /**
+     * Locks the complete Snapshot object for read access.
+     *
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * This is used to synchronize the access from different Threads, if both members need to be read.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void lockRead() {
+        readWriteLock.readLock().lock();
+
+        state.lockRead();
+        metaData.lockRead();
+    }
+
+    /**
+     * Locks the complete Snapshot object for write access.
+     *
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * This is used to synchronize the access from different Threads, if both members need to be modified.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void lockWrite() {
+        readWriteLock.writeLock().lock();
+
+        state.lockWrite();
+        metaData.lockWrite();
+    }
+
+    /**
+     * Unlocks the complete Snapshot object from read blocks.
+     *
+     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
+     * synchronize the access from different Threads, if both members needed to be read.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void unlockRead() {
+        readWriteLock.readLock().unlock();
+
+        state.unlockRead();
+        metaData.unlockRead();
+    }
+
+    /**
+     * Unlocks the complete Snapshot object from write blocks.
+     *
+     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
+     * synchronize the access from different Threads, if both members needed to be modified.
+     *
+     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
+     * themselves.
+     */
+    public void unlockWrite() {
+        readWriteLock.writeLock().lock();
+
+        state.unlockWrite();
+        metaData.unlockWrite();
+    }
+
+    /**
      * Getter of the metadata object.
      *
      * It simply returns the stored private property.
@@ -36,7 +108,13 @@ public class Snapshot {
      * @return metadata of this snapshot
      */
     public SnapshotMetaData getMetaData() {
-        return metaData;
+        lockRead();
+
+        try {
+            return metaData;
+        } finally {
+            unlockRead();
+        }
     }
 
     /**
@@ -75,62 +153,6 @@ public class Snapshot {
     // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Locks the complete Snapshot object for read access.
-     *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
-     * This is used to synchronize the access from different Threads, if both members need to be read.
-     *
-     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
-     * themselves.
-     */
-    public void lockRead() {
-        state.lockRead();
-        metaData.lockRead();
-    }
-
-    /**
-     * Locks the complete Snapshot object for write access.
-     *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
-     * This is used to synchronize the access from different Threads, if both members need to be modified.
-     *
-     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
-     * themselves.
-     */
-    public void lockWrite() {
-        state.lockWrite();
-        metaData.lockWrite();
-    }
-
-    /**
-     * Unlocks the complete Snapshot object from read blocks.
-     *
-     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
-     * synchronize the access from different Threads, if both members needed to be read.
-     *
-     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
-     * themselves.
-     */
-    public void unlockRead() {
-        state.unlockRead();
-        metaData.unlockRead();
-    }
-
-    /**
-     * Unlocks the complete Snapshot object from write blocks.
-     *
-     * It sets the corresponding unlocks in all child objects and therefore unlocks the whole object. This is used to
-     * synchronize the access from different Threads, if both members needed to be modified.
-     *
-     * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
-     * themselves.
-     */
-    public void unlockWrite() {
-        state.unlockWrite();
-        metaData.unlockWrite();
-    }
-
-    /**
      * This method updates both - the balances and the index - in a single call.
      *
      * It first locks both child objects and then performs the corresponding updates. It is used by the MilestoneTracker
@@ -159,6 +181,20 @@ public class Snapshot {
         finally {
             unlockWrite();
         }
+    }
+
+    /**
+     * This is a utility method for determining if a given hash is a solid entry point.
+     *
+     * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
+     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
+     * without having to manually traverse the necessary references.
+     *
+     * @param transactionHash hash of the referenced transaction that shall be checked
+     * @return true if it is a solid entry point and false otherwise
+     */
+    public boolean isSolidEntryPoint(Hash transactionHash) {
+        return getMetaData().hasSolidEntryPoint(transactionHash);
     }
 
     /**

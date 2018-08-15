@@ -6,6 +6,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -27,6 +28,7 @@ public class TransactionValidatorTest {
   private static final TemporaryFolder dbFolder = new TemporaryFolder();
   private static final TemporaryFolder logFolder = new TemporaryFolder();
   private static Tangle tangle;
+  private static SnapshotManager snapshotManager;
   private static TransactionValidator txValidator;
 
   @BeforeClass
@@ -34,6 +36,9 @@ public class TransactionValidatorTest {
     dbFolder.create();
     logFolder.create();
     tangle = new Tangle();
+    Configuration configuration = new Configuration();
+    configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
+    snapshotManager = new SnapshotManager(tangle, configuration);
     tangle.addPersistenceProvider(
         new RocksDBPersistenceProvider(
             dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
@@ -41,7 +46,7 @@ public class TransactionValidatorTest {
     TipsViewModel tipsViewModel = new TipsViewModel();
     MessageQ messageQ = new MessageQ(0, "", 0, false);
     TransactionRequester txRequester = new TransactionRequester(tangle, messageQ);
-    txValidator = new TransactionValidator(tangle, tipsViewModel, txRequester, messageQ,
+    txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester, messageQ,
             Long.parseLong(Configuration.GLOBAL_SNAPSHOT_TIME));
     txValidator.setMwm(false, MAINNET_MWM);
   }
