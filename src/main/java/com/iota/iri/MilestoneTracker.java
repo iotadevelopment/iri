@@ -381,6 +381,8 @@ public class MilestoneTracker {
                 // and abort our loop
                 break;
             } else {
+                softReset();
+
                 // and abort our loop
                 break;
             }
