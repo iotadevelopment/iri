@@ -50,8 +50,8 @@ public class MilestoneTracker {
     private final SnapshotManager snapshotManager;
 
     private LedgerValidator ledgerValidator;
-    public Hash latestMilestone = Hash.NULL_HASH;
-    public Hash latestSolidSubtangleMilestone = latestMilestone;
+    public Hash latestMilestone;
+    public Hash latestSolidSubtangleMilestone;
 
     public int latestMilestoneIndex;
 
@@ -73,8 +73,11 @@ public class MilestoneTracker {
         this.testnet = testnet;
         this.messageQ = messageQ;
         this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
         this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
+
+        latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+        latestMilestone = snapshotManager.getLatestSnapshot().getHash();
+        latestSolidSubtangleMilestone = latestMilestone;
     }
 
     private boolean shuttingDown;
@@ -213,7 +216,7 @@ public class MilestoneTracker {
 
         // reset the ledger state to the initial state
         snapshotManager.resetLatestSnapshot();
-        latestSolidSubtangleMilestone = Hash.NULL_HASH;
+        latestSolidSubtangleMilestone = snapshotManager.getInitialSnapshot().getHash();
 
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         solidMilestoneTrackerTasks.decrementAndGet();

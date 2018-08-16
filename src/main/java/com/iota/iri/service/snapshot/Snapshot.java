@@ -153,6 +153,16 @@ public class Snapshot {
 
     // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
 
+    public Hash getHash() {
+        lockRead();
+
+        try {
+            return this.getMetaData().getHash();
+        } finally {
+            unlockRead();
+        }
+    }
+
     /**
      * This method updates both - the balances and the index - in a single call.
      *
