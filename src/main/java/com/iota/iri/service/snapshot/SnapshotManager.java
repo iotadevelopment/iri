@@ -42,7 +42,7 @@ public class SnapshotManager {
 
     private boolean shuttingDown;
 
-    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10;
+    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 5000;
 
     private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
 
@@ -88,6 +88,8 @@ public class SnapshotManager {
 
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
+
+                    log.info("checking" + ((latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) ? "true" : "false"));
 
                     if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                         try {
