@@ -89,8 +89,6 @@ public class SnapshotManager {
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
 
-                    log.info("checking" + ((latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) ? "true" : "false"));
-
                     if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                         try {
                             takeLocalSnapshot();

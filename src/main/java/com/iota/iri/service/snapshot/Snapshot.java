@@ -95,7 +95,7 @@ public class Snapshot {
      * themselves.
      */
     public void unlockWrite() {
-        readWriteLock.writeLock().lock();
+        readWriteLock.writeLock().unlock();
 
         state.unlockWrite();
         metaData.unlockWrite();
