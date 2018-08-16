@@ -1,5 +1,6 @@
 package com.iota.iri.service.snapshot;
 
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.ApproveeViewModel;
@@ -73,7 +74,7 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
     }
 
-    public void init() {
+    public void init(MilestoneTracker milestoneTracker) {
         // load necessary configuration parameters
         boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
 
@@ -84,12 +85,12 @@ public class SnapshotManager {
 
                 // load necessary configuration parameters
                 int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
-                int LOCAL_SNAPSHOT_INTERVAL = 1000;
+                int LOCAL_SNAPSHOT_INTERVAL = 10;
 
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
 
-                    if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                    if(latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                         try {
                             takeLocalSnapshot();
                         } catch(SnapshotException e) {
