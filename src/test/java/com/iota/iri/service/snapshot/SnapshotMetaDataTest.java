@@ -28,7 +28,7 @@ public class SnapshotMetaDataTest {
         long timestamp = System.currentTimeMillis() / 1000L;
 
         // create a metadata object containing the constructed data
-        SnapshotMetaData originalMetaData = new SnapshotMetaData(1337, timestamp, solidEntryPoints);
+        SnapshotMetaData originalMetaData = new SnapshotMetaData(Hash.NULL_HASH, 1337, timestamp, solidEntryPoints);
 
         // dump our metadata file
         File metaDataFile = originalMetaData.writeFile("testMetaDataFile.msnap");

@@ -443,6 +443,7 @@ public class SnapshotManager {
         snapshot.getMetaData().setIndex(targetMilestone.index());
         snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
         snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
+        snapshot.getMetaData().setHash(targetMilestone.getHash());
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -595,6 +596,7 @@ public class SnapshotManager {
         return new Snapshot(
             snapshotState,
             new SnapshotMetaData(
+                Hash.NULL_HASH,
                 testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
                 configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME),
                 solidEntryPoints

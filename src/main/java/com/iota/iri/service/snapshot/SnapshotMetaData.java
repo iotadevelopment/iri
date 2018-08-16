@@ -19,6 +19,11 @@ public class SnapshotMetaData implements Cloneable {
     public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
+     * Holds the transaction hash of the milestone.
+     */
+    private Hash hash;
+
+    /**
      * Holds the current index of this snapshot.
      *
      * The initial snapshot has its index set to the start index.
@@ -74,12 +79,20 @@ public class SnapshotMetaData implements Cloneable {
             )
         );
 
-        // create a variable to store the read index
+        // create variables to store the read values
+        Hash hash;
         int index;
         long timestamp;
 
-        // read the index
+        // read the hash
         String line;
+        if((line = reader.readLine()) != null) {
+            hash = new Hash(line);
+        } else {
+            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+        }
+
+        // read the index
         if((line = reader.readLine()) != null) {
             index = Integer.parseInt(line);
         } else {
@@ -106,7 +119,7 @@ public class SnapshotMetaData implements Cloneable {
         reader.close();
 
         // create and return our SnapshotMetaData object
-        return new SnapshotMetaData(index, timestamp, solidEntryPoints);
+        return new SnapshotMetaData(hash, index, timestamp, solidEntryPoints);
     }
 
     /**
@@ -114,11 +127,13 @@ public class SnapshotMetaData implements Cloneable {
      *
      * It simply stores the passed in parameters for later use.
      *
+     * @param  hash transaction hash representing
      * @param index index of the Snapshot that this metadata belongs to
      * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints) {
+    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints) {
         // store our parameters
+        this.hash = hash;
         this.index = index;
         this.timestamp = timestamp;
         this.solidEntryPoints = solidEntryPoints;
@@ -158,6 +173,38 @@ public class SnapshotMetaData implements Cloneable {
      */
     public void unlockWrite() {
         readWriteLock.writeLock().unlock();
+    }
+
+    /**
+     * This method is the setter of the milestone hash.
+     *
+     * It simply stores the passed value in the private property, with locking the object first.
+     *
+     * @param hash transaction hash of the milestone
+     */
+    public void setHash(Hash hash) {
+        lockWrite();
+
+        this.hash = hash;
+
+        unlockWrite();
+    }
+
+    /**
+     * This method is the getter of the milestone hash.
+     *
+     * It simply returns the stored private property, with locking the object first.
+     *
+     * @return transaction hash of the milestone
+     */
+    public Hash getHash() {
+        lockRead();
+
+        try {
+            return hash;
+        } finally {
+            unlockRead();
+        }
     }
 
     /**
@@ -388,8 +435,11 @@ public class SnapshotMetaData implements Cloneable {
             Paths.get(metaDataFile.getAbsolutePath()),
             () -> Stream.concat(
                 Stream.concat(
-                    Stream.of(String.valueOf(index)),
-                    Stream.of(String.valueOf(timestamp))
+                    Stream.of(hash.toString()),
+                    Stream.concat(
+                        Stream.of(String.valueOf(index)),
+                        Stream.of(String.valueOf(timestamp))
+                    )
                 ),
                 solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
             ).iterator()
@@ -406,6 +456,6 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(index, timestamp, (HashMap) solidEntryPoints.clone());
+        return new SnapshotMetaData(new Hash(hash.toString()), index, timestamp, (HashMap) solidEntryPoints.clone());
     }
 }
