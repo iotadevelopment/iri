@@ -59,7 +59,7 @@ public class LedgerValidator {
         int numberOfAnalyzedTransactions = 0;
         Set<Hash> countedTx = new HashSet<>();
 
-        snapshotManager.getInitialSnapshot().getMetaData().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+        snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
             visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);
             countedTx.add(solidEntryPointHash);
         });
@@ -69,7 +69,7 @@ public class LedgerValidator {
         while ((transactionPointer = nonAnalyzedTransactions.poll()) != null) {
             if (visitedNonMilestoneSubtangleHashes.add(transactionPointer)) {
 
-                final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
+                final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
@@ -82,7 +82,7 @@ public class LedgerValidator {
 
                             boolean validBundle = false;
 
-                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, transactionViewModel.getHash());
+                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash());
                             /*
                             for(List<TransactionViewModel> transactions: bundleTransactions) {
                                 if (transactions.size() > 0) {
@@ -150,9 +150,9 @@ public class LedgerValidator {
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (visitedHashes.add(hashPointer)) {
-                final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
+                final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
-                    transactionViewModel2.setSnapshot(tangle, index);
+                    transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
                     messageQ.publish("sn %d %s %s %s %s %s", index, transactionViewModel2.getHash(),
                             transactionViewModel2.getAddressHash(),
@@ -176,7 +176,7 @@ public class LedgerValidator {
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
-            final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
+            final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
             if((transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) ) {
                 if(visitedHashes.add(hashPointer)) {
                     nonAnalyzedTransactions.offer(transactionViewModel2.getTrunkTransactionHash());
@@ -234,7 +234,7 @@ public class LedgerValidator {
                 // "Solid Milestone Tracker" do it's magic
                 //
                 // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
+                if(TransactionViewModel.fromHash(tangle, snapshotManager, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
                     break;
                 }
 
@@ -265,7 +265,7 @@ public class LedgerValidator {
     }
 
     public boolean updateSnapshot(MilestoneViewModel milestoneVM) throws Exception {
-        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
+        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneVM.getHash());
         final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
         boolean hasSnapshot = transactionSnapshotIndex == milestoneVM.index();
         if (!hasSnapshot) {
@@ -314,7 +314,7 @@ public class LedgerValidator {
     }
 
     public boolean updateDiff(Set<Hash> approvedHashes, final Map<Hash, Long> diff, Hash tip) throws Exception {
-        if(!TransactionViewModel.fromHash(tangle, tip).isSolid()) {
+        if(!TransactionViewModel.fromHash(tangle, snapshotManager, tip).isSolid()) {
             return false;
         }
         if (approvedHashes.contains(tip)) {

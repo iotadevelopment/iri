@@ -216,9 +216,9 @@ public class API {
                         transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
                     }
 
-                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, transactionHash);
 
-                    transaction.updateReferencedSnapshot(instance.tangle);
+                    transaction.updateReferencedSnapshot(instance.tangle, instance.snapshotManager);
 
                     String isConsistent = "" + transaction.getValidity();
 
@@ -410,7 +410,7 @@ public class API {
         }
         Set<Hash> hashes = AddressViewModel.load(instance.tangle, address).getHashes();
         for (Hash hash : hashes) {
-            final TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, hash);
+            final TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, hash);
             //spend
             if (tx.value() < 0) {
                 //confirmed
@@ -419,7 +419,7 @@ public class API {
                 }
                 //pending
                 Hash tail = findTail(hash);
-                if (tail != null && BundleValidator.validate(instance.tangle, tail).size() != 0) {
+                if (tail != null && BundleValidator.validate(instance.tangle, instance.snapshotManager, tail).size() != 0) {
                     return true;
                 }
             }
@@ -428,14 +428,14 @@ public class API {
     }
 
     private Hash findTail(Hash hash) throws Exception {
-        TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, hash);
+        TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, hash);
         final Hash bundleHash = tx.getBundleHash();
         long index = tx.getCurrentIndex();
         boolean foundApprovee = false;
         while (index-- > 0 && tx.getBundleHash().equals(bundleHash)) {
             Set<Hash> approvees = tx.getApprovers(instance.tangle).getHashes();
             for (Hash approvee : approvees) {
-                TransactionViewModel nextTx = TransactionViewModel.fromHash(instance.tangle, approvee);
+                TransactionViewModel nextTx = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, approvee);
                 if (nextTx.getBundleHash().equals(bundleHash)) {
                     tx = nextTx;
                     foundApprovee = true;
@@ -460,7 +460,7 @@ public class API {
 
         //check transactions themselves are valid
         for (Hash transaction : transactions) {
-            TransactionViewModel txVM = TransactionViewModel.fromHash(instance.tangle, transaction);
+            TransactionViewModel txVM = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, transaction);
             if (txVM.getType() == TransactionViewModel.PREFILLED_SLOT) {
                 return ErrorResponse.create("Invalid transaction, missing: " + transaction);
             }
@@ -473,7 +473,7 @@ public class API {
                 state = false;
                 info = "tails are not solid (missing a referenced tx): " + transaction;
                 break;
-            } else if (BundleValidator.validate(instance.tangle, txVM.getHash()).size() == 0) {
+            } else if (BundleValidator.validate(instance.tangle, instance.snapshotManager, txVM.getHash()).size() == 0) {
                 state = false;
                 info = "tails are not consistent (bundle is invalid): " + transaction;
                 break;
@@ -589,7 +589,7 @@ public class API {
     private synchronized AbstractResponse getTrytesStatement(List<String> hashes) throws Exception {
         final List<String> elements = new LinkedList<>();
         for (final String hash : hashes) {
-            final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, new Hash(hash));
+            final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, new Hash(hash));
             if (transactionViewModel != null) {
                 elements.add(Converter.trytes(transactionViewModel.trits()));
             }
@@ -657,11 +657,11 @@ public class API {
         }
         for (final TransactionViewModel transactionViewModel : elements) {
             //store transactions
-            if(transactionViewModel.store(instance.tangle)) {
+            if(transactionViewModel.store(instance.tangle, instance.snapshotManager)) {
                 transactionViewModel.setArrivalTime(System.currentTimeMillis() / 1000L);
                 instance.transactionValidator.updateStatus(transactionViewModel);
                 transactionViewModel.updateSender("local");
-                transactionViewModel.update(instance.tangle, "sender");
+                transactionViewModel.update(instance.tangle, instance.snapshotManager, "sender");
             }
         }
     }
@@ -679,7 +679,7 @@ public class API {
         List<Integer> tipsIndex = new LinkedList<>();
         {
             for(Hash tip: tips) {
-                TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, tip);
+                TransactionViewModel tx = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, tip);
                 if (tx.getType() != TransactionViewModel.PREFILLED_SLOT) {
                     tipsIndex.add(tx.snapshotIndex());
                 }
@@ -690,7 +690,7 @@ public class API {
             int maxTipsIndex = tipsIndex.stream().reduce((a,b) -> a > b ? a : b).orElse(0);
             int count = 0;
             for(Hash hash: transactions) {
-                TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, hash);
+                TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, hash);
                 if(transaction.getType() == TransactionViewModel.PREFILLED_SLOT || transaction.snapshotIndex() == 0) {
                     inclusionStates[count] = -1;
                 } else if(transaction.snapshotIndex() > maxTipsIndex) {
@@ -706,7 +706,7 @@ public class API {
         Map<Integer, Integer> sameIndexTransactionCount = new HashMap<>();
         Map<Integer, Queue<Hash>> sameIndexTips = new HashMap<>();
         for (final Hash tip : tips) {
-            TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, tip);
+            TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, tip);
             if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT){
                 return ErrorResponse.create("One of the tips absents");
             }
@@ -716,7 +716,7 @@ public class API {
         }
         for(int i = 0; i < inclusionStates.length; i++) {
             if(inclusionStates[i] == 0) {
-                TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, transactions.get(i));
+                TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, transactions.get(i));
                 int snapshotIndex = transactionViewModel.snapshotIndex();
                 sameIndexTransactionCount.putIfAbsent(snapshotIndex, 0);
                 sameIndexTransactionCount.put(snapshotIndex, sameIndexTransactionCount.get(snapshotIndex) + 1);
@@ -744,7 +744,7 @@ public class API {
         MAIN_LOOP:
         while ((pointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedTips.add(pointer)) {
-                final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, pointer);
+                final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, pointer);
                 if (transactionViewModel.snapshotIndex() == index) {
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
                         return false;
@@ -813,7 +813,7 @@ public class API {
         if (request.containsKey("approvees")) {
             final HashSet<String> approvees = getParameterAsSet(request,"approvees",HASH_SIZE);
             for (final String approvee : approvees) {
-                approveeTransactions.addAll(TransactionViewModel.fromHash(instance.tangle, new Hash(approvee)).getApprovers(instance.tangle).getHashes());
+                approveeTransactions.addAll(TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, new Hash(approvee)).getApprovers(instance.tangle).getHashes());
             }
             foundTransactions.addAll(approveeTransactions);
             containsKey = true;

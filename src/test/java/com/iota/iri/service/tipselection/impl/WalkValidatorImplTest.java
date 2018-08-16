@@ -62,7 +62,7 @@ public class WalkValidatorImplTest {
         int depth = 15;
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
         tx.updateSolid(true);
-        tx.store(tangle);
+        tx.store(tangle, snapshotManager);
         Hash hash = tx.getHash();
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
@@ -77,7 +77,7 @@ public class WalkValidatorImplTest {
     public void failOnTxType() throws Exception {
         int depth = 15;
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
+        tx.store(tangle, snapshotManager);
         Hash hash = tx.getTrunkTransactionHash();
         tx.updateSolid(true);
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), hash))
@@ -92,7 +92,7 @@ public class WalkValidatorImplTest {
     @Test
     public void failOnTxIndex() throws Exception {
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(2);
-        tx.store(tangle);
+        tx.store(tangle, snapshotManager);
         Hash hash = tx.getHash();
         Mockito.when(transactionValidator.checkSolidity(hash, false))
                 .thenReturn(true);
@@ -108,7 +108,7 @@ public class WalkValidatorImplTest {
     @Test
     public void failOnSolid() throws Exception {
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
+        tx.store(tangle, snapshotManager);
         Hash hash = tx.getHash();
         tx.updateSolid(false);
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), hash))
@@ -124,8 +124,8 @@ public class WalkValidatorImplTest {
     @Test
     public void failOnBelowMaxDepthDueToOldMilestone() throws Exception {
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
-        tx.setSnapshot(tangle, 2);
+        tx.store(tangle, snapshotManager);
+        tx.setSnapshot(tangle, snapshotManager, 2);
         Hash hash = tx.getHash();
         tx.updateSolid(true);
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), hash))
@@ -140,8 +140,8 @@ public class WalkValidatorImplTest {
     @Test
     public void belowMaxDepthWithFreshMilestone() throws Exception {
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
-        tx.setSnapshot(tangle, 92);
+        tx.store(tangle, snapshotManager);
+        tx.setSnapshot(tangle, snapshotManager, 92);
         Hash hash = tx.getHash();
         for (int i = 0; i < 4 ; i++) {
             tx = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(hash, hash), TransactionViewModelTest.getRandomTransactionHash());
@@ -149,7 +149,7 @@ public class WalkValidatorImplTest {
             TransactionTestUtils.setCurrentIndex(tx,0);
             tx.updateSolid(true);
             hash = tx.getHash();
-            tx.store(tangle);
+            tx.store(tangle, snapshotManager);
         }
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
@@ -164,8 +164,8 @@ public class WalkValidatorImplTest {
     public void failBelowMaxDepthWithFreshMilestoneDueToLongChain() throws Exception {
         final int maxAnalyzedTxs = Integer.parseInt(Configuration.BELOW_MAX_DEPTH_LIMIT);
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
-        tx.setSnapshot(tangle, 92);
+        tx.store(tangle, snapshotManager);
+        tx.setSnapshot(tangle, snapshotManager, 92);
         Hash hash = tx.getHash();
         for (int i = 0; i < maxAnalyzedTxs ; i++) {
             tx = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(hash, hash),
@@ -173,7 +173,7 @@ public class WalkValidatorImplTest {
             TransactionTestUtils.setLastIndex(tx,0);
             TransactionTestUtils.setCurrentIndex(tx,0);
             hash = tx.getHash();
-            tx.store(tangle);
+            tx.store(tangle, snapshotManager);
         }
         Mockito.when(transactionValidator.checkSolidity(hash, false))
                 .thenReturn(true);
@@ -197,7 +197,7 @@ public class WalkValidatorImplTest {
             TransactionTestUtils.setCurrentIndex(tx,0);
             tx.updateSolid(true);
             hash = tx.getHash();
-            tx.store(tangle);
+            tx.store(tangle, snapshotManager);
         }
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), tx.getHash()))
                 .thenReturn(true);
@@ -219,7 +219,7 @@ public class WalkValidatorImplTest {
                     TransactionViewModelTest.getRandomTransactionHash());
             TransactionTestUtils.setLastIndex(tx,0);
             TransactionTestUtils.setCurrentIndex(tx,0);
-            tx.store(tangle);
+            tx.store(tangle, snapshotManager);
             hash = tx.getHash();
         }
         Mockito.when(transactionValidator.checkSolidity(tx.getHash(), false))
@@ -237,7 +237,7 @@ public class WalkValidatorImplTest {
     @Test
     public void failOnInconsistency() throws Exception {
         TransactionViewModel tx = TransactionTestUtils.createBundleHead(0);
-        tx.store(tangle);
+        tx.store(tangle, snapshotManager);
         Hash hash = tx.getHash();
         Mockito.when(transactionValidator.checkSolidity(hash, false))
                 .thenReturn(true);
@@ -255,33 +255,33 @@ public class WalkValidatorImplTest {
     public void dontMarkWrongTxsAsBelowMaxDepth() throws Exception {
         final int maxAnalyzedTxs = Integer.parseInt(Configuration.BELOW_MAX_DEPTH_LIMIT);
         TransactionViewModel tx1 = TransactionTestUtils.createBundleHead(0);
-        tx1.store(tangle);
-        tx1.setSnapshot(tangle, 92);
+        tx1.store(tangle, snapshotManager);
+        tx1.setSnapshot(tangle, snapshotManager, 92);
 
         TransactionViewModel txBad = TransactionTestUtils.createBundleHead(0);
-        txBad.store(tangle);
-        txBad.setSnapshot(tangle, 10);
+        txBad.store(tangle, snapshotManager);
+        txBad.setSnapshot(tangle, snapshotManager, 10);
 
         TransactionViewModel tx2 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx1.getHash(), tx1.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx2,0);
         TransactionTestUtils.setCurrentIndex(tx2,0);
         tx2.updateSolid(true);
-        tx2.store(tangle);
+        tx2.store(tangle, snapshotManager);
 
         TransactionViewModel tx3 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx1.getHash(), txBad.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx3,0);
         TransactionTestUtils.setCurrentIndex(tx3,0);
         tx3.updateSolid(true);
-        tx3.store(tangle);
+        tx3.store(tangle, snapshotManager);
 
         TransactionViewModel tx4 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx2.getHash(), tx3.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx4,0);
         TransactionTestUtils.setCurrentIndex(tx4,0);
         tx4.updateSolid(true);
-        tx4.store(tangle);
+        tx4.store(tangle, snapshotManager);
 
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), tx4.getHash()))
                 .thenReturn(true);
@@ -301,33 +301,33 @@ public class WalkValidatorImplTest {
     public void allowConfirmedTxToPassBelowMaxDepthAfterMilestoneConfirmation() throws Exception {
         final int maxAnalyzedTxs = Integer.parseInt(Configuration.BELOW_MAX_DEPTH_LIMIT);
         TransactionViewModel tx1 = TransactionTestUtils.createBundleHead(0);
-        tx1.store(tangle);
-        tx1.setSnapshot(tangle, 92);
+        tx1.store(tangle, snapshotManager);
+        tx1.setSnapshot(tangle, snapshotManager, 92);
 
         TransactionViewModel txBad = TransactionTestUtils.createBundleHead(0);
-        txBad.store(tangle);
-        txBad.setSnapshot(tangle, 10);
+        txBad.store(tangle, snapshotManager);
+        txBad.setSnapshot(tangle, snapshotManager, 10);
 
         TransactionViewModel tx2 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx1.getHash(), tx1.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx2,0);
         TransactionTestUtils.setCurrentIndex(tx2,0);
         tx2.updateSolid(true);
-        tx2.store(tangle);
+        tx2.store(tangle, snapshotManager);
 
         TransactionViewModel tx3 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx1.getHash(), txBad.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx3,0);
         TransactionTestUtils.setCurrentIndex(tx3,0);
         tx3.updateSolid(true);
-        tx3.store(tangle);
+        tx3.store(tangle, snapshotManager);
 
         TransactionViewModel tx4 = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionWithTrunkAndBranch(tx2.getHash(), tx3.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
         TransactionTestUtils.setLastIndex(tx4,0);
         TransactionTestUtils.setCurrentIndex(tx4,0);
         tx4.updateSolid(true);
-        tx4.store(tangle);
+        tx4.store(tangle, snapshotManager);
 
         Mockito.when(ledgerValidator.updateDiff(new HashSet<>(), new HashMap<>(), tx4.getHash()))
                 .thenReturn(true);
@@ -339,7 +339,7 @@ public class WalkValidatorImplTest {
                 walkValidator.isValid(tx4.getHash()));
 
         //Now assume milestone 99 confirmed tx3
-        tx3.setSnapshot(tangle, 99);
+        tx3.setSnapshot(tangle, snapshotManager, 99);
 
         Assert.assertTrue("Validation of tx4 failed but should have succeeded since tx is above max depth",
                 walkValidator.isValid(tx4.getHash()));

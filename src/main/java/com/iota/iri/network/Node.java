@@ -7,6 +7,7 @@ import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
 import org.apache.commons.lang3.StringUtils;
@@ -54,6 +55,7 @@ public class Node {
     private final ExecutorService executor = Executors.newFixedThreadPool(5);
     private final Configuration configuration;
     private final Tangle tangle;
+    private final SnapshotManager snapshotManager;
     private final TipsViewModel tipsViewModel;
     private final TransactionValidator transactionValidator;
     private final MilestoneTracker milestone;
@@ -82,6 +84,7 @@ public class Node {
 
     public Node(final Configuration configuration,
                 final Tangle tangle,
+                final SnapshotManager snapshotManager,
                 final TransactionValidator transactionValidator,
                 final TransactionRequester transactionRequester,
                 final TipsViewModel tipsViewModel,
@@ -90,6 +93,7 @@ public class Node {
     ) {
         this.configuration = configuration;
         this.tangle = tangle;
+        this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.tipsViewModel = tipsViewModel;
@@ -381,7 +385,7 @@ public class Node {
 
         //store new transaction
         try {
-            stored = receivedTransactionViewModel.store(tangle);
+            stored = receivedTransactionViewModel.store(tangle, snapshotManager);
         } catch (Exception e) {
             log.error("Error accessing persistence store.", e);
             neighbor.incInvalidTransactions();
@@ -393,7 +397,7 @@ public class Node {
             try {
                 transactionValidator.updateStatus(receivedTransactionViewModel);
                 receivedTransactionViewModel.updateSender(neighbor.getAddress().toString());
-                receivedTransactionViewModel.update(tangle, "arrivalTime|sender");
+                receivedTransactionViewModel.update(tangle, snapshotManager, "arrivalTime|sender");
             } catch (Exception e) {
                 log.error("Error updating transactions.", e);
             }
@@ -415,7 +419,7 @@ public class Node {
                 if (transactionRequester.numberOfTransactionsToRequest() > 0 && rnd.nextDouble() < P_REPLY_RANDOM_TIP) {
                     neighbor.incRandomTransactionRequests();
                     transactionPointer = getRandomTipPointer();
-                    transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
+                    transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, transactionPointer);
                 } else {
                     //no tx to request, so no random tip will be sent as a reply.
                     return;
@@ -427,7 +431,7 @@ public class Node {
             //find requested trytes
             try {
                 //transactionViewModel = TransactionViewModel.find(Arrays.copyOf(requestedHash.bytes(), TransactionRequester.REQUEST_HASH_SIZE));
-                transactionViewModel = TransactionViewModel.fromHash(tangle, new Hash(requestedHash.bytes(), 0, reqHashSize));
+                transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, new Hash(requestedHash.bytes(), 0, reqHashSize));
                 //log.debug("Requested Hash: " + requestedHash + " \nFound: " + transactionViewModel.getHash());
             } catch (Exception e) {
                 log.error("Error while searching for transaction.", e);
@@ -525,7 +529,7 @@ public class Node {
             while (!shuttingDown.get()) {
 
                 try {
-                    final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestone.latestMilestone);
+                    final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, milestone.latestMilestone);
                     System.arraycopy(transactionViewModel.getBytes(), 0, tipRequestingPacket.getData(), 0, TransactionViewModel.SIZE);
                     System.arraycopy(transactionViewModel.getHash().bytes(), 0, tipRequestingPacket.getData(), TransactionViewModel.SIZE,
                            reqHashSize);

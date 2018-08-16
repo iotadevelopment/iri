@@ -1,7 +1,9 @@
 package com.iota.iri.service.tipselection.impl;
 
+import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.HashId;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -23,6 +25,7 @@ public class RatingOneTest {
             "tx%d cumulative weight is not as expected";
     private static Tangle tangle;
     private static RatingCalculator rating;
+    private static SnapshotManager snapshotManager;
 
     @AfterClass
     public static void tearDown() throws Exception {
@@ -39,6 +42,9 @@ public class RatingOneTest {
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
         rating = new RatingOne(tangle);
+        Configuration configuration = new Configuration();
+        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
+        snapshotManager = new SnapshotManager(tangle, configuration);
     }
 
     @Test
@@ -53,11 +59,11 @@ public class RatingOneTest {
                 transaction1.getHash()), getRandomTransactionHash());
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction2.getHash(),
                 transaction3.getHash()), getRandomTransactionHash());
-        transaction.store(tangle);
-        transaction1.store(tangle);
-        transaction2.store(tangle);
-        transaction3.store(tangle);
-        transaction4.store(tangle);
+        transaction.store(tangle, snapshotManager);
+        transaction1.store(tangle, snapshotManager);
+        transaction2.store(tangle, snapshotManager);
+        transaction3.store(tangle, snapshotManager);
+        transaction4.store(tangle, snapshotManager);
         UnIterableMap<HashId, Integer> rate = rating.calculate(transaction.getHash());
 
         Assert.assertEquals(TX_CUMULATIVE_WEIGHT_IS_NOT_AS_EXPECTED_FORMAT,

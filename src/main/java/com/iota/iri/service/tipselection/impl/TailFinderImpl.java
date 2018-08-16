@@ -2,6 +2,7 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.TailFinder;
 import com.iota.iri.storage.Tangle;
 
@@ -15,21 +16,23 @@ import java.util.Set;
 public class TailFinderImpl implements TailFinder {
 
     private final Tangle tangle;
+    private final SnapshotManager snapshotManager;
 
-    public TailFinderImpl(Tangle tangle) {
+    public TailFinderImpl(Tangle tangle, SnapshotManager snapshotManager) {
         this.tangle = tangle;
+        this.snapshotManager = snapshotManager;
     }
 
     @Override
     public Optional<Hash> findTail(Hash hash) throws Exception {
-        TransactionViewModel tx = TransactionViewModel.fromHash(tangle, hash);
+        TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
         final Hash bundleHash = tx.getBundleHash();
         long index = tx.getCurrentIndex();
         while (index-- > 0 && bundleHash.equals(tx.getBundleHash())) {
             Set<Hash> approvees = tx.getApprovers(tangle).getHashes();
             boolean foundApprovee = false;
             for (Hash approvee : approvees) {
-                TransactionViewModel nextTx = TransactionViewModel.fromHash(tangle, approvee);
+                TransactionViewModel nextTx = TransactionViewModel.fromHash(tangle, snapshotManager, approvee);
                 if (nextTx.getCurrentIndex() == index && bundleHash.equals(nextTx.getBundleHash())) {
                     tx = nextTx;
                     foundApprovee = true;

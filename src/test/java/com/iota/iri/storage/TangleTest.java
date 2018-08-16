@@ -1,9 +1,11 @@
 package com.iota.iri.storage;
 
+import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.Tag;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import org.junit.After;
 import org.junit.Assert;
@@ -19,6 +21,7 @@ public class TangleTest {
     private final TemporaryFolder dbFolder = new TemporaryFolder();
     private final TemporaryFolder logFolder = new TemporaryFolder();
     private Tangle tangle = new Tangle();
+    private static SnapshotManager snapshotManager;
 
     private static final Random seed = new Random();
 
@@ -31,6 +34,9 @@ public class TangleTest {
                 logFolder.getRoot().getAbsolutePath(),1000);
         tangle.addPersistenceProvider(rocksDBPersistenceProvider);
         tangle.init();
+        Configuration configuration = new Configuration();
+        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
+        snapshotManager = new SnapshotManager(tangle, configuration);
     }
 
     @After
@@ -46,7 +52,7 @@ public class TangleTest {
     public void getKeysStartingWithValue() throws Exception {
         byte[] trits = getRandomTransactionTrits();
         TransactionViewModel transactionViewModel = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
-        transactionViewModel.store(tangle);
+        transactionViewModel.store(tangle, snapshotManager);
         Set<Indexable> tag = tangle.keysStartingWith(Tag.class, Arrays.copyOf(transactionViewModel.getTagValue().bytes(), 15));
         Assert.assertNotEquals(tag.size(), 0);
     }

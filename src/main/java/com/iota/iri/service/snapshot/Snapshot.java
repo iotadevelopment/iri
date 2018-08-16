@@ -2,6 +2,7 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
+import java.util.HashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -181,6 +182,19 @@ public class Snapshot {
         finally {
             unlockWrite();
         }
+    }
+
+    /**
+     * This is a utility method for retrieving the solid entry points.
+     *
+     * Even tho the solid entry points are not directly stored in this object, we offer the ability to read them from
+     * the Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more
+     * readable, without having to manually traverse the necessary references.
+     *
+     * @return set of transaction hashes that shall be considered solid when being referenced
+     */
+    public HashMap<Hash, Integer> getSolidEntryPoints() {
+        return getMetaData().getSolidEntryPoints();
     }
 
     /**

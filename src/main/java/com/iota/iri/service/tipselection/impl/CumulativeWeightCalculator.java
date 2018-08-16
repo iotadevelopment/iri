@@ -5,6 +5,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
 import com.iota.iri.model.HashPrefix;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.utils.collections.impl.TransformingBoundedHashSet;
 import com.iota.iri.storage.Tangle;
@@ -31,9 +32,11 @@ public class CumulativeWeightCalculator implements RatingCalculator{
     public static final int MAX_FUTURE_SET_SIZE = 5000;
 
     public final Tangle tangle;
+    private final SnapshotManager snapshotManager;
 
-    public CumulativeWeightCalculator(Tangle tangle) {
+    public CumulativeWeightCalculator(Tangle tangle, SnapshotManager snapshotManager) {
         this.tangle = tangle;
+        this.snapshotManager = snapshotManager;
     }
 
     @Override
@@ -41,6 +44,7 @@ public class CumulativeWeightCalculator implements RatingCalculator{
         log.debug("Start calculating cw starting with tx hash {}", entryPoint);
 
         LinkedHashSet<Hash> txHashesToRate = sortTransactionsInTopologicalOrder(entryPoint);
+        System.out.println(txHashesToRate.toString());
         return calculateCwInOrder(txHashesToRate);
     }
 
@@ -87,7 +91,7 @@ public class CumulativeWeightCalculator implements RatingCalculator{
             txApprovers = new HashSet<>(appHashes.size());
             for (Hash appHash : appHashes) {
                 //if not genesis (the tx that confirms itself)
-                if (ObjectUtils.notEqual(Hash.NULL_HASH, appHash)) {
+                if (!snapshotManager.getInitialSnapshot().isSolidEntryPoint(appHash)) {
                     txApprovers.add(appHash);
                 }
             }
@@ -116,7 +120,7 @@ public class CumulativeWeightCalculator implements RatingCalculator{
                     Set<HashId>> txHashToApprovers, Hash txHash) throws Exception {
         Set<HashId> approvers = SetUtils.emptyIfNull(txHashToApprovers.get(txHash));
 
-        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, txHash);
+        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, txHash);
         Hash trunkHash = transactionViewModel.getTrunkTransactionHash();
         Hash branchHash = transactionViewModel.getBranchTransactionHash();
 

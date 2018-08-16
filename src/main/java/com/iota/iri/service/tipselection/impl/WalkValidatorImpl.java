@@ -60,7 +60,7 @@ public class WalkValidatorImpl implements WalkValidator {
     @Override
     public boolean isValid(Hash transactionHash) throws Exception {
 
-        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionHash);
+        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, transactionHash);
         if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
             log.debug("Validation failed: {} is missing in db", transactionHash);
             return false;
@@ -82,7 +82,7 @@ public class WalkValidatorImpl implements WalkValidator {
 
     private boolean belowMaxDepth(Hash tip, int lowerAllowedSnapshotIndex) throws Exception {
         //if tip is confirmed stop
-        if (TransactionViewModel.fromHash(tangle, tip).snapshotIndex() >= lowerAllowedSnapshotIndex) {
+        if (TransactionViewModel.fromHash(tangle, snapshotManager, tip).snapshotIndex() >= lowerAllowedSnapshotIndex) {
             return false;
         }
         //if tip unconfirmed, check if any referenced tx is confirmed below maxDepth
@@ -97,8 +97,8 @@ public class WalkValidatorImpl implements WalkValidator {
             }
 
             if (analyzedTransactions.add(hash)) {
-                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hash);
-                if ((transaction.snapshotIndex() != 0 || Objects.equals(Hash.NULL_HASH, transaction.getHash()))
+                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
+                if ((transaction.snapshotIndex() != 0 || snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getHash()))
                         && transaction.snapshotIndex() < lowerAllowedSnapshotIndex) {
                     log.debug("failed below max depth because of reaching a tx below the allowed snapshot index {}",
                             lowerAllowedSnapshotIndex);

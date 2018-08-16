@@ -137,7 +137,10 @@ public class TransactionValidator {
         if(TransactionViewModel.fromHash(tangle, snapshotManager, hash).isSolid()) {
             return true;
         }
-        Set<Hash> analyzedHashes = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+        Set<Hash> analyzedHashes = new HashSet<>();
+        snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+            analyzedHashes.add(solidEntryPointHash);
+        });
         boolean solid = true;
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
@@ -145,7 +148,7 @@ public class TransactionValidator {
             if (analyzedHashes.add(hashPointer)) {
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
                 if(!transaction.isSolid()) {
-                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !hashPointer.equals(Hash.NULL_HASH)) {
+                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(hashPointer)) {
                         transactionRequester.requestTransaction(hashPointer, milestone);
                         solid = false;
                         break;
@@ -210,7 +213,7 @@ public class TransactionValidator {
                 for(Hash h: approvers) {
                     TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, h);
                     if(quietQuickSetSolid(tx)) {
-                        tx.update(tangle, "solid");
+                        tx.update(tangle, snapshotManager, "solid");
                         addSolidTransaction(h);
                     }
                 }
@@ -245,16 +248,16 @@ public class TransactionValidator {
     private boolean quickSetSolid(final TransactionViewModel transactionViewModel) throws Exception {
         if(!transactionViewModel.isSolid()) {
             boolean solid = true;
-            if (!checkApproovee(transactionViewModel.getTrunkTransaction(tangle))) {
+            if (!checkApproovee(transactionViewModel.getTrunkTransaction(tangle, snapshotManager))) {
                 solid = false;
             }
-            if (!checkApproovee(transactionViewModel.getBranchTransaction(tangle))) {
+            if (!checkApproovee(transactionViewModel.getBranchTransaction(tangle, snapshotManager))) {
                 solid = false;
             }
             if(solid) {
                 transactionViewModel.updateSolid(true);
-                transactionViewModel.updateHeights(tangle);
-                transactionViewModel.updateReferencedSnapshot(tangle);
+                transactionViewModel.updateHeights(tangle, snapshotManager);
+                transactionViewModel.updateReferencedSnapshot(tangle, snapshotManager);
                 return true;
             }
         }
@@ -267,7 +270,7 @@ public class TransactionValidator {
             transactionRequester.requestTransaction(approovee.getHash(), false);
             return false;
         }
-        if(approovee.getHash().equals(Hash.NULL_HASH)) {
+        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(approovee.getHash())) {
             return true;
         }
         return approovee.isSolid();

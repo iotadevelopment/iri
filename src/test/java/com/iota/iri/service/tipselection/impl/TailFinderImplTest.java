@@ -1,9 +1,11 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.TransactionTestUtils;
+import com.iota.iri.conf.Configuration;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.controllers.TransactionViewModelTest;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import org.junit.AfterClass;
@@ -19,10 +21,11 @@ public class TailFinderImplTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
+    private static SnapshotManager snapshotManager;
     private TailFinderImpl tailFinder;
 
     public TailFinderImplTest() {
-        tailFinder = new TailFinderImpl(tangle);
+        tailFinder = new TailFinderImpl(tangle, snapshotManager);
     }
 
     @AfterClass
@@ -40,28 +43,31 @@ public class TailFinderImplTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
+        Configuration configuration = new Configuration();
+        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
+        snapshotManager = new SnapshotManager(tangle, configuration);
     }
 
     @Test
     public void findTailTest() throws Exception {
         TransactionViewModel txa = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionTrits(), TransactionViewModelTest.getRandomTransactionHash());
-        txa.store(tangle);
+        txa.store(tangle, snapshotManager);
 
         TransactionViewModel tx2 = TransactionTestUtils.createBundleHead(2);
-        tx2.store(tangle);
+        tx2.store(tangle, snapshotManager);
 
         TransactionViewModel tx1 = TransactionTestUtils.createTransactionWithTrunkBundleHash(tx2, txa.getHash());
-        tx1.store(tangle);
+        tx1.store(tangle, snapshotManager);
 
         TransactionViewModel tx0 = TransactionTestUtils.createTransactionWithTrunkBundleHash(tx1, txa.getHash());
-        tx0.store(tangle);
+        tx0.store(tangle, snapshotManager);
 
         //negative index - make sure we stop at 0
         TransactionViewModel txNeg = TransactionTestUtils.createTransactionWithTrunkBundleHash(tx0, txa.getHash());
-        txNeg.store(tangle);
+        txNeg.store(tangle, snapshotManager);
 
         TransactionViewModel txLateTail = TransactionTestUtils.createTransactionWithTrunkBundleHash(tx1, txa.getHash());
-        txLateTail.store(tangle);
+        txLateTail.store(tangle, snapshotManager);
 
         Optional<Hash> tail = tailFinder.findTail(tx2.getHash());
         Assert.assertTrue("no tail was found", tail.isPresent());
@@ -73,18 +79,18 @@ public class TailFinderImplTest {
     public void findMissingTailTest() throws Exception {
         TransactionViewModel txa = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionTrits(),
                 TransactionViewModelTest.getRandomTransactionHash());
-        txa.store(tangle);
+        txa.store(tangle, snapshotManager);
 
         TransactionViewModel tx2 = TransactionTestUtils.createBundleHead(2);
-        tx2.store(tangle);
+        tx2.store(tangle, snapshotManager);
 
         TransactionViewModel tx1 = TransactionTestUtils.createTransactionWithTrunkBundleHash(tx2, txa.getHash());
-        tx1.store(tangle);
+        tx1.store(tangle, snapshotManager);
 
         TransactionViewModel tx0 = new TransactionViewModel(TransactionViewModelTest
                 .getRandomTransactionWithTrunkAndBranch(tx1.getHash(), tx2.getHash()),
                 TransactionViewModelTest.getRandomTransactionHash());
-        tx0.store(tangle);
+        tx0.store(tangle, snapshotManager);
 
         Optional<Hash> tail = tailFinder.findTail(tx2.getHash());
         Assert.assertFalse("tail was found, but should me missing", tail.isPresent());

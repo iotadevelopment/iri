@@ -84,7 +84,7 @@ public class TransactionViewModel {
 
     public TransactionViewModel(final Transaction transaction, final Hash hash) {
         this.transaction = transaction == null || transaction.bytes == null ? new Transaction(): transaction;
-        this.hash = hash == null? Hash.NULL_HASH: hash;
+        this.hash = hash == null ? Hash.NULL_HASH : hash;
         weightMagnitude = this.hash.trailingZeros();
     }
 
@@ -117,7 +117,7 @@ public class TransactionViewModel {
         return tangle.getCount(Transaction.class).intValue();
     }
 
-    public boolean update(Tangle tangle, String item) throws Exception {
+    public boolean update(Tangle tangle, SnapshotManager snapshotManager, String item) throws Exception {
         getAddressHash();
         getTrunkTransactionHash();
         getBranchTransactionHash();
@@ -126,7 +126,7 @@ public class TransactionViewModel {
         getObsoleteTagValue();
         setAttachmentData();
         setMetadata();
-        if(hash.equals(Hash.NULL_HASH)) {
+        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(hash)) {
             return false;
         }
         return tangle.update(transaction, hash, item);
@@ -201,8 +201,8 @@ public class TransactionViewModel {
         return null;
     }
 
-    public boolean store(Tangle tangle) throws Exception {
-        if (hash.equals(Hash.NULL_HASH) || exists(tangle, hash)) {
+    public boolean store(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
+        if (snapshotManager.getInitialSnapshot().isSolidEntryPoint(hash) || exists(tangle, hash)) {
             return false;
         }
 
@@ -317,10 +317,10 @@ public class TransactionViewModel {
         return transaction.value;
     }
 
-    public void setValidity(Tangle tangle, int validity) throws Exception {
+    public void setValidity(Tangle tangle, SnapshotManager snapshotManager, int validity) throws Exception {
         if(transaction.validity != validity) {
             transaction.validity = validity;
-            update(tangle, "validity");
+            update(tangle, snapshotManager, "validity");
         }
     }
 
@@ -387,7 +387,7 @@ public class TransactionViewModel {
 
             if(!transactionViewModel.isSolid()) {
                 transactionViewModel.updateSolid(true);
-                transactionViewModel.update(tangle, "solid|height");
+                transactionViewModel.update(tangle, snapshotManager, "solid|height");
             }
         }
     }
@@ -410,7 +410,10 @@ public class TransactionViewModel {
                 LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
 
                 // create a set of seen transactions that we do not want to traverse anymore (NULL HASH by default)
-                HashSet<Hash> seenTransactions = new HashSet<Hash>(Collections.singleton(Hash.NULL_HASH));
+                HashSet<Hash> seenTransactions = new HashSet<Hash>();
+                snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+                    seenTransactions.add(solidEntryPointHash);
+                });
 
                 // add our traversal root
                 seenTransactions.add(this.getHash());
@@ -493,7 +496,7 @@ public class TransactionViewModel {
     private void updateReferencedSnapshotOfLeaf(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel transaction) throws Exception {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
-        if(transaction.getBranchTransactionHash().equals(Hash.NULL_HASH)) {
+        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getBranchTransactionHash())) {
             referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
@@ -511,7 +514,7 @@ public class TransactionViewModel {
 
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
-        if(transaction.getTrunkTransactionHash().equals(Hash.NULL_HASH)) {
+        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getTrunkTransactionHash())) {
             referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
@@ -528,7 +531,7 @@ public class TransactionViewModel {
         }
 
         // update the referencedSnapshot of the transaction to the bigger one of both
-        transaction.referencedSnapshot(tangle, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
+        transaction.referencedSnapshot(tangle, snapshotManager, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
     }
 
     /**
@@ -555,10 +558,10 @@ public class TransactionViewModel {
      */
     private class ReferencedSnapshotNotProcessedYetException extends Exception {}
 
-    public void referencedSnapshot(Tangle tangle, final int referencedSnapshot) throws Exception {
+    public void referencedSnapshot(Tangle tangle, SnapshotManager snapshotManager, final int referencedSnapshot) throws Exception {
         if ( referencedSnapshot != transaction.referencedSnapshot ) {
             transaction.referencedSnapshot = referencedSnapshot;
-            update(tangle, "referencedSnapshot");
+            update(tangle, snapshotManager, "referencedSnapshot");
         }
     }
 
@@ -582,10 +585,10 @@ public class TransactionViewModel {
         return transaction.snapshot;
     }
 
-    public void setSnapshot(Tangle tangle, final int index) throws Exception {
+    public void setSnapshot(Tangle tangle, SnapshotManager snapshotManager, final int index) throws Exception {
         if ( index != transaction.snapshot ) {
             transaction.snapshot = index;
-            update(tangle, "snapshot");
+            update(tangle, snapshotManager, "snapshot");
         }
     }
 
@@ -599,10 +602,10 @@ public class TransactionViewModel {
      * @param isSnapshot true if the transaction is a snapshot and false otherwise
      * @throws Exception if something goes wrong while saving the changes to the database
      */
-    public void isSnapshot(Tangle tangle, final boolean isSnapshot) throws Exception {
+    public void isSnapshot(Tangle tangle, SnapshotManager snapshotManager, final boolean isSnapshot) throws Exception {
         if ( isSnapshot != transaction.isSnapshot ) {
             transaction.isSnapshot = isSnapshot;
-            update(tangle, "isSnapshot");
+            update(tangle, snapshotManager, "isSnapshot");
         }
     }
 
@@ -632,7 +635,7 @@ public class TransactionViewModel {
         TransactionViewModel transactionVM = this, trunk = this.getTrunkTransaction(tangle, snapshotManager);
         Stack<Hash> transactionViewModels = new Stack<>();
         transactionViewModels.push(transactionVM.getHash());
-        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !trunk.getHash().equals(Hash.NULL_HASH)) {
+        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(trunk.getHash())) {
             transactionVM = trunk;
             trunk = transactionVM.getTrunkTransaction(tangle, snapshotManager);
             transactionViewModels.push(transactionVM.getHash());
@@ -640,17 +643,17 @@ public class TransactionViewModel {
         while(transactionViewModels.size() != 0) {
             transactionVM = TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModels.pop());
             long currentHeight = transactionVM.getHeight();
-            if(Hash.NULL_HASH.equals(trunk.getHash()) && trunk.getHeight() == 0
-                    && !Hash.NULL_HASH.equals(transactionVM.getHash())) {
+            if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(trunk.getHash()) && trunk.getHeight() == 0
+                    && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionVM.getHash())) {
                 if(currentHeight != 1L ){
                     transactionVM.updateHeight(1L);
-                    transactionVM.update(tangle, "height");
+                    transactionVM.update(tangle, snapshotManager, "height");
                 }
             } else if ( trunk.getType() != PREFILLED_SLOT && transactionVM.getHeight() == 0){
                 long newHeight = 1L + trunk.getHeight();
                 if(currentHeight != newHeight) {
                     transactionVM.updateHeight(newHeight);
-                    transactionVM.update(tangle, "height");
+                    transactionVM.update(tangle, snapshotManager, "height");
                 }
             } else {
                 break;

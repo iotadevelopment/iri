@@ -119,7 +119,7 @@ public class MilestoneTracker {
                                 }
 
                                 if(analyzedMilestoneCandidates.add(hash)) {
-                                    TransactionViewModel t = TransactionViewModel.fromHash(tangle, hash);
+                                    TransactionViewModel t = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
                                     if (t.getCurrentIndex() == 0) {
                                         final Validity valid = validateMilestone(mode, t, getIndex(t));
                                         switch (valid) {
@@ -131,7 +131,7 @@ public class MilestoneTracker {
                                                 }
 
                                                 // mark the transaction as a snapshot
-                                                t.isSnapshot(tangle, true);
+                                                t.isSnapshot(tangle, snapshotManager, true);
                                                 break;
                                             case INCOMPLETE:
                                                 // issue a solidity check to solidify incomplete milestones
@@ -246,7 +246,7 @@ public class MilestoneTracker {
             MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null) {
                 // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).setSnapshot(tangle, 0);
+                TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash()).setSnapshot(tangle, snapshotManager, 0);
 
                 // remove the following StateDiffs
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
@@ -285,7 +285,7 @@ public class MilestoneTracker {
             // Already validated.
             return VALID;
         }
-        final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, transactionViewModel.getHash());
+        final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash());
         if (bundleTransactions.size() == 0) {
             return INCOMPLETE;
         }
@@ -296,7 +296,7 @@ public class MilestoneTracker {
                 if (bundleTransactionViewModels.get(0).getHash().equals(transactionViewModel.getHash())) {
 
                     //final TransactionViewModel transactionViewModel2 = StorageTransactions.instance().loadTransaction(transactionViewModel.trunkTransactionPointer);
-                    final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle);
+                    final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle, snapshotManager);
                     if (transactionViewModel2.getType() == TransactionViewModel.FILLED_SLOT
                             && transactionViewModel.getBranchTransactionHash().equals(transactionViewModel2.getTrunkTransactionHash())
                             && transactionViewModel.getBundleHash().equals(transactionViewModel2.getBundleHash())) {

@@ -121,11 +121,11 @@ public class Iota {
                 snapshotManager.getInitialSnapshot().getMetaData().getTimestamp());
         milestone = new MilestoneTracker(tangle, coordinator, snapshotManager, transactionValidator, testnet, messageQ,
                 numKeysMilestone, dontValidateMilestoneSig);
-        node = new Node(configuration, tangle, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
+        node = new Node(configuration, tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
         replicator = new Replicator(node, tcpPort, maxPeers, testnet, transactionPacketSize);
         udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
         ledgerValidator = new LedgerValidator(tangle, milestone, snapshotManager, transactionRequester, messageQ);
-        tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
+        tipsSolidifier = new TipsSolidifier(tangle, snapshotManager, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(alpha, belowMaxDepthTxLimit);
     }
 
@@ -227,8 +227,8 @@ public class Iota {
 
     private TipSelector createTipSelector(double alpha, int belowMaxDepthTxLimit) {
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, snapshotManager);
-        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle);
-        TailFinder tailFinder = new TailFinderImpl(tangle);
+        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
+        TailFinder tailFinder = new TailFinderImpl(tangle, snapshotManager);
         Walker walker = new WalkerAlpha(alpha, new SecureRandom(), tangle, messageQ, tailFinder);
         return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, transactionValidator, entryPointSelector, ratingCalculator,
                 walker, milestone, maxTipSearchDepth, belowMaxDepthTxLimit);
