@@ -35,6 +35,7 @@ public class CumulativeWeightCalculatorTest {
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
+        snapshotManager.shutDown();
         dbFolder.delete();
         logFolder.delete();
     }

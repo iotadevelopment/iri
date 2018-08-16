@@ -40,6 +40,7 @@ public class BundleValidatorTest {
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
+        snapshotManager.shutDown();
     }
 
     @Test

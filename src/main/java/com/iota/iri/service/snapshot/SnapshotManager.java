@@ -136,6 +136,8 @@ public class SnapshotManager {
 
     public void shutDown() {
         shuttingDown = true;
+        initialSnapshot = null;
+        latestSnapshot = null;
     }
 
     /**
