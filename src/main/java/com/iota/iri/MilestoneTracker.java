@@ -380,6 +380,9 @@ public class MilestoneTracker {
 
                 // and abort our loop
                 break;
+            } else {
+                // and abort our loop
+                break;
             }
         }
 

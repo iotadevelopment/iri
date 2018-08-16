@@ -215,6 +215,9 @@ public class SnapshotManager {
     }
 
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+        // read required config variables
+        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
+
         // variables used by the snapshot generation process
         Snapshot snapshot;
         int generationMode;
@@ -330,7 +333,7 @@ public class SnapshotManager {
 
         // create a set where we collect the solid entry points
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        solidEntryPoints.put(Hash.NULL_HASH, 590000);
+        solidEntryPoints.put(Hash.NULL_HASH, testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX));
 
         // copy the old solid entry points which are still valid
         snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
