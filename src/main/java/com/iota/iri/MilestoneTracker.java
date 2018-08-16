@@ -378,10 +378,14 @@ public class MilestoneTracker {
                 // reset the ledger to the initial snapshot and rescan
                 softReset();
 
+                System.out.println(snapshotManager.getInitialSnapshot().getIndex());
+
                 // and abort our loop
                 break;
             } else {
                 softReset();
+
+                System.out.println(snapshotManager.getInitialSnapshot().getIndex());
 
                 // and abort our loop
                 break;
