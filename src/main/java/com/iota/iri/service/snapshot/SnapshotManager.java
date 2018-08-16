@@ -42,7 +42,7 @@ public class SnapshotManager {
 
     private boolean shuttingDown;
 
-    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 5000;
+    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 100;
 
     private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
 
@@ -84,7 +84,7 @@ public class SnapshotManager {
 
                 // load necessary configuration parameters
                 int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
-                int LOCAL_SNAPSHOT_INTERVAL = 10;
+                int LOCAL_SNAPSHOT_INTERVAL = 1000;
 
                 while(!shuttingDown) {
                     long scanStart = System.currentTimeMillis();
