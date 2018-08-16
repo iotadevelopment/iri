@@ -42,7 +42,7 @@ public class SnapshotManager {
 
     private boolean shuttingDown;
 
-    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 5000;
+    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10;
 
     private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
 
