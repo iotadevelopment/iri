@@ -1,6 +1,6 @@
 package com.iota.iri.service.tipselection.impl;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.HashId;
 import com.iota.iri.service.snapshot.SnapshotManager;
@@ -42,9 +42,7 @@ public class RatingOneTest {
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
         rating = new RatingOne(tangle);
-        Configuration configuration = new Configuration();
-        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
-        snapshotManager = new SnapshotManager(tangle, configuration);
+        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
     }
 
     @Test

@@ -2,7 +2,7 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.LedgerValidator;
 import com.iota.iri.MilestoneTracker;
-import com.iota.iri.TransactionValidator;
+import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
 import com.iota.iri.service.snapshot.SnapshotManager;
@@ -27,30 +27,20 @@ public class TipSelectorImpl implements TipSelector {
     private final RatingCalculator ratingCalculator;
     private final Walker walker;
 
-    private final int maxDepth;
     private final LedgerValidator ledgerValidator;
-    private final TransactionValidator transactionValidator;
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
     private final MilestoneTracker milestone;
-    private final int belowMaxDepthTxLimit;
-
-    @Override
-    public int getMaxDepth() {
-        return maxDepth;
-    }
+    private final TipSelConfig config;
 
     public TipSelectorImpl(Tangle tangle,
                            SnapshotManager snapshotManager,
                            LedgerValidator ledgerValidator,
-                           TransactionValidator transactionValidator,
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,
                            Walker walkerAlpha,
-                           MilestoneTracker milestone,
-                           int maxDepth,
-                           int belowMaxDepthTxLimit) {
-
+                            MilestoneTracker milestone,
+                           TipSelConfig config) {
 
         this.entryPointSelector = entryPointSelector;
         this.ratingCalculator = ratingCalculator;
@@ -58,13 +48,11 @@ public class TipSelectorImpl implements TipSelector {
         this.walker = walkerAlpha;
 
         //used by walkValidator
-        this.maxDepth = maxDepth;
-        this.belowMaxDepthTxLimit = belowMaxDepthTxLimit;
         this.ledgerValidator = ledgerValidator;
-        this.transactionValidator = transactionValidator;
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.milestone = milestone;
+        this.config = config;
     }
 
     /**
@@ -94,10 +82,7 @@ public class TipSelectorImpl implements TipSelector {
 
             //random walk
             List<Hash> tips = new LinkedList<>();
-            WalkValidator walkValidator = new WalkValidatorImpl(
-                tangle, ledgerValidator, transactionValidator, milestone, snapshotManager, maxDepth,
-                belowMaxDepthTxLimit
-            );
+            WalkValidator walkValidator = new WalkValidatorImpl(tangle, snapshotManager, ledgerValidator, milestone, config);
             Hash tip = walker.walk(entryPoint, rating, walkValidator);
             tips.add(tip);
 

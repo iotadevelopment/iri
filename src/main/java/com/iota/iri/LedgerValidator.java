@@ -25,7 +25,7 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, MilestoneTracker milestone, SnapshotManager snapshotManager, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotManager snapshotManager, MilestoneTracker milestone, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.milestone = milestone;
         this.snapshotManager = snapshotManager;

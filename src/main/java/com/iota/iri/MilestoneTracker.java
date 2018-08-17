@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import com.iota.iri.conf.ConsensusConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
@@ -57,33 +58,31 @@ public class MilestoneTracker {
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
 
-    public MilestoneTracker(final Tangle tangle,
-                            final Hash coordinator,
-                            final SnapshotManager snapshotManager,
-                            final TransactionValidator transactionValidator,
-                            final boolean testnet,
-                            final MessageQ messageQ,
-                            final int numOfKeysInMilestone,
-                            final boolean acceptAnyTestnetCoo
-                     ) {
+    public MilestoneTracker(Tangle tangle,
+                     SnapshotManager snapshotManager,
+                     TransactionValidator transactionValidator,
+                     MessageQ messageQ,
+                     ConsensusConfig config
+    ) {
         this.tangle = tangle;
-        this.coordinator = coordinator;
         this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
-        this.testnet = testnet;
         this.messageQ = messageQ;
-        this.numOfKeysInMilestone = numOfKeysInMilestone;
-        this.acceptAnyTestnetCoo = acceptAnyTestnetCoo;
 
-        latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-        latestMilestone = snapshotManager.getLatestSnapshot().getHash();
-        latestSolidSubtangleMilestone = latestMilestone;
+        //configure
+        this.testnet = config.isTestnet();
+        this.coordinator = new Hash(config.getCoordinator());
+        this.numOfKeysInMilestone = config.getNumberOfKeysInMilestone();
+        this.acceptAnyTestnetCoo = config.isDontValidateTestnetMilestoneSig();
+        this.latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+        this.latestMilestone = snapshotManager.getLatestSnapshot().getHash();
+        this.latestSolidSubtangleMilestone = latestMilestone;
     }
 
     private boolean shuttingDown;
     private static int RESCAN_INTERVAL = 5000;
 
-    public void init(final SpongeFactory.Mode mode, final LedgerValidator ledgerValidator, final boolean revalidate) throws Exception {
+    public void init (SpongeFactory.Mode mode, LedgerValidator ledgerValidator) {
         // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize
         // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once and
         // create the corresponding MilestoneViewModels to our transactions

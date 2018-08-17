@@ -1,5 +1,6 @@
 package com.iota.iri;
 
+import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.Curl;
@@ -44,13 +45,13 @@ public class TransactionValidator {
     private final Set<Hash> newSolidTransactionsTwo = new LinkedHashSet<>();
 
     public TransactionValidator(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel, TransactionRequester transactionRequester,
-                                MessageQ messageQ, long snapshotTimestamp) {
+                                MessageQ messageQ, SnapshotConfig config) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
-        TransactionValidator.snapshotTimestamp = snapshotTimestamp;
+        TransactionValidator.snapshotTimestamp = config.getSnapshotTime();
         TransactionValidator.snapshotTimestampMs = snapshotTimestamp * 1000;
     }
 
@@ -213,7 +214,8 @@ public class TransactionValidator {
                 for(Hash h: approvers) {
                     TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, h);
                     if(quietQuickSetSolid(tx)) {
-                        tx.update(tangle, snapshotManager, "solid");
+                        tx.update(tangle, snapshotManager, "solid|height");
+                        tipsViewModel.setSolid(h);
                         addSolidTransaction(h);
                     }
                 }
@@ -232,6 +234,8 @@ public class TransactionValidator {
         tipsViewModel.removeTipHash(transactionViewModel.getBranchTransactionHash());
 
         if(quickSetSolid(transactionViewModel)) {
+            transactionViewModel.update(tangle, snapshotManager, "solid|height");
+            tipsViewModel.setSolid(transactionViewModel.getHash());
             addSolidTransaction(transactionViewModel.getHash());
         }
     }

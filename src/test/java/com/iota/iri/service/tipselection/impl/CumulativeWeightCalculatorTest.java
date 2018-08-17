@@ -1,7 +1,7 @@
 package com.iota.iri.service.tipselection.impl;
 
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
@@ -48,9 +48,7 @@ public class CumulativeWeightCalculatorTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        Configuration configuration = new Configuration();
-        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
-        snapshotManager = new SnapshotManager(tangle, configuration);
+        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
         cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
     }
 

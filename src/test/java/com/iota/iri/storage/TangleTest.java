@@ -1,6 +1,6 @@
 package com.iota.iri.storage;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
@@ -34,14 +34,13 @@ public class TangleTest {
                 logFolder.getRoot().getAbsolutePath(),1000);
         tangle.addPersistenceProvider(rocksDBPersistenceProvider);
         tangle.init();
-        Configuration configuration = new Configuration();
-        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
-        snapshotManager = new SnapshotManager(tangle, configuration);
+        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
     }
 
     @After
     public void tearDown() throws Exception {
         tangle.shutdown();
+        snapshotManager.shutDown();
     }
 
     @Test

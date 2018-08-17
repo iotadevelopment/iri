@@ -1,6 +1,6 @@
 package com.iota.iri;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
@@ -16,6 +16,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 import static com.iota.iri.controllers.TransactionViewModelTest.*;
 import static org.junit.Assert.assertFalse;
@@ -36,18 +37,15 @@ public class TransactionValidatorTest {
     dbFolder.create();
     logFolder.create();
     tangle = new Tangle();
-    Configuration configuration = new Configuration();
-    configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
-    snapshotManager = new SnapshotManager(tangle, configuration);
+    snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
     tangle.addPersistenceProvider(
         new RocksDBPersistenceProvider(
             dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
     tangle.init();
     TipsViewModel tipsViewModel = new TipsViewModel();
-    MessageQ messageQ = new MessageQ(0, "", 0, false);
+    MessageQ messageQ = Mockito.mock(MessageQ.class);
     TransactionRequester txRequester = new TransactionRequester(tangle, messageQ);
-    txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester, messageQ,
-            Long.parseLong(Configuration.GLOBAL_SNAPSHOT_TIME));
+    txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester, messageQ, new MainnetConfig());
     txValidator.setMwm(false, MAINNET_MWM);
   }
 

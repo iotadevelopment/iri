@@ -2,7 +2,7 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.LedgerValidator;
 import com.iota.iri.MilestoneTracker;
-import com.iota.iri.TransactionValidator;
+import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.SnapshotManager;
@@ -27,30 +27,24 @@ import java.util.*;
  */
 public class WalkValidatorImpl implements WalkValidator {
 
-    private int maxAnalyzedTxs;
-
     private final Tangle tangle;
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
     private final LedgerValidator ledgerValidator;
-    private final TransactionValidator transactionValidator;
     private final MilestoneTracker milestone;
     private final SnapshotManager snapshotManager;
+    private final TipSelConfig config;
 
-    private final int maxDepth;
 
     private Set<Hash> maxDepthOkMemoization;
     private Map<Hash, Long> myDiff;
     private Set<Hash> myApprovedHashes;
 
-    public WalkValidatorImpl(Tangle tangle, LedgerValidator ledgerValidator, TransactionValidator transactionValidator,
-                             MilestoneTracker milestone, SnapshotManager snapshotManager, int maxDepth, int maxAnalyzedTxs) {
+    public WalkValidatorImpl(Tangle tangle, SnapshotManager snapshotManager, LedgerValidator ledgerValidator, MilestoneTracker milestone, TipSelConfig config) {
         this.tangle = tangle;
         this.ledgerValidator = ledgerValidator;
-        this.transactionValidator = transactionValidator;
         this.milestone = milestone;
         this.snapshotManager = snapshotManager;
-        this.maxDepth = maxDepth;
-        this.maxAnalyzedTxs = maxAnalyzedTxs;
+        this.config = config;
 
         maxDepthOkMemoization = new HashSet<>();
         myDiff = new HashMap<>();
@@ -70,7 +64,8 @@ public class WalkValidatorImpl implements WalkValidator {
         } else if (!transactionViewModel.isSolid()) {
             log.debug("Validation failed: {} is not solid", transactionHash);
             return false;
-        } else if (belowMaxDepth(transactionViewModel.getHash(), snapshotManager.getLatestSnapshot().getIndex() - maxDepth)) {
+        } else if (belowMaxDepth(transactionViewModel.getHash(),
+                snapshotManager.getLatestSnapshot().getIndex() - config.getMaxDepth())) {
             log.debug("Validation failed: {} is below max depth", transactionHash);
             return false;
         } else if (!ledgerValidator.updateDiff(myApprovedHashes, myDiff, transactionViewModel.getHash())) {
@@ -89,10 +84,11 @@ public class WalkValidatorImpl implements WalkValidator {
         Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
         Set<Hash> analyzedTransactions = new HashSet<>();
         Hash hash;
+        final int maxAnalyzedTransactions = config.getBelowMaxDepthTransactionLimit();
         while ((hash = nonAnalyzedTransactions.poll()) != null) {
-            if (analyzedTransactions.size() == maxAnalyzedTxs) {
+            if (analyzedTransactions.size() == maxAnalyzedTransactions) {
                 log.debug("failed below max depth because of exceeding max threshold of {} analyzed transactions",
-                        maxAnalyzedTxs);
+                        maxAnalyzedTransactions);
                 return true;
             }
 

@@ -1,10 +1,10 @@
 package com.iota.iri;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.IotaConfig;
+import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
-import com.iota.iri.model.Hash;
 import com.iota.iri.network.Node;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
@@ -18,7 +18,6 @@ import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.zmq.MessageQ;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,108 +44,46 @@ public class Iota {
     public final Node node;
     public final UDPReceiver udpReceiver;
     public final Replicator replicator;
-    public final Configuration configuration;
-    public final Hash coordinator;
+    public final IotaConfig configuration;
     public final TipsViewModel tipsViewModel;
     public final MessageQ messageQ;
     public final TipSelector tipsSelector;
 
-    public final boolean testnet;
-    public final int maxPeers;
-    public final int udpPort;
-    public final int tcpPort;
-    public final int maxTipSearchDepth;
-
-    public Iota(Configuration configuration) throws IOException {
+    public Iota(IotaConfig configuration) throws IOException {
         this.configuration = configuration;
-        testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
-        maxPeers = configuration.integer(Configuration.DefaultConfSettings.MAX_PEERS);
-        udpPort = configuration.integer(Configuration.DefaultConfSettings.UDP_RECEIVER_PORT);
-        tcpPort = configuration.integer(Configuration.DefaultConfSettings.TCP_RECEIVER_PORT);
-
-        // try to initialize and start our node (any error will lead to a stop)
-        try {
-            // create the database interface
-            tangle = new Tangle();
-
-            // create the snapshot manager
-            snapshotManager = new SnapshotManager(tangle, configuration);
-        }
-
-        // handle initialization errors in a generic way
-        catch(Exception e) {
-            // create a string representation of the stacktrace
-            StringWriter stackTraceStringWriter = new StringWriter();
-            e.printStackTrace(new PrintWriter(stackTraceStringWriter));
-
-            // dump the error message
-            log.error("Initialization Error: " + e.getMessage() + "\n" + stackTraceStringWriter.toString());
-
-            // stop the node if a critical initialization error occurs
-            System.exit(-1);
-        }
-
-        long snapshotTimestamp = configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME);
-        int milestoneStartIndex = configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX);
-        int numKeysMilestone = configuration.integer(Configuration.DefaultConfSettings.NUMBER_OF_KEYS_IN_A_MILESTONE);
-        double alpha = configuration.doubling(Configuration.DefaultConfSettings.TIPSELECTION_ALPHA.name());
-        int belowMaxDepthTxLimit = configuration.integer(
-                Configuration.DefaultConfSettings.BELOW_MAX_DEPTH_TRANSACTION_LIMIT);
-
-        boolean dontValidateMilestoneSig = configuration.booling(Configuration.DefaultConfSettings
-                .DONT_VALIDATE_TESTNET_MILESTONE_SIG);
-        int transactionPacketSize = configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE);
-
-        maxTipSearchDepth = configuration.integer(Configuration.DefaultConfSettings.MAX_DEPTH);
-        if(testnet) {
-            String coordinatorTrytes = configuration.string(Configuration.DefaultConfSettings.COORDINATOR);
-            if(StringUtils.isNotEmpty(coordinatorTrytes)) {
-                coordinator = new Hash(coordinatorTrytes);
-            } else {
-                log.warn("No coordinator address given for testnet. Defaulting to "
-                        + Configuration.TESTNET_COORDINATOR_ADDRESS);
-                coordinator = new Hash(Configuration.TESTNET_COORDINATOR_ADDRESS);
-            }
-        } else {
-            coordinator = new Hash(Configuration.MAINNET_COORDINATOR_ADDRESS);
-        }
-        messageQ = new MessageQ(configuration.integer(Configuration.DefaultConfSettings.ZMQ_PORT),
-                configuration.string(Configuration.DefaultConfSettings.ZMQ_IPC),
-                configuration.integer(Configuration.DefaultConfSettings.ZMQ_THREADS),
-                configuration.booling(Configuration.DefaultConfSettings.ZMQ_ENABLED)
-                );
+        tangle = new Tangle();
+        messageQ = MessageQ.createWith(configuration);
         tipsViewModel = new TipsViewModel();
         transactionRequester = new TransactionRequester(tangle, messageQ);
         transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester, messageQ,
-                snapshotManager.getInitialSnapshot().getMetaData().getTimestamp());
-        milestone = new MilestoneTracker(tangle, coordinator, snapshotManager, transactionValidator, testnet, messageQ,
-                numKeysMilestone, dontValidateMilestoneSig);
-        node = new Node(configuration, tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ);
-        replicator = new Replicator(node, tcpPort, maxPeers, testnet, transactionPacketSize);
-        udpReceiver = new UDPReceiver(udpPort, node, configuration.integer(Configuration.DefaultConfSettings.TRANSACTION_PACKET_SIZE));
-        ledgerValidator = new LedgerValidator(tangle, milestone, snapshotManager, transactionRequester, messageQ);
+                configuration);
+        milestone = new MilestoneTracker(tangle, snapshotManager, transactionValidator, messageQ, configuration);
+        node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ,
+                configuration);
+        replicator = new Replicator(node, configuration);
+        udpReceiver = new UDPReceiver(node, configuration);
+        ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestone, transactionRequester, messageQ);
         tipsSolidifier = new TipsSolidifier(tangle, snapshotManager, transactionValidator, tipsViewModel);
-        tipsSelector = createTipSelector(alpha, belowMaxDepthTxLimit);
+        tipsSelector = createTipSelector(configuration);
     }
 
     public void init() throws Exception {
         initializeTangle();
         tangle.init();
 
-        if (configuration.booling(Configuration.DefaultConfSettings.RESCAN_DB)){
+        if (configuration.isRescanDb()){
             rescan_db();
         }
-        boolean revalidate = configuration.booling(Configuration.DefaultConfSettings.REVALIDATE);
 
-        if (revalidate) {
+        if (configuration.isRevalidate()) {
             tangle.clearColumn(com.iota.iri.model.Milestone.class);
             tangle.clearColumn(com.iota.iri.model.StateDiff.class);
             tangle.clearMetadata(com.iota.iri.model.Transaction.class);
         }
-        milestone.init(SpongeFactory.Mode.CURLP27, ledgerValidator, revalidate);
-        transactionValidator.init(testnet, configuration.integer(Configuration.DefaultConfSettings.MWM));
+        milestone.init(SpongeFactory.Mode.CURLP27, ledgerValidator);
+        transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
-        transactionRequester.init(configuration.doubling(Configuration.DefaultConfSettings.P_REMOVE_REQUEST.name()));
+        transactionRequester.init(configuration.getpRemoveRequest());
         udpReceiver.init();
         replicator.init();
         node.init();
@@ -191,46 +128,32 @@ public class Iota {
     }
 
     private void initializeTangle() {
-        String dbPath = configuration.string(Configuration.DefaultConfSettings.DB_PATH);
-        if (testnet) {
-            if (dbPath.isEmpty() || dbPath.equals("mainnetdb")) {
-                // testnetusers must not use mainnetdb, overwrite it unless an explicit name is set.
-                configuration.put(Configuration.DefaultConfSettings.DB_PATH.name(), "testnetdb");
-                configuration.put(Configuration.DefaultConfSettings.DB_LOG_PATH.name(), "testnetdb.log");
-            }
-        } else {
-            if (dbPath.isEmpty() || dbPath.equals("testnetdb")) {
-                // mainnetusers must not use testnetdb, overwrite it unless an explicit name is set.
-                configuration.put(Configuration.DefaultConfSettings.DB_PATH.name(), "mainnetdb");
-                configuration.put(Configuration.DefaultConfSettings.DB_LOG_PATH.name(), "mainnetdb.log");
-            }
-        }
-        switch (configuration.string(Configuration.DefaultConfSettings.MAIN_DB)) {
+        switch (configuration.getMainDb()) {
             case "rocksdb": {
                 tangle.addPersistenceProvider(new RocksDBPersistenceProvider(
-                        configuration.string(Configuration.DefaultConfSettings.DB_PATH),
-                        configuration.string(Configuration.DefaultConfSettings.DB_LOG_PATH),
-                        configuration.integer(Configuration.DefaultConfSettings.DB_CACHE_SIZE)));
+                        configuration.getDbPath(),
+                        configuration.getDbLogPath(),
+                        configuration.getDbCacheSize()));
                 break;
             }
             default: {
                 throw new NotImplementedException("No such database type.");
             }
         }
-        if (configuration.booling(Configuration.DefaultConfSettings.EXPORT)) {
+        if (configuration.isExport()) {
             tangle.addPersistenceProvider(new FileExportProvider());
         }
-        if (configuration.booling(Configuration.DefaultConfSettings.ZMQ_ENABLED)) {
+        if (configuration.isZmqEnabled()) {
             tangle.addPersistenceProvider(new ZmqPublishProvider(messageQ));
         }
     }
 
-    private TipSelector createTipSelector(double alpha, int belowMaxDepthTxLimit) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, milestone, snapshotManager);
+    private TipSelector createTipSelector(TipSelConfig config) {
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestone, config);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
         TailFinder tailFinder = new TailFinderImpl(tangle, snapshotManager);
-        Walker walker = new WalkerAlpha(alpha, new SecureRandom(), tangle, messageQ, tailFinder);
-        return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, transactionValidator, entryPointSelector, ratingCalculator,
-                walker, milestone, maxTipSearchDepth, belowMaxDepthTxLimit);
+        Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
+        return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, entryPointSelector, ratingCalculator,
+                walker, milestone, config);
     }
 }

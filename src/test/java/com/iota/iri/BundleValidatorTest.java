@@ -1,6 +1,6 @@
 package com.iota.iri;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.SnapshotManager;
@@ -32,9 +32,7 @@ public class BundleValidatorTest {
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
         tangle.init();
-        Configuration configuration = new Configuration();
-        configuration.put(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED, "false");
-        snapshotManager = new SnapshotManager(tangle, configuration);
+        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
     }
 
     @AfterClass

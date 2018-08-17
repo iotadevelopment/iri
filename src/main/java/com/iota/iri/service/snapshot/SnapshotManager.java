@@ -2,7 +2,7 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.MilestoneTracker;
 import com.iota.iri.SignedFiles;
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
@@ -35,7 +35,7 @@ public class SnapshotManager {
 
     private Tangle tangle;
 
-    private Configuration configuration;
+    private SnapshotConfig configuration;
 
     private Snapshot initialSnapshot;
 
@@ -57,7 +57,7 @@ public class SnapshotManager {
      * @param configuration configuration of the node
      * @throws IOException if something goes wrong while processing the snapshot files
      */
-    public SnapshotManager(Tangle tangle, Configuration configuration) throws IOException {
+    public SnapshotManager(Tangle tangle, SnapshotConfig configuration) throws IOException {
         // save the necessary dependencies
         this.tangle = tangle;
         this.configuration = configuration;
@@ -76,7 +76,7 @@ public class SnapshotManager {
 
     public void init(MilestoneTracker milestoneTracker) {
         // load necessary configuration parameters
-        boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
+        boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
 
         // if local sna
         if(localSnapshotsEnabled) {
@@ -84,7 +84,7 @@ public class SnapshotManager {
                 log.info("Local Snapshot Monitor started ...");
 
                 // load necessary configuration parameters
-                int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+                int snapshotDepth = configuration.getLocalSnapshotsDepth();
                 int LOCAL_SNAPSHOT_INTERVAL = 10;
 
                 while(!shuttingDown) {
@@ -112,7 +112,7 @@ public class SnapshotManager {
                 log.info("Local Snapshot Garbage Collector started ...");
 
                 // load necessary configuration parameters
-                int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+                int snapshotDepth = configuration.getLocalSnapshotsDepth();
                 int LOCAL_SNAPSHOT_INTERVAL = 10;
 
                 while(!shuttingDown) {
@@ -139,6 +139,10 @@ public class SnapshotManager {
         shuttingDown = true;
         initialSnapshot = null;
         latestSnapshot = null;
+    }
+
+    public SnapshotConfig getConfiguration() {
+        return configuration;
     }
 
     /**
@@ -217,7 +221,7 @@ public class SnapshotManager {
 
     public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
         // read required config variables
-        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
+        boolean testnet = configuration.isTestnet();
 
         // variables used by the snapshot generation process
         Snapshot snapshot;
@@ -334,7 +338,7 @@ public class SnapshotManager {
 
         // create a set where we collect the solid entry points
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        solidEntryPoints.put(Hash.NULL_HASH, testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX));
+        solidEntryPoints.put(Hash.NULL_HASH, testnet ? 0 : configuration.getMilestoneStartIndex());
 
         // copy the old solid entry points which are still valid
         snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
@@ -510,16 +514,15 @@ public class SnapshotManager {
 
     public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
         // load necessary configuration parameters
-        boolean localSnapshotsEnabled = configuration.booling(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_ENABLED);
+        boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
 
         // if local snapshots are enabled
         if(localSnapshotsEnabled) {
             // load the remaining configuration parameters
-            boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
-            String basePath = configuration.string(
-                testnet ? Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH
-                        : Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH
-            );
+            boolean testnet = configuration.isTestnet();
+            String basePath = testnet
+                            ? configuration.getLocalSnapshotsTestnetBasePath()
+                            : configuration.getLocalSnapshotsMainnetBasePath();
 
             // create a file handle for our snapshot file
             File localSnapshotFile = new File(basePath + ".snapshot.state");
@@ -563,10 +566,10 @@ public class SnapshotManager {
 
     public Snapshot loadBuiltInSnapshot() throws IOException, IllegalStateException {
         // read the config vars for the built in snapshot files
-        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
-        String snapshotPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_FILE);
-        String snapshotSigPath = configuration.string(Configuration.DefaultConfSettings.SNAPSHOT_SIGNATURE_FILE);
-        int milestoneStartIndex = testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX);
+        boolean testnet = configuration.isTestnet();
+        String snapshotPath = configuration.getSnapshotFile();
+        String snapshotSigPath = configuration.getSnapshotSignatureFile();
+        int milestoneStartIndex = testnet ? 0 : configuration.getMilestoneStartIndex();
 
         // verify the signature of the builtin snapshot file
         if(!testnet && !SignedFiles.isFileSignatureValid(
@@ -601,8 +604,8 @@ public class SnapshotManager {
             snapshotState,
             new SnapshotMetaData(
                 Hash.NULL_HASH,
-                testnet ? 0 : configuration.integer(Configuration.DefaultConfSettings.MILESTONE_START_INDEX),
-                configuration.longNum(Configuration.DefaultConfSettings.SNAPSHOT_TIME),
+                milestoneStartIndex,
+                configuration.getSnapshotTime(),
                 solidEntryPoints
             )
         );
@@ -610,12 +613,11 @@ public class SnapshotManager {
 
     public Snapshot takeLocalSnapshot() throws SnapshotException {
         // load necessary configuration parameters
-        boolean testnet = configuration.booling(Configuration.DefaultConfSettings.TESTNET);
-        String basePath = configuration.string(
-            testnet ? Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH
-                    : Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH
-        );
-        int snapshotDepth = configuration.integer(Configuration.DefaultConfSettings.LOCAL_SNAPSHOTS_DEPTH);
+        boolean testnet = configuration.isTestnet();
+        String basePath = testnet
+                          ? configuration.getLocalSnapshotsTestnetBasePath()
+                          : configuration.getLocalSnapshotsMainnetBasePath();
+        int snapshotDepth = configuration.getLocalSnapshotsDepth();
 
         // determine our target milestone
         int targetMilestoneIndex = latestSnapshot.getIndex() - snapshotDepth;

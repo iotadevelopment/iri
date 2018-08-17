@@ -1,6 +1,6 @@
 package com.iota.iri.controllers;
 
-import com.iota.iri.conf.Configuration;
+import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.model.*;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Indexable;
@@ -497,7 +497,7 @@ public class TransactionViewModel {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
         if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getBranchTransactionHash())) {
-            referencedSnapshotOfBranch = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+            referencedSnapshotOfBranch = snapshotManager.getConfiguration().isTestnet() ? 0 : snapshotManager.getConfiguration().getMilestoneStartIndex();
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 
@@ -515,7 +515,7 @@ public class TransactionViewModel {
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
         if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getTrunkTransactionHash())) {
-            referencedSnapshotOfTrunk = Integer.parseInt(Configuration.MAINNET_MILESTONE_START_INDEX);
+            referencedSnapshotOfTrunk = snapshotManager.getConfiguration().isTestnet() ? 0 : snapshotManager.getConfiguration().getMilestoneStartIndex();
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 
