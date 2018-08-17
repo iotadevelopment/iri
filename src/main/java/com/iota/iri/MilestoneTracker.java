@@ -244,12 +244,54 @@ public class MilestoneTracker {
         // log a message when we are resetting
         log.info("Resetting ledger to milestone " + targetMilestone.index() + " due to: " + reason + " ...");
 
-        // prune all potentially invalid database fields
+        // reset all potentially invalid database fields
         try {
             MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null) {
-                // reset the snapshotIndex() of all following milestones to recalculate the corresponding values
-                TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash()).setSnapshot(tangle, snapshotManager, 0);
+                //region RESET THE SNAPSHOT INDEX //////////////////////////////////////////////////////////////////////
+
+                // retrieve the transaction belonging to our current milestone
+                TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash());
+
+                // create a set where we keep track of the processed transactions
+                Set<Hash> seenMilestoneTransactions = new HashSet<>();
+
+                // create a queue where we collect the transactions that shall be examined (starting with our milestone)
+                final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(Collections.singleton(milestoneTransaction));
+
+                // iterate through our queue and process all elements (while we iterate we add more)
+                TransactionViewModel currentTransaction;
+                while((currentTransaction = transactionsToExamine.poll()) != null) {
+                    // only process transactions that we haven't seen yet
+                    if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
+                        // reset the snapshotIndex to allow a repair
+                        currentTransaction.setSnapshot(tangle, snapshotManager, 0);
+
+                        // only examine transactions that are not part of the solid entry points
+                        if(!snapshotManager.getInitialSnapshot().isSolidEntryPoint(currentTransaction.getBranchTransactionHash())) {
+                            // retrieve the branch transaction of our current transaction
+                            TransactionViewModel branchTransaction = currentTransaction.getBranchTransaction(tangle, snapshotManager);;
+
+                            // if the branch transaction still belongs to our current or a following milestone -> add it
+                            if(branchTransaction.snapshotIndex() >= currentMilestone.index()) {
+                                transactionsToExamine.add(branchTransaction);
+                            }
+                        }
+
+                        // only examine transactions that are not part of the solid entry points
+                        if(!snapshotManager.getInitialSnapshot().isSolidEntryPoint(currentTransaction.getTrunkTransactionHash())) {
+                            // retrieve the trunk transaction of our current transaction
+                            TransactionViewModel trunkTransaction = currentTransaction.getTrunkTransaction(tangle, snapshotManager);
+
+                            // if the trunk transaction still belongs to our current or a following milestone -> add it
+                            if(trunkTransaction.snapshotIndex() >= currentMilestone.index()) {
+                                transactionsToExamine.add(trunkTransaction);
+                            }
+                        }
+                    }
+                }
+
+                //endregion ////////////////////////////////////////////////////////////////////////////////////////////
 
                 // remove the following StateDiffs
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
@@ -351,6 +393,7 @@ public class MilestoneTracker {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
+            // if the ledger can get updated
             if(ledgerValidator.updateSnapshot(nextMilestone)) {
                 // update our internal variables
                 latestSolidSubtangleMilestone = nextMilestone.getHash();
@@ -373,23 +416,18 @@ public class MilestoneTracker {
                 );
             }
 
-            // otherwise if we didn't reset yet in the updateSnapshot method ... (try to actively repair)
-            else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
-                // reset the ledger to the initial snapshot and rescan
-                //hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 640000), "invalid ledger state");
-                softReset();
+            // otherwise -> try to repair and abort our loop
+            else {
+                // do a soft reset if we didn't do a hard reset yet
+                if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
+                    softReset();
+                }
 
-                // and abort our loop
-                break;
-            } else {
-                //hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 640000), "invalid ledger state");
-                softReset();
-
-                // and abort our loop
-                break;
+                nextMilestone = null;
             }
         }
 
+        // dump a log message when we finish
         if(previousSolidSubtangleLatestMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex()) {
             messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
             messageQ.publish("lmhs %s", latestSolidSubtangleMilestone);
