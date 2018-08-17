@@ -208,6 +208,18 @@ public class API {
             log.debug("# {} -> Requesting command '{}'", counter.incrementAndGet(), command);
 
             switch (command) {
+                case "hardReset": {
+                    try {
+                        instance.milestone.hardReset(
+                            MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))),
+                            "manual reset"
+                        );
+                    } catch(ValidationException e) {
+
+                    }
+
+                    return ErrorResponse.create("reset successfull");
+                }
                 case "getTransactionDetails": {
                     Hash transactionHash;
                     try {
