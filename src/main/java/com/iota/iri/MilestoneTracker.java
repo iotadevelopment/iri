@@ -376,12 +376,14 @@ public class MilestoneTracker {
             // otherwise if we didn't reset yet in the updateSnapshot method ... (try to actively repair)
             else if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
                 // reset the ledger to the initial snapshot and rescan
-                hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 660000), "invalid ledger state");
+                //hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 640000), "invalid ledger state");
+                softReset();
 
                 // and abort our loop
                 break;
             } else {
-                hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 660000), "invalid ledger state");
+                //hardReset(MilestoneViewModel.findClosestNextMilestone(tangle, 640000), "invalid ledger state");
+                softReset();
 
                 // and abort our loop
                 break;
