@@ -34,7 +34,7 @@ public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
     public Tangle tangle = null;
-    public SnapshotManager snapshotManager = null;
+    public SnapshotManager snapshotManager;
 
     public final LedgerValidator ledgerValidator;
     public final MilestoneTracker milestone;
