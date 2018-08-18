@@ -71,6 +71,7 @@ public class Iota {
     public void init() throws Exception {
         initializeTangle();
         tangle.init();
+        snapshotManager.init(milestone);
 
         if (configuration.isRescanDb()){
             rescan_db();
