@@ -347,12 +347,14 @@ public class SnapshotManager {
             }
         });
 
+        final int OUTER_SHELL_SIZE = 50;
+
         // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", stepCounter = 0, amountOfMilestonesToProcess = targetMilestone.index() - initialSnapshotIndex);
+        dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", stepCounter = 0, amountOfMilestonesToProcess = Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshotIndex));
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         currentMilestone = targetMilestone;
-        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex) {
+        while(currentMilestone != null && currentMilestone.index() > initialSnapshotIndex && stepCounter < amountOfMilestonesToProcess) {
             // create a set where we collect the solid entry points
             Set<Hash> seenMilestoneTransactions = new HashSet<>();
 
