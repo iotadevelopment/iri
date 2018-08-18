@@ -52,6 +52,7 @@ public class Iota {
     public Iota(IotaConfig configuration) throws IOException {
         this.configuration = configuration;
         tangle = new Tangle();
+        snapshotManager = new SnapshotManager(tangle, configuration);
         messageQ = MessageQ.createWith(configuration);
         tipsViewModel = new TipsViewModel();
         transactionRequester = new TransactionRequester(tangle, messageQ);
