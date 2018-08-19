@@ -590,7 +590,7 @@ public class TransactionViewModel {
      * @return true if we can stop traversing or false otherwise
      */
     private boolean isReferencedSnapshotLeaf(TransactionViewModel transaction) {
-        return transaction.isSnapshot() || transaction.referencedSnapshot() != 0;
+        return transaction.isSnapshot() || transaction.referencedSnapshot() != -1;
     }
 
     /**
