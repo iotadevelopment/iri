@@ -391,6 +391,11 @@ public class TransactionViewModel {
         }
     }
 
+    public void cleanupReferencedTransactions() {
+        branch = null;
+        trunk = null;
+    }
+
     /**
      * This method updates the referencedSnapshot value of this transaction.
      *
@@ -406,8 +411,8 @@ public class TransactionViewModel {
         if(referencedSnapshot() == 0) {
             // cover the trivial case first -> for faster bottom up propagation
             if(
-                (Hash.NULL_HASH.equals(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this)) &&
-                (Hash.NULL_HASH.equals(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this))
+                (Hash.NULL_HASH.equals(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle))) &&
+                (Hash.NULL_HASH.equals(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle)))
             ) {
                 // calculate the correct value ...
                 updateReferencedSnapshotOfLeaf(tangle, this);
@@ -456,6 +461,8 @@ public class TransactionViewModel {
                             stepsStack.push(root.getHash());
                             stepsStack.push(currentTransaction.getHash());
 
+                            root.cleanupReferencedTransactions();
+
                             break;
                         }
 
@@ -484,6 +491,8 @@ public class TransactionViewModel {
                                 stack.pop();
 
                                 updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+
+                                currentTransaction.cleanupReferencedTransactions();
                             }
                         }
 
@@ -501,6 +510,8 @@ public class TransactionViewModel {
                                 stack.pop();
 
                                 updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+
+                                currentTransaction.cleanupReferencedTransactions();
                             }
                         }
 
@@ -509,6 +520,8 @@ public class TransactionViewModel {
                             stack.pop();
 
                             updateReferencedSnapshotOfLeaf(tangle, currentTransaction);
+
+                            currentTransaction.cleanupReferencedTransactions();
                         }
 
                         // remember the currentTransaction to determine which way we are traversing
