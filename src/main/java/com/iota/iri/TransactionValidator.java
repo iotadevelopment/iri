@@ -28,6 +28,7 @@ public class TransactionValidator {
     private final TipsViewModel tipsViewModel;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
+    private final SnapshotConfig config;
     private int MIN_WEIGHT_MAGNITUDE = 81;
     private static long snapshotTimestamp;
     private static long snapshotTimestampMs;
@@ -48,6 +49,7 @@ public class TransactionValidator {
         this.tipsViewModel = tipsViewModel;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
+        this.config = config;
         TransactionValidator.snapshotTimestamp = config.getSnapshotTime();
         TransactionValidator.snapshotTimestampMs = snapshotTimestamp * 1000;
     }
@@ -152,7 +154,7 @@ public class TransactionValidator {
             }
         }
         if (solid) {
-            TransactionViewModel.updateSolidTransactions(tangle, analyzedHashes);
+            TransactionViewModel.updateSolidTransactions(tangle, config, analyzedHashes);
         }
         analyzedHashes.clear();
         return solid;
@@ -250,7 +252,7 @@ public class TransactionValidator {
             if(solid) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.updateHeights(tangle);
-                transactionViewModel.updateReferencedSnapshot(tangle);
+                transactionViewModel.updateReferencedSnapshot(tangle, config);
                 return true;
             }
         }

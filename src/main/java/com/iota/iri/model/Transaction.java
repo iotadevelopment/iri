@@ -59,7 +59,7 @@ public class Transaction implements Persistable {
     /**
      * This field indicates which milestone a transactions references.
      */
-    public int referencedSnapshot;
+    public int referencedSnapshot = -1;
 
     public byte[] bytes() {
         return bytes;
