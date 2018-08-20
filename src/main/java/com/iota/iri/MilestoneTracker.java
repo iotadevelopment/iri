@@ -126,8 +126,6 @@ public class MilestoneTracker {
                                         final Validity valid = validateMilestone(mode, t, getIndex(t));
                                         switch (valid) {
                                             case VALID:
-                                                transactionValidator.checkSolidity(t.getHash(), true);
-
                                                 MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
                                                 if (milestoneViewModel != null && milestoneViewModel.index() > latestMilestoneIndex) {
                                                     latestMilestone = milestoneViewModel.getHash();
