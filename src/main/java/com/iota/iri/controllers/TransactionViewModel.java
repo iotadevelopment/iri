@@ -545,7 +545,7 @@ public class TransactionViewModel {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
         if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getBranchTransactionHash())) {
-            referencedSnapshotOfBranch = snapshotManager.getConfiguration().isTestnet() ? 0 : snapshotManager.getConfiguration().getMilestoneStartIndex();
+            referencedSnapshotOfBranch = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getBranchTransactionHash());
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 
@@ -563,7 +563,7 @@ public class TransactionViewModel {
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
         if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getTrunkTransactionHash())) {
-            referencedSnapshotOfTrunk = snapshotManager.getConfiguration().isTestnet() ? 0 : snapshotManager.getConfiguration().getMilestoneStartIndex();
+            referencedSnapshotOfTrunk = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getTrunkTransactionHash());
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle, snapshotManager);
 

@@ -221,6 +221,10 @@ public class Snapshot {
         return getMetaData().hasSolidEntryPoint(transactionHash);
     }
 
+    public int getSolidEntryPointIndex(Hash solidEntrypoint) {
+        return getMetaData().getSolidEntryPointIndex(solidEntrypoint);
+    }
+
     /**
      * This is a utility method for determining the balance of an address.
      *

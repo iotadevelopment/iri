@@ -362,6 +362,10 @@ public class SnapshotMetaData implements Cloneable {
         return solidEntryPoints.containsKey(solidEntrypoint);
     }
 
+    public int getSolidEntryPointIndex(Hash solidEntrypoint) {
+        return solidEntryPoints.get(solidEntrypoint);
+    }
+
     /**
      * This method is the getter of the solid entry points.
      *
