@@ -409,19 +409,19 @@ public class TransactionViewModel {
     public void updateReferencedSnapshot(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == -1) {
-            // cover the trivial case first -> for faster bottom up propagation
-            if(
-                (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle, snapshotManager))) &&
-                (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle, snapshotManager)))
-            ) {
-                // calculate the correct value ...
-                updateReferencedSnapshotOfLeaf(tangle, snapshotManager, this);
-
-                // ... and return
-                return;
-            }
-
             try {
+                // cover the trivial case first -> for faster bottom up propagation
+                if(
+                    (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle, snapshotManager))) &&
+                    (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle, snapshotManager)))
+                ) {
+                    // calculate the correct value ...
+                    updateReferencedSnapshotOfLeaf(tangle, snapshotManager, this);
+
+                    // ... and return
+                    return;
+                }
+
                 // we maintain a stack with the steps (to reduce the memory consumption, we "abort" if we go too deep
                 // and continue with fresh data structures allowing the garbage collector to clean up)
                 LinkedList<Hash> stepsStack = new LinkedList<>();
