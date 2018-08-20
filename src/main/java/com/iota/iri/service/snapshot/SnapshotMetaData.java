@@ -43,6 +43,8 @@ public class SnapshotMetaData implements Cloneable {
      */
     private HashMap<Hash, Integer> solidEntryPoints;
 
+    private HashMap<Hash, Integer> seenMilestones;
+
     /**
      * This method retrieves the meta data of a snapshot from a file.
      *
@@ -127,11 +129,14 @@ public class SnapshotMetaData implements Cloneable {
             }
         }
 
+        // read the seen milestones
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+
         // close the reader
         reader.close();
 
         // create and return our SnapshotMetaData object
-        return new SnapshotMetaData(hash, index, timestamp, solidEntryPoints);
+        return new SnapshotMetaData(hash, index, timestamp, solidEntryPoints, seenMilestones);
     }
 
     /**
@@ -143,12 +148,13 @@ public class SnapshotMetaData implements Cloneable {
      * @param index index of the Snapshot that this metadata belongs to
      * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints) {
+    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
         // store our parameters
         this.hash = hash;
         this.index = index;
         this.timestamp = timestamp;
         this.solidEntryPoints = solidEntryPoints;
+        this.seenMilestones = seenMilestones;
     }
 
     /**
@@ -471,6 +477,6 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(new Hash(hash.toString()), index, timestamp, (HashMap) solidEntryPoints.clone());
+        return new SnapshotMetaData(new Hash(hash.toString()), index, timestamp, (HashMap) solidEntryPoints.clone(), (HashMap) seenMilestones.clone());
     }
 }

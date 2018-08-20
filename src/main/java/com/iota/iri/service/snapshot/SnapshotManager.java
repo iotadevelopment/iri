@@ -609,7 +609,8 @@ public class SnapshotManager {
                 Hash.NULL_HASH,
                 milestoneStartIndex,
                 configuration.getSnapshotTime(),
-                solidEntryPoints
+                solidEntryPoints,
+                new HashMap<>()
             )
         );
     }

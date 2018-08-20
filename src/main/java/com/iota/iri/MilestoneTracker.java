@@ -123,13 +123,13 @@ public class MilestoneTracker {
                                 if(analyzedMilestoneCandidates.add(hash)) {
                                     TransactionViewModel t = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
                                     if (t.getCurrentIndex() == 0) {
-                                        final Validity valid = validateMilestone(mode, t, getIndex(t));
+                                        int milestoneIndex = getIndex(t);
+                                        final Validity valid = validateMilestone(mode, t, milestoneIndex);
                                         switch (valid) {
                                             case VALID:
-                                                MilestoneViewModel milestoneViewModel = MilestoneViewModel.latest(tangle);
-                                                if (milestoneViewModel != null && milestoneViewModel.index() > latestMilestoneIndex) {
-                                                    latestMilestone = milestoneViewModel.getHash();
-                                                    latestMilestoneIndex = milestoneViewModel.index();
+                                                if (milestoneIndex > latestMilestoneIndex) {
+                                                    latestMilestone = hash;
+                                                    latestMilestoneIndex = milestoneIndex;
                                                 }
 
                                                 // mark the transaction as a snapshot
