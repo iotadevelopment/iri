@@ -83,6 +83,7 @@ public class SnapshotMetaData implements Cloneable {
         Hash hash;
         int index;
         long timestamp;
+        int solidEntryPointsSize;
 
         // read the hash
         String line;
@@ -106,12 +107,23 @@ public class SnapshotMetaData implements Cloneable {
             throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
+        // read the solid entry points size
+        if((line = reader.readLine()) != null) {
+            solidEntryPointsSize = Integer.parseInt(line);
+        } else {
+            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+        }
+
         // read the solid entry points from our file
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        while((line = reader.readLine()) != null) {
-            String[] parts = line.split(";", 2);
-            if(parts.length >= 2) {
-                solidEntryPoints.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
+        for(int i = 0; i < solidEntryPointsSize; i++) {
+            if((line = reader.readLine()) != null) {
+                String[] parts = line.split(";", 2);
+                if(parts.length >= 2) {
+                    solidEntryPoints.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
+                }
+            } else {
+                throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
             }
         }
 
@@ -438,12 +450,11 @@ public class SnapshotMetaData implements Cloneable {
         Files.write(
             Paths.get(metaDataFile.getAbsolutePath()),
             () -> Stream.concat(
-                Stream.concat(
-                    Stream.of(hash.toString()),
-                    Stream.concat(
-                        Stream.of(String.valueOf(index)),
-                        Stream.of(String.valueOf(timestamp))
-                    )
+                Stream.of(
+                    hash.toString(),
+                    String.valueOf(index),
+                    String.valueOf(timestamp),
+                    String.valueOf(solidEntryPoints.size())
                 ),
                 solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
             ).iterator()
