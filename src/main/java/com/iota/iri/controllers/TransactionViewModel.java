@@ -411,8 +411,8 @@ public class TransactionViewModel {
         if(referencedSnapshot() == -1) {
             // cover the trivial case first -> for faster bottom up propagation
             if(
-                (Hash.NULL_HASH.equals(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle, snapshotManager))) &&
-                (Hash.NULL_HASH.equals(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle, snapshotManager)))
+                (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle, snapshotManager))) &&
+                (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle, snapshotManager)))
             ) {
                 // calculate the correct value ...
                 updateReferencedSnapshotOfLeaf(tangle, snapshotManager, this);
@@ -424,7 +424,7 @@ public class TransactionViewModel {
             try {
                 // we maintain a stack with the steps (to reduce the memory consumption, we "abort" if we go too deep
                 // and continue with fresh data structures allowing the garbage collector to clean up)
-                LinkedList<Hash> stepsStack = new LinkedList<Hash>();
+                LinkedList<Hash> stepsStack = new LinkedList<>();
 
                 // start by adding this transaction to our stack
                 stepsStack.push(this.getHash());
@@ -438,7 +438,7 @@ public class TransactionViewModel {
                     LinkedList<TransactionViewModel> stack = new LinkedList<TransactionViewModel>();
 
                     // create a set of seen transactions that we do not want to traverse anymore (NULL HASH by default)
-                    HashSet<Hash> seenTransactions = new HashSet<Hash>();
+                    HashSet<Hash> seenTransactions = new HashSet<>();
                     snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
                         seenTransactions.add(solidEntryPointHash);
                     });
