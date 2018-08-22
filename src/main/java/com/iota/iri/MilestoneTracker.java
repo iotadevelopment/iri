@@ -179,16 +179,18 @@ public class MilestoneTracker {
     private void spawnMilestoneSolidifier() {
         new Thread(() -> {
             while(!shuttingDown) {
+                System.out.println(unsolidMilestones.size());
+
                 unsolidMilestones.forEach(milestoneHash -> {
                     try {
+                        System.out.println(milestoneHash);
+
                         if(transactionValidator.checkSolidity(milestoneHash, true)) {
                             unsolidMilestones.remove(milestoneHash);
                         }
                     } catch(Exception e) {
                         e.printStackTrace();
                     }
-
-                    System.out.println(unsolidMilestones.size());
                 });
 
                 try { Thread.sleep(500); } catch (InterruptedException e) { e.printStackTrace(); }
@@ -244,7 +246,7 @@ public class MilestoneTracker {
                         latestMilestoneIndex = milestoneIndex;
                     }
 
-                    if(!potentialMilestoneTransaction.isSolid()) {
+                    if(!potentialMilestoneTransaction.isSolid() && milestoneIndex >= snapshotManager.getInitialSnapshot().getIndex()) {
                         unsolidMilestones.add(potentialMilestoneTransaction.getHash());
                     }
 
@@ -254,7 +256,9 @@ public class MilestoneTracker {
 
                 case INCOMPLETE:
                     // issue a solidity check to solidify incomplete milestones
-                    unsolidMilestones.add(potentialMilestoneTransaction.getHash());
+                    if(milestoneIndex >= snapshotManager.getInitialSnapshot().getIndex()) {
+                        unsolidMilestones.add(potentialMilestoneTransaction.getHash());
+                    }
 
                     potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
 
