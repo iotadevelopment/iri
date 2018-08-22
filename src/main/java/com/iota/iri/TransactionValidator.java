@@ -152,7 +152,6 @@ public class TransactionValidator {
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(hashPointer)) {
-                        System.out.println(hash.toString() + " => " + hashPointer.toString());
                         transactionRequester.requestTransaction(hashPointer, milestone);
                         solid = false;
                         break;
