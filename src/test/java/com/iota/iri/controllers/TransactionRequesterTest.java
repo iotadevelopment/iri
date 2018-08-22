@@ -1,7 +1,9 @@
 package com.iota.iri.controllers;
 
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
 import org.junit.After;
@@ -15,16 +17,17 @@ import static org.junit.Assert.*;
  */
 public class TransactionRequesterTest {
     private static Tangle tangle = new Tangle();
+    private static SnapshotManager snapshotManager;
     private MessageQ mq;
 
     @Before
     public void setUp() throws Exception {
-
+        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
     }
 
     @After
     public void tearDown() throws Exception {
-
+        snapshotManager.shutDown();
     }
 
     @Test
@@ -74,7 +77,7 @@ public class TransactionRequesterTest {
 
     @Test
     public void nonMilestoneCapacityLimited() throws Exception {
-        TransactionRequester txReq = new TransactionRequester(tangle, mq);
+        TransactionRequester txReq = new TransactionRequester(tangle, snapshotManager, mq);
         int capacity = TransactionRequester.MAX_TX_REQ_QUEUE_SIZE;
         //fill tips list
         for (int i = 0; i < capacity * 2 ; i++) {
@@ -87,7 +90,7 @@ public class TransactionRequesterTest {
 
     @Test
     public void milestoneCapacityNotLimited() throws Exception {
-        TransactionRequester txReq = new TransactionRequester(tangle, mq);
+        TransactionRequester txReq = new TransactionRequester(tangle, snapshotManager, mq);
         int capacity = TransactionRequester.MAX_TX_REQ_QUEUE_SIZE;
         //fill tips list
         for (int i = 0; i < capacity * 2 ; i++) {
@@ -100,7 +103,7 @@ public class TransactionRequesterTest {
 
     @Test
     public void mixedCapacityLimited() throws Exception {
-        TransactionRequester txReq = new TransactionRequester(tangle, mq);
+        TransactionRequester txReq = new TransactionRequester(tangle, snapshotManager, mq);
         int capacity = TransactionRequester.MAX_TX_REQ_QUEUE_SIZE;
         //fill tips list
         for (int i = 0; i < capacity * 4 ; i++) {
