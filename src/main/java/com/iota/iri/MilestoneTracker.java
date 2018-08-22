@@ -125,7 +125,7 @@ public class MilestoneTracker {
                     Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
 
                     // analyze all found milestone candidates
-                    scanningMilestonesProgress.setEnabled(firstRun && isRescanning).start(hashes.size());
+                    scanningMilestonesProgress.setEnabled(firstRun).start(hashes.size());
                     for(Hash hash: hashes) {
                         if(!shuttingDown && analyzedMilestoneCandidates.add(hash) && analyzeMilestoneCandidate(hash) == INCOMPLETE) {
                             analyzedMilestoneCandidates.remove(hash);
@@ -452,6 +452,11 @@ public class MilestoneTracker {
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
             tangle, previousSolidSubtangleLatestMilestoneIndex
         );
+
+        System.out.println(blockingSolidMilestoneTrackerTasks.get() == 0);
+        System.out.println(shuttingDown);
+        System.out.println(nextMilestone != null);
+        System.out.println(transactionValidator.checkSolidity(nextMilestone.getHash(), true));
 
         // while we have a milestone which is solid
         while(
