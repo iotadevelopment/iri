@@ -1,12 +1,12 @@
 package com.iota.iri;
 
-import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -15,7 +15,6 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.service.snapshot.SnapshotManager;
-import com.iota.iri.service.snapshot.SnapshotStateDiff;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -25,6 +24,9 @@ import org.slf4j.LoggerFactory;
 import com.iota.iri.hash.ISS;
 import com.iota.iri.model.Hash;
 import com.iota.iri.utils.Converter;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static com.iota.iri.MilestoneTracker.Validity.*;
 
@@ -59,7 +61,7 @@ public class MilestoneTracker {
     public int latestMilestoneIndex;
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
-    private final Set<Hash> unsolidMilestones = new HashSet<>();
+    private final Set<Hash> unsolidMilestones = ConcurrentHashMap.newKeySet();
 
     public MilestoneTracker(Tangle tangle,
                      SnapshotManager snapshotManager,
