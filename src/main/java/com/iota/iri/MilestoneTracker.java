@@ -60,7 +60,7 @@ public class MilestoneTracker {
     public int latestMilestoneIndex;
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
-    private final Set<Hash> unsolidMilestones = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<Hash, Integer> unsolidMilestones = new ConcurrentHashMap<>();
 
     public MilestoneTracker(Tangle tangle,
                      SnapshotManager snapshotManager,
@@ -181,12 +181,21 @@ public class MilestoneTracker {
             while(!shuttingDown) {
                 System.out.println(unsolidMilestones.size());
 
-                unsolidMilestones.forEach(milestoneHash -> {
+                unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
-                        System.out.println(milestoneHash);
-
-                        if(transactionValidator.checkSolidity(milestoneHash, true)) {
+                        // remove old milestones that are not relevant anymore
+                        if(milestoneIndex <= snapshotManager.getLatestSnapshot().getIndex()) {
                             unsolidMilestones.remove(milestoneHash);
+                        }
+
+                        // check milestones that are within our check range
+                        else if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
+                            System.out.println(milestoneHash);
+
+                            // remove milestones that have become solid
+                            if(transactionValidator.checkSolidity(milestoneHash, true)) {
+                                unsolidMilestones.remove(milestoneHash);
+                            }
                         }
                     } catch(Exception e) {
                         e.printStackTrace();
@@ -247,7 +256,7 @@ public class MilestoneTracker {
                     }
 
                     if(!potentialMilestoneTransaction.isSolid() && milestoneIndex >= snapshotManager.getInitialSnapshot().getIndex()) {
-                        unsolidMilestones.add(potentialMilestoneTransaction.getHash());
+                        unsolidMilestones.put(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     }
 
                     potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
@@ -257,7 +266,7 @@ public class MilestoneTracker {
                 case INCOMPLETE:
                     // issue a solidity check to solidify incomplete milestones
                     if(milestoneIndex >= snapshotManager.getInitialSnapshot().getIndex()) {
-                        unsolidMilestones.add(potentialMilestoneTransaction.getHash());
+                        unsolidMilestones.put(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     }
 
                     potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
