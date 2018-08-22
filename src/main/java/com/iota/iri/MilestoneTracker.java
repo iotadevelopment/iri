@@ -86,7 +86,7 @@ public class MilestoneTracker {
         // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize
         // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once and
         // create the corresponding MilestoneViewModels to our transactions
-        solidMilestoneTrackerTasks = new AtomicInteger(1);
+        solidMilestoneTrackerTasks = new AtomicInteger(0);
 
         this.ledgerValidator = ledgerValidator;
         AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
@@ -108,6 +108,11 @@ public class MilestoneTracker {
                 long lastLogTime = System.currentTimeMillis();
 
                 try {
+                    MilestoneViewModel latestMilestoneViewModel = MilestoneViewModel.latest(tangle);
+                    if(latestMilestoneViewModel != null) {
+                        latestMilestone = latestMilestoneViewModel.getHash();
+                        latestMilestoneIndex = latestMilestoneViewModel.index();
+                    }
                     final int previousLatestMilestoneIndex = latestMilestoneIndex;
                     Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
                     { // Update Milestone
@@ -168,7 +173,7 @@ public class MilestoneTracker {
                 // if we processed all milestone candidates once
                 if(firstRun) {
                     // allow the "Solid Milestone Tracker" to continue
-                    solidMilestoneTrackerTasks.decrementAndGet();
+                    //solidMilestoneTrackerTasks.decrementAndGet();
 
                     // only execute this part once (remember we ran once)
                     firstRun = false;

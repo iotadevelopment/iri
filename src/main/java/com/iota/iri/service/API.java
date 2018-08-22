@@ -230,6 +230,8 @@ public class API {
 
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, transactionHash);
 
+                    instance.transactionValidator.checkSolidity(transactionHash, true);
+
                     transaction.updateReferencedSnapshot(instance.tangle, instance.snapshotManager);
 
                     String isConsistent = "" + transaction.getValidity();
