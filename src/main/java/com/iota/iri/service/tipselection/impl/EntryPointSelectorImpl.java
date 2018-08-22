@@ -37,6 +37,6 @@ public class EntryPointSelectorImpl implements EntryPointSelector {
             return milestoneViewModel.getHash();
         }
 
-        return milestone.latestSolidSubtangleMilestone;
+        return snapshotManager.getLatestSnapshot().getHash();
     }
 }

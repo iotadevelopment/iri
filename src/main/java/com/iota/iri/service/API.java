@@ -319,7 +319,7 @@ public class API {
                     return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                             Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
                             Runtime.getRuntime().totalMemory(), instance.milestoneTracker.latestMilestone, instance.milestoneTracker.latestMilestoneIndex,
-                            instance.milestoneTracker.latestSolidSubtangleMilestone, instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.getInitialSnapshot().getIndex(),
+                            instance.snapshotManager.getLatestSnapshot().getHash(), instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.getInitialSnapshot().getIndex(),
                             instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                             System.currentTimeMillis(), instance.tipsViewModel.size(),
                             instance.transactionRequester.numberOfTransactionsToRequest());
@@ -912,7 +912,7 @@ public class API {
         instance.snapshotManager.getLatestSnapshot().lockRead();
         final int index = instance.snapshotManager.getLatestSnapshot().getIndex();
         if (tips == null || tips.size() == 0) {
-            hashes = Collections.singletonList(instance.milestoneTracker.latestSolidSubtangleMilestone);
+            hashes = Collections.singletonList(instance.snapshotManager.getLatestSnapshot().getHash());
         } else {
             hashes = tips.stream().map(address -> (new Hash(address)))
                     .collect(Collectors.toCollection(LinkedList::new));

@@ -198,8 +198,6 @@ public class LedgerValidator {
         MilestoneViewModel latestConsistentMilestone = buildSnapshot();
         if(latestConsistentMilestone != null) {
             log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
-
-            milestone.latestSolidSubtangleMilestone = latestConsistentMilestone.getHash();
         }
     }
 
