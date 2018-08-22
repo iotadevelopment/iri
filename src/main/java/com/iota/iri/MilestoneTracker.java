@@ -179,8 +179,6 @@ public class MilestoneTracker {
     private void spawnMilestoneSolidifier() {
         new Thread(() -> {
             while(!shuttingDown) {
-                System.out.println(unsolidMilestones.size());
-
                 unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
                         // remove old milestones that are not relevant anymore
