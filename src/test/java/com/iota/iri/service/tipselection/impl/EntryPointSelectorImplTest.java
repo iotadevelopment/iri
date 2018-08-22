@@ -1,8 +1,8 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.MilestoneTracker;
-import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;

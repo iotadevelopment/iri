@@ -33,11 +33,10 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
-    public Tangle tangle = null;
-    public SnapshotManager snapshotManager;
-
     public final LedgerValidator ledgerValidator;
-    public final MilestoneTracker milestone;
+    public final MilestoneTracker milestoneTracker;
+    public final Tangle tangle;
+    public final SnapshotManager snapshotManager;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -58,12 +57,12 @@ public class Iota {
         transactionRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
         transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester, messageQ,
                 configuration);
-        milestone = new MilestoneTracker(tangle, snapshotManager, transactionValidator, messageQ, configuration);
-        node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestone, messageQ,
+        milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, messageQ, configuration);
+        node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
                 configuration);
         replicator = new Replicator(node, configuration);
         udpReceiver = new UDPReceiver(node, configuration);
-        ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestone, transactionRequester, messageQ);
+        ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestoneTracker, transactionRequester, messageQ);
         tipsSolidifier = new TipsSolidifier(tangle, snapshotManager, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(configuration);
     }
@@ -71,7 +70,7 @@ public class Iota {
     public void init() throws Exception {
         initializeTangle();
         tangle.init();
-        snapshotManager.init(milestone);
+        snapshotManager.init(milestoneTracker);
 
         if (configuration.isRescanDb()){
             rescan_db();
@@ -82,14 +81,14 @@ public class Iota {
             tangle.clearColumn(com.iota.iri.model.StateDiff.class);
             tangle.clearMetadata(com.iota.iri.model.Transaction.class);
         }
-        milestone.init(SpongeFactory.Mode.CURLP27, ledgerValidator);
-        transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
+        milestoneTracker.init(ledgerValidator);
+        transactionValidator.init(configuration.isTestnet(), configuration.getMwm(), milestoneTracker);
         tipsSolidifier.init();
         transactionRequester.init(configuration.getpRemoveRequest());
         udpReceiver.init();
         replicator.init();
         node.init();
-        snapshotManager.init(milestone);
+        snapshotManager.init(milestoneTracker);
     }
 
     private void rescan_db() throws Exception {
@@ -118,7 +117,7 @@ public class Iota {
     }
 
     public void shutdown() throws Exception {
-        milestone.shutDown();
+        milestoneTracker.shutDown();
         tipsSolidifier.shutdown();
         node.shutdown();
         udpReceiver.shutdown();
@@ -151,11 +150,11 @@ public class Iota {
     }
 
     private TipSelector createTipSelector(TipSelConfig config) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestone, config);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestoneTracker, config);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
         TailFinder tailFinder = new TailFinderImpl(tangle, snapshotManager);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
         return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, entryPointSelector, ratingCalculator,
-                walker, milestone, config);
+                walker, milestoneTracker, config);
     }
 }

@@ -39,7 +39,7 @@ public class TipSelectorImpl implements TipSelector {
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,
                            Walker walkerAlpha,
-                            MilestoneTracker milestone,
+                           MilestoneTracker milestone,
                            TipSelConfig config) {
 
         this.entryPointSelector = entryPointSelector;

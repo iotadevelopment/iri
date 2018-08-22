@@ -37,6 +37,7 @@ public class TransactionValidator {
     private static long MAX_TIMESTAMP_FUTURE = 2 * 60 * 60;
     private static long MAX_TIMESTAMP_FUTURE_MS = MAX_TIMESTAMP_FUTURE * 1000;
 
+    protected MilestoneTracker milestone;
     private Thread newSolidThread;
 
     private final AtomicBoolean useFirst = new AtomicBoolean(true);
@@ -57,7 +58,9 @@ public class TransactionValidator {
         TransactionValidator.snapshotTimestampMs = snapshotTimestamp * 1000;
     }
 
-    public void init(boolean testnet, int mwm) {
+    public void init(boolean testnet, int mwm, MilestoneTracker milestone) {
+        this.milestone = milestone;
+
         setMwm(testnet, mwm);
 
         newSolidThread = new Thread(spawnSolidTransactionsPropagation(), "Solid TX cascader");
@@ -263,7 +266,11 @@ public class TransactionValidator {
             if(solid) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.updateHeights(tangle, snapshotManager);
-                transactionViewModel.updateReferencedSnapshot(tangle, snapshotManager);
+
+                if(milestone.analyzeMilestoneCandidate(transactionViewModel) == MilestoneTracker.Validity.VALID) {
+                    // do some other milestone specific updates (check for latestSolidMilestone)
+                }
+
                 return true;
             }
         }

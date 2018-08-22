@@ -5,7 +5,10 @@ import com.google.gson.GsonBuilder;
 import com.iota.iri.*;
 import com.iota.iri.controllers.*;
 import com.iota.iri.conf.APIConfig;
-import com.iota.iri.conf.ConsensusConfig;
+import com.iota.iri.controllers.AddressViewModel;
+import com.iota.iri.controllers.BundleViewModel;
+import com.iota.iri.controllers.TagViewModel;
+import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.Curl;
 import com.iota.iri.hash.PearlDiver;
 import com.iota.iri.hash.Sponge;
@@ -61,7 +64,6 @@ public class API {
     public static final String REFERENCE_TRANSACTION_TOO_OLD = "reference transaction is too old";
     private static final Logger log = LoggerFactory.getLogger(API.class);
     private final IXI ixi;
-    private final int milestoneStartIndex;
 
     private Undertow server;
 
@@ -101,7 +103,6 @@ public class API {
         maxGetTrytes = configuration.getMaxGetTrytes();
         maxBodyLength = configuration.getMaxBodyLength();
         testNet = configuration.isTestnet();
-        milestoneStartIndex = ((ConsensusConfig) configuration).getMilestoneStartIndex();
 
         previousEpochsSpentAddresses = new ConcurrentHashMap<>();
     }
@@ -210,7 +211,7 @@ public class API {
             switch (command) {
                 case "hardReset": {
                     try {
-                        instance.milestone.hardReset(
+                        instance.milestoneTracker.hardReset(
                             MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))),
                             "manual reset"
                         );
@@ -317,8 +318,8 @@ public class API {
                     String name = instance.configuration.isTestnet() ? IRI.TESTNET_NAME : IRI.MAINNET_NAME;
                     return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                             Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
-                            Runtime.getRuntime().totalMemory(), instance.milestone.latestMilestone, instance.milestone.latestMilestoneIndex,
-                            instance.milestone.latestSolidSubtangleMilestone, instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.getInitialSnapshot().getIndex(),
+                            Runtime.getRuntime().totalMemory(), instance.milestoneTracker.latestMilestone, instance.milestoneTracker.latestMilestoneIndex,
+                            instance.milestoneTracker.latestSolidSubtangleMilestone, instance.snapshotManager.getLatestSnapshot().getIndex(), instance.snapshotManager.getInitialSnapshot().getIndex(),
                             instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                             System.currentTimeMillis(), instance.tipsViewModel.size(),
                             instance.transactionRequester.numberOfTransactionsToRequest());
@@ -501,7 +502,7 @@ public class API {
             instance.snapshotManager.getLatestSnapshot().lockRead();
             try {
                 WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotManager, instance.ledgerValidator,
-                        instance.milestone, instance.configuration);
+                        instance.milestoneTracker, instance.configuration);
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
                         state = false;
@@ -584,7 +585,7 @@ public class API {
     }
 
     public boolean invalidSubtangleStatus() {
-        return (instance.snapshotManager.getLatestSnapshot().getIndex() == milestoneStartIndex);
+        return (instance.snapshotManager.getLatestSnapshot().getIndex() == instance.snapshotManager.getInitialSnapshot().getIndex());
     }
 
     private AbstractResponse removeNeighborsStatement(List<String> uris) {
@@ -911,7 +912,7 @@ public class API {
         instance.snapshotManager.getLatestSnapshot().lockRead();
         final int index = instance.snapshotManager.getLatestSnapshot().getIndex();
         if (tips == null || tips.size() == 0) {
-            hashes = Collections.singletonList(instance.milestone.latestSolidSubtangleMilestone);
+            hashes = Collections.singletonList(instance.milestoneTracker.latestSolidSubtangleMilestone);
         } else {
             hashes = tips.stream().map(address -> (new Hash(address)))
                     .collect(Collectors.toCollection(LinkedList::new));
