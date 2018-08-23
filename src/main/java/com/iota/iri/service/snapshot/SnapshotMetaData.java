@@ -465,7 +465,7 @@ public class SnapshotMetaData implements Cloneable {
      * @param seenMilestones set of solid entry points that shall be stored
      */
     public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
-        setSeenMilestones(solidEntryPoints, true);
+        setSeenMilestones(seenMilestones, true);
     }
 
     /**
