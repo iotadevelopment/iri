@@ -31,20 +31,32 @@ import java.io.OutputStream;
 import static com.iota.iri.MilestoneTracker.Validity.*;
 
 public class MilestoneTracker {
-
+    /**
+     * Validity states of transactions regarding their milestone status.
+     */
     enum Validity {
         VALID,
         INVALID,
         INCOMPLETE
     }
 
+    private static int RESCAN_INTERVAL = 5000;
+
+    /**
+     * How often (in milliseconds) to dump log messages about status updates.
+     */
+    private static int STATUS_LOG_INTERVAL = 5000;
+
     /**
      * This variable is used to keep track of the asynchronous tasks, that the "Solid Milestone Tracker" should wait for.
      */
-    private AtomicInteger blockingSolidMilestoneTrackerTasks;
+    private AtomicInteger blockingSolidMilestoneTrackerTasks = new AtomicInteger(0);
+
+    private AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
 
     private final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
     private final Tangle tangle;
+    private final SnapshotManager snapshotManager;
     private final Hash coordinator;
     private final TransactionValidator transactionValidator;
     private final boolean testnet;
@@ -52,7 +64,6 @@ public class MilestoneTracker {
     private final int numOfKeysInMilestone;
     private final boolean acceptAnyTestnetCoo;
     private final boolean isRescanning;
-    private final SnapshotManager snapshotManager;
 
     private LedgerValidator ledgerValidator;
     public Hash latestMilestone;
@@ -61,6 +72,8 @@ public class MilestoneTracker {
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
     private final ConcurrentHashMap<Hash, Integer> unsolidMilestones = new ConcurrentHashMap<>();
+
+    private boolean shuttingDown;
 
     public MilestoneTracker(Tangle tangle,
                      SnapshotManager snapshotManager,
@@ -83,29 +96,22 @@ public class MilestoneTracker {
         this.latestMilestone = snapshotManager.getLatestSnapshot().getHash();
     }
 
-    private boolean shuttingDown;
-    private static int RESCAN_INTERVAL = 5000;
-
-    /**
-     * How often (in milliseconds) to dump log messages about status updates.
-     */
-    private static int STATUS_LOG_INTERVAL = 5000;
-
     public void init (LedgerValidator ledgerValidator) {
-        // to be able to process the milestones in the correct order (i.e. after a rescan of the database), we initialize
-        // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once if
-        // we are rescanning or revalidating the database
-        blockingSolidMilestoneTrackerTasks = new AtomicInteger(isRescanning ? 1 : 0);
-
         this.ledgerValidator = ledgerValidator;
-        AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
 
-        spawnLatestMilestoneTracker(ledgerValidatorInitialized);
-        spawnSolidMilestoneTracker(ledgerValidatorInitialized);
+        // to be able to process the milestones in the correct order after a rescan of the database, we initialize
+        // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once
+        if(isRescanning) {
+            blockingSolidMilestoneTrackerTasks.incrementAndGet();
+        }
+
+        // start the threads
+        spawnLatestMilestoneTracker();
+        spawnSolidMilestoneTracker();
         spawnMilestoneSolidifier();
     }
 
-    private void spawnLatestMilestoneTracker(AtomicBoolean ledgerValidatorInitialized) {
+    private void spawnLatestMilestoneTracker() {
         (new Thread(() -> {
             log.info("Waiting for Ledger Validator initialization ...");
             while(!ledgerValidatorInitialized.get()) {
@@ -116,19 +122,19 @@ public class MilestoneTracker {
 
             ProgressLogger scanningMilestonesProgress = new ProgressLogger("Scanning Latest Milestones", log);
 
+            // bootstrap our latestMilestone with the last milestone in the database (faster startup)
+            try {
+                analyzeMilestoneCandidate(MilestoneViewModel.latest(tangle).getHash());
+            } catch(Exception e) { /* do nothing */ }
+
             log.info("Tracker started.");
             boolean firstRun = true;
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();
 
                 try {
-                    Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
-
-                    // bootstrap out latest milestone with the last in db (faster startup)
-                    MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
-                    analyzeMilestoneCandidate(latestMilestone.getHash());
-
                     // analyze all found milestone candidates
+                    Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
                     scanningMilestonesProgress.setEnabled(firstRun).start(hashes.size());
                     for(Hash hash: hashes) {
                         if(!shuttingDown && analyzedMilestoneCandidates.add(hash) && analyzeMilestoneCandidate(hash) == INCOMPLETE) {
@@ -154,7 +160,7 @@ public class MilestoneTracker {
         }, "Latest Milestone Tracker")).start();
     }
 
-    private void spawnSolidMilestoneTracker(AtomicBoolean ledgerValidatorInitialized) {
+    private void spawnSolidMilestoneTracker() {
         (new Thread(() -> {
             log.info("Initializing Ledger Validator...");
             try {

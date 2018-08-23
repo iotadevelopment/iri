@@ -572,7 +572,6 @@ public class SnapshotManager {
         String snapshotPath = configuration.getSnapshotFile();
         String snapshotSigPath = configuration.getSnapshotSignatureFile();
         int milestoneStartIndex = testnet ? 0 : configuration.getMilestoneStartIndex();
-        System.out.println(milestoneStartIndex);
 
         // verify the signature of the builtin snapshot file
         if(!testnet && !SignedFiles.isFileSignatureValid(
