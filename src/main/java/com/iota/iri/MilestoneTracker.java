@@ -195,20 +195,23 @@ public class MilestoneTracker {
 
         new Thread(() -> {
             while(!shuttingDown) {
-                System.out.println(seenMilestones.size());
-
                 seenMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
-                        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneHash);
-                        if(milestoneTransaction == null || milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
-                            transactionRequester.requestTransaction(milestoneHash, true);
-                        } else {
-                            seenMilestones.remove(milestoneHash);
+                        if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
+                            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneHash);
+                            if(milestoneTransaction == null || milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                                transactionRequester.requestTransaction(milestoneHash, true);
+                            } else {
+                                System.out.println(milestoneHash.toString() + " exists");
+                                seenMilestones.remove(milestoneHash);
+                            }
                         }
                     } catch(Exception e) {
                         e.printStackTrace();
                     }
                 });
+
+                System.out.println(unsolidMilestones.size());
 
                 unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
