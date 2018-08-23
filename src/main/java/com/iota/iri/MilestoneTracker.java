@@ -191,7 +191,7 @@ public class MilestoneTracker {
     }
 
     private void spawnMilestoneSolidifier() {
-        HashMap<Hash, Integer> seenMilestones = (HashMap) snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones().clone();
+        ConcurrentHashMap<Hash, Integer> seenMilestones = new ConcurrentHashMap(snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones());
 
         new Thread(() -> {
             while(!shuttingDown) {
