@@ -191,29 +191,32 @@ public class MilestoneTracker {
     }
 
     private void spawnMilestoneSolidifier() {
-        ConcurrentHashMap<Hash, Integer> seenMilestones = new ConcurrentHashMap(snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones());
-
         new Thread(() -> {
+            // prepare seen milestones for concurrent access
+            ConcurrentHashMap<Hash, Integer> seenMilestones = new ConcurrentHashMap(snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones());
+
             while(!shuttingDown) {
+                // retrieve milestones from our local snapshot (if they are still missing)
                 seenMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
-                        if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
+                        // remove old milestones that are not relevant anymore
+                        if(milestoneIndex <= snapshotManager.getLatestSnapshot().getIndex()) {
+                            seenMilestones.remove(milestoneHash);
+                        }
+
+                        // check milestones that are within our check range
+                        else if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
                             TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneHash);
                             if(milestoneTransaction == null || milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
                                 transactionRequester.requestTransaction(milestoneHash, true);
                             } else {
-                                System.out.println(milestoneHash.toString() + " exists");
                                 seenMilestones.remove(milestoneHash);
                             }
                         }
-                    } catch(Exception e) {
-                        System.out.println(e.getMessage());
-                        e.printStackTrace();
-                    }
+                    } catch(Exception e) { /* do nothing */ }
                 });
 
-                System.out.println(unsolidMilestones.size());
-
+                // solidify known milestones
                 unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
                         // remove old milestones that are not relevant anymore
@@ -228,9 +231,7 @@ public class MilestoneTracker {
                                 unsolidMilestones.remove(milestoneHash);
                             }
                         }
-                    } catch(Exception e) {
-                        e.printStackTrace();
-                    }
+                    } catch(Exception e) { /* do nothing */ }
                 });
 
                 try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
