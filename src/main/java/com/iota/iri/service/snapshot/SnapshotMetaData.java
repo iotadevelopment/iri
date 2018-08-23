@@ -425,6 +425,28 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
+     * This method is the setter of the solid entry points.
+     *
+     * It simply stores the passed value in the private property, with optionally locking the object first.
+     *
+     * @param solidEntryPoints set of solid entry points that shall be stored
+     */
+    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints, boolean lock) {
+        // prevent other threads to write to this object while we do the updates
+        if(lock) {
+            lockWrite();
+        }
+
+        // apply our changes
+        this.solidEntryPoints = solidEntryPoints;
+
+        // unlock the access to this object once we are done updating
+        if(lock) {
+            unlockWrite();
+        }
+    }
+
+    /**
      * This method is the getter of the seen milestones.
      *
      * It simply returns the stored private property.
@@ -443,24 +465,24 @@ public class SnapshotMetaData implements Cloneable {
      * @param seenMilestones set of solid entry points that shall be stored
      */
     public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
-        setSolidEntryPoints(solidEntryPoints, true);
+        setSeenMilestones(solidEntryPoints, true);
     }
 
     /**
-     * This method is the setter of the solid entry points.
+     * This method is the setter of the seen milestones.
      *
      * It simply stores the passed value in the private property, with optionally locking the object first.
      *
-     * @param solidEntryPoints set of solid entry points that shall be stored
+     * @param seenMilestones set of solid entry points that shall be stored
      */
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints, boolean lock) {
+    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones, boolean lock) {
         // prevent other threads to write to this object while we do the updates
         if(lock) {
             lockWrite();
         }
 
         // apply our changes
-        this.solidEntryPoints = solidEntryPoints;
+        this.seenMilestones = seenMilestones;
 
         // unlock the access to this object once we are done updating
         if(lock) {
