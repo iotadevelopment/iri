@@ -86,6 +86,7 @@ public class SnapshotMetaData implements Cloneable {
         int index;
         long timestamp;
         int solidEntryPointsSize;
+        int seenMilestonesSize;
 
         // read the hash
         String line;
@@ -116,6 +117,13 @@ public class SnapshotMetaData implements Cloneable {
             throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
+        // read the solid entry points size
+        if((line = reader.readLine()) != null) {
+            seenMilestonesSize = Integer.parseInt(line);
+        } else {
+            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+        }
+
         // read the solid entry points from our file
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
         for(int i = 0; i < solidEntryPointsSize; i++) {
@@ -131,6 +139,16 @@ public class SnapshotMetaData implements Cloneable {
 
         // read the seen milestones
         HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+        for(int i = 0; i < seenMilestonesSize; i++) {
+            if((line = reader.readLine()) != null) {
+                String[] parts = line.split(";", 2);
+                if(parts.length >= 2) {
+                    seenMilestones.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
+                }
+            } else {
+                throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            }
+        }
 
         // close the reader
         reader.close();
@@ -407,6 +425,28 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
+     * This method is the getter of the seen milestones.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return set of milestones that were known
+     */
+    public HashMap<Hash, Integer> getSeenMilestones() {
+        return seenMilestones;
+    }
+
+    /**
+     * This method is the setter of the solid entry points.
+     *
+     * It simply stores the passed value in the private property, with locking the object first.
+     *
+     * @param seenMilestones set of solid entry points that shall be stored
+     */
+    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
+        setSolidEntryPoints(solidEntryPoints, true);
+    }
+
+    /**
      * This method is the setter of the solid entry points.
      *
      * It simply stores the passed value in the private property, with optionally locking the object first.
@@ -460,9 +500,13 @@ public class SnapshotMetaData implements Cloneable {
                     hash.toString(),
                     String.valueOf(index),
                     String.valueOf(timestamp),
-                    String.valueOf(solidEntryPoints.size())
+                    String.valueOf(solidEntryPoints.size()),
+                    String.valueOf(seenMilestones.size())
                 ),
-                solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
+                Stream.concat(
+                    solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
+                    seenMilestones.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
+                )
             ).iterator()
         );
 

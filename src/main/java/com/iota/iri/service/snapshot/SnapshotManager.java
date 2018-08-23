@@ -9,6 +9,7 @@ import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.ProgressLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -436,6 +437,27 @@ public class SnapshotManager {
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+        //region GENERATE THE LIST OF SEEN MILESTONES //////////////////////////////////////////////////////////////////
+
+        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
+
+        seenMilestonesProgressLogger.start(configuration.getLocalSnapshotsDepth());
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+        try {
+            MilestoneViewModel seenMilestone = targetMilestone;
+            while((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index())) != null) {
+                seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
+                seenMilestonesProgressLogger.progress();
+            }
+        } catch(Exception e) {
+            seenMilestonesProgressLogger.abort(e);
+
+            throw new SnapshotException("could not generate the set of seen milestones", e);
+        }
+        seenMilestonesProgressLogger.finish();
+
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
+
         //region UPDATE THE SCALAR METADATA VALUES OF THE NEW SNAPSHOT  ////////////////////////////////////////////////
 
         // retrieve the transaction belonging to our targetMilestone
@@ -454,6 +476,7 @@ public class SnapshotManager {
         snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
         snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
         snapshot.getMetaData().setHash(targetMilestone.getHash());
+        snapshot.getMetaData().setSeenMilestones(seenMilestones);
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
