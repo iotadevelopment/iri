@@ -14,6 +14,7 @@ import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
+import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.zmq.MessageQ;
@@ -59,6 +60,7 @@ public class MilestoneTracker {
     private final SnapshotManager snapshotManager;
     private final Hash coordinator;
     private final TransactionValidator transactionValidator;
+    private final TransactionRequester transactionRequester;
     private final boolean testnet;
     private final MessageQ messageQ;
     private final int numOfKeysInMilestone;
@@ -78,12 +80,14 @@ public class MilestoneTracker {
     public MilestoneTracker(Tangle tangle,
                      SnapshotManager snapshotManager,
                      TransactionValidator transactionValidator,
+                     TransactionRequester transactionRequester,
                      MessageQ messageQ,
                      IotaConfig config
     ) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
+        this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
 
         //configure
@@ -187,8 +191,25 @@ public class MilestoneTracker {
     }
 
     private void spawnMilestoneSolidifier() {
+        HashMap<Hash, Integer> seenMilestones = (HashMap) snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones().clone();
+
         new Thread(() -> {
             while(!shuttingDown) {
+                System.out.println(seenMilestones.size());
+
+                seenMilestones.forEach((milestoneHash, milestoneIndex) -> {
+                    try {
+                        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneHash);
+                        if(milestoneTransaction == null || milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                            transactionRequester.requestTransaction(milestoneHash, true);
+                        } else {
+                            seenMilestones.remove(milestoneHash);
+                        }
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
                 unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
                     try {
                         // remove old milestones that are not relevant anymore
@@ -208,7 +229,7 @@ public class MilestoneTracker {
                     }
                 });
 
-                try { Thread.sleep(500); } catch (InterruptedException e) { e.printStackTrace(); }
+                try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
             }
         }, "Milestone Solidifier").start();
     }

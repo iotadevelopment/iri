@@ -51,7 +51,7 @@ public class TransactionValidatorTest {
     MainnetConfig config = new MainnetConfig();
     txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester, messageQ, config);
     txValidator.setMwm(false, MAINNET_MWM);
-    milestoneTracker = new MilestoneTracker(tangle, snapshotManager, txValidator, messageQ, config);
+    milestoneTracker = new MilestoneTracker(tangle, snapshotManager, txValidator, Mockito.mock(TransactionRequester.class), messageQ, config);
     txValidator.init(false, MAINNET_MWM, milestoneTracker);
   }
 

@@ -57,7 +57,7 @@ public class Iota {
         transactionRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
         transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester, messageQ,
                 configuration);
-        milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, messageQ, configuration);
+        milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, transactionRequester, messageQ, configuration);
         node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
                 configuration);
         replicator = new Replicator(node, configuration);
