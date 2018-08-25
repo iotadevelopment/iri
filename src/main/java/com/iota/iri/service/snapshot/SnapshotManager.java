@@ -36,6 +36,8 @@ public class SnapshotManager {
 
     private Tangle tangle;
 
+    private SnapshotGarbageCollector snapshotGarbageCollector;
+
     private SnapshotConfig configuration;
 
     private Snapshot initialSnapshot;
@@ -73,67 +75,48 @@ public class SnapshotManager {
 
         // create a working copy of the initial snapshot that keeps track of the latest state
         latestSnapshot = initialSnapshot.clone();
+
+        // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
+        snapshotGarbageCollector = new SnapshotGarbageCollector(tangle, this);
     }
 
     public void init(MilestoneTracker milestoneTracker) {
-        // load necessary configuration parameters
-        boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
+        // if local snapshots are enabled we initialize the parts taking care of local snapshots
+        if(configuration.getLocalSnapshotsEnabled()) {
+            spawnMonitorThread(milestoneTracker);
 
-        // if local sna
-        if(localSnapshotsEnabled) {
-            (new Thread(() -> {
-                log.info("Local Snapshot Monitor started ...");
-
-                // load necessary configuration parameters
-                int snapshotDepth = configuration.getLocalSnapshotsDepth();
-                int LOCAL_SNAPSHOT_INTERVAL = 10;
-
-                while(!shuttingDown) {
-                    long scanStart = System.currentTimeMillis();
-
-                    if(latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
-                        try {
-                            takeLocalSnapshot();
-                        } catch(SnapshotException e) {
-                            log.error("Error while taking local snapshot: " + e.getMessage());
-                        }
-                    }
-
-                    try {
-                        Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
-                    } catch(InterruptedException e) {
-                        log.info("Local Snapshot Monitor stopped ...");
-
-                        shuttingDown = true;
-                    }
-                }
-            }, "Local Snapshot Monitor")).start();
-
-            (new Thread(() -> {
-                log.info("Local Snapshot Garbage Collector started ...");
-
-                // load necessary configuration parameters
-                int snapshotDepth = configuration.getLocalSnapshotsDepth();
-                int LOCAL_SNAPSHOT_INTERVAL = 10;
-
-                while(!shuttingDown) {
-                    long scanStart = System.currentTimeMillis();
-
-                    // remove all orphaned approvers
-                    //orphanedApprovers.forEach((k, v) -> {
-
-                    //});
-
-                    try {
-                        Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
-                    } catch(InterruptedException e) {
-                        log.info("Local Snapshot Monitor stopped ...");
-
-                        shuttingDown = true;
-                    }
-                }
-            }, "Local Snapshot Garbage Collector")).start();
+            snapshotGarbageCollector.start();
         }
+    }
+
+    public void spawnMonitorThread(MilestoneTracker milestoneTracker) {
+        (new Thread(() -> {
+            log.info("Local Snapshot Monitor started ...");
+
+            // load necessary configuration parameters
+            int snapshotDepth = configuration.getLocalSnapshotsDepth();
+            int LOCAL_SNAPSHOT_INTERVAL = 10;
+
+            while(!shuttingDown) {
+                long scanStart = System.currentTimeMillis();
+
+                if(latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                    try {
+                        takeLocalSnapshot();
+                    } catch(SnapshotException e) {
+                        log.error("Error while taking local snapshot: " + e.getMessage());
+                    }
+                }
+
+                try {
+                    Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
+                } catch(InterruptedException e) {
+                    log.info("Local Snapshot Monitor stopped ...");
+
+                    shuttingDown = true;
+                }
+            }
+        }, "Local Snapshot Monitor")).start();
     }
 
     public void shutDown() {
@@ -668,6 +651,7 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the snapshot");
         }
 
+        snapshotGarbageCollector.addCleanupJob(targetMilestone.index());
 
         try {
             targetSnapshot.getState().writeFile(basePath + ".snapshot.state");
