@@ -70,7 +70,6 @@ public class Iota {
     public void init() throws Exception {
         initializeTangle();
         tangle.init();
-        snapshotManager.init(milestoneTracker);
 
         if (configuration.isRescanDb()){
             rescan_db();
@@ -88,6 +87,7 @@ public class Iota {
         udpReceiver.init();
         replicator.init();
         node.init();
+        snapshotManager.init(milestoneTracker);
     }
 
     private void rescan_db() throws Exception {
