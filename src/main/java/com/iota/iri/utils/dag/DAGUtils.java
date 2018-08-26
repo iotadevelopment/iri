@@ -44,7 +44,6 @@ public class DAGUtils {
             if(
                 seenTransactions.add(currentTransaction.getHash()) &&
                 currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
-                snapshotManager.getInitialSnapshot().isSolidEntryPoint(currentTransaction.getHash()) &&
                 condition.check(currentTransaction)
             ) {
                 currentTransactionConsumer.consume(currentTransaction);
