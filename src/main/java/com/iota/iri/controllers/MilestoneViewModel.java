@@ -39,6 +39,10 @@ public class MilestoneViewModel {
         milestones.clear();
     }
 
+    public static void clear(int milestoneIndex) {
+        milestones.remove(milestoneIndex);
+    }
+
     public MilestoneViewModel(final int index, final Hash milestoneHash) {
         this.milestone = new Milestone();
         this.milestone.index = new IntegerIndex(index);

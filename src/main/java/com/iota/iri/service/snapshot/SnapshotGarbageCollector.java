@@ -159,6 +159,8 @@ public class SnapshotGarbageCollector {
                     }
                 );
 
+                MilestoneViewModel.clear(milestoneIndex);
+
                 tangle.deleteBatch(elementsToDelete);
 
                 System.out.println("MI: " + milestoneIndex + " / " + elementsToDelete.size());
