@@ -231,9 +231,7 @@ public class API {
 
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, instance.snapshotManager, transactionHash);
 
-                    instance.transactionValidator.checkSolidity(transactionHash, true);
-
-                    transaction.updateReferencedSnapshot(instance.tangle, instance.snapshotManager);
+                    String exists = transaction.getType() != TransactionViewModel.PREFILLED_SLOT ? "true" : "false";
 
                     String isConsistent = "" + transaction.getValidity();
 
@@ -247,7 +245,7 @@ public class API {
                     MilestoneViewModel referencedSnapshotMilestone = MilestoneViewModel.get(instance.tangle, transaction.referencedSnapshot());
                     String referencedSnapshot = "" + transaction.referencedSnapshot() + "" + (referencedSnapshotMilestone == null ? "" : " (" + referencedSnapshotMilestone.getHash().toString() + ")");
 
-                    return ErrorResponse.create(transaction.getHash().toString() + ": isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex + "; referencedSnapshot: " + referencedSnapshot);
+                    return ErrorResponse.create(transaction.getHash().toString() + ": exists: " + exists + "; isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex + "; referencedSnapshot: " + referencedSnapshot);
                 }
                 case "storeMessage": {
                     if (!testNet) {
