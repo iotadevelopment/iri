@@ -7,8 +7,8 @@ import com.iota.iri.model.Transaction;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGUtils;
-import javafx.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +40,7 @@ public class SnapshotGarbageCollector {
     /**
      * List of cleanup jobs that shall get processed by the garbage collector.
      */
-    protected LinkedList<Pair<Integer, Integer>> cleanupJobs;
+    protected LinkedList<GarbageCollectorJob> cleanupJobs;
 
     protected DAGUtils dagUtils;
 
@@ -66,7 +66,7 @@ public class SnapshotGarbageCollector {
      * @throws SnapshotException if something goes wrong while persisting the job queue
      */
     public void addCleanupJob(int milestoneIndex) throws SnapshotException {
-        cleanupJobs.addLast(new Pair<>(milestoneIndex, milestoneIndex));
+        cleanupJobs.addLast(new GarbageCollectorJob(milestoneIndex, milestoneIndex));
 
         persistChanges();
     }
@@ -119,6 +119,8 @@ public class SnapshotGarbageCollector {
      */
     protected SnapshotGarbageCollector cleanupMilestone(int milestoneIndex) throws SnapshotException {
         try {
+            System.out.println("MI: " + milestoneIndex);
+
             MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, milestoneIndex);
             if(milestoneViewModel != null) {
                 // create references to the classes of the cleaned up entities
@@ -172,20 +174,13 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
-    protected SnapshotGarbageCollector updateStepProgress(int stepIndex, int milestoneIndex) throws SnapshotException {
-        Pair<Integer, Integer> job = cleanupJobs.get(stepIndex);
+    protected SnapshotGarbageCollector processCleanupJob(GarbageCollectorJob job, int cleanupTarget) throws SnapshotException {
+        while(!shuttingDown && cleanupTarget < job.getCurrentIndex()) {
+            cleanupMilestone(job.getCurrentIndex());
 
-        cleanupJobs.set(stepIndex, new Pair<>(job.getKey(), milestoneIndex));
-        persistChanges();
+            job.setCurrentIndex(job.getCurrentIndex() - 1);
 
-        return this;
-    }
-
-    protected SnapshotGarbageCollector processCleanupJob(int jobIndex, int cleanupTarget, int cleanupStep) throws SnapshotException {
-        while(!shuttingDown && cleanupTarget < cleanupStep) {
-            cleanupMilestone(cleanupStep);
-
-            updateStepProgress(jobIndex, --cleanupStep);
+            persistChanges();
         }
 
         return this;
@@ -193,22 +188,23 @@ public class SnapshotGarbageCollector {
 
     protected SnapshotGarbageCollector processCleanupJobs() throws SnapshotException {
         // repeat until all jobs are processed
-        while(!shuttingDown && cleanupJobs.size() >= 1) {
-            // process the first job
-            processCleanupJob(0, snapshotManager.getConfiguration().getMilestoneStartIndex(), cleanupJobs.get(0).getValue());
+        while(!shuttingDown) {
+            if(cleanupJobs.size() >= 1) {
+                GarbageCollectorJob firstJob = cleanupJobs.getFirst();
+                processCleanupJob(firstJob, snapshotManager.getConfiguration().getMilestoneStartIndex());
 
-            // if we have a 2nd job -> process this one as well and try to consolidate after
-            if(!shuttingDown && cleanupJobs.size() >= 2) {
-                // the 2nd job prunes until it reaches the start of the first job
-                processCleanupJob(1, cleanupJobs.get(0).getKey(), cleanupJobs.get(1).getValue());
+                if(cleanupJobs.size() >= 2) {
+                    cleanupJobs.removeFirst();
+                    GarbageCollectorJob secondJob = cleanupJobs.getFirst();
+                    cleanupJobs.addFirst(firstJob);
 
-                // if both jobs are done we can consolidate them to one
-                consolidateCleanupJobs();
-            }
+                    processCleanupJob(secondJob, firstJob.getStartingIndex());
 
-            // otherwise we are done
-            else {
-                break;
+                    // if both jobs are done we can consolidate them to one
+                    consolidateCleanupJobs();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -227,20 +223,12 @@ public class SnapshotGarbageCollector {
         // if we have at least 2 jobs -> check if we can consolidate them
         if(cleanupJobs.size() >= 2) {
             // retrieve the first two jobs
-            Pair<Integer, Integer> job1 = cleanupJobs.pollFirst();
-            Pair<Integer, Integer> job2 = cleanupJobs.pollFirst();
-
-            // read the values of the jobs into variables
-            int pruneTarget1 = snapshotManager.getConfiguration().getMilestoneStartIndex();
-            int pruneStart1 = job1.getKey();
-            int pruneStep1 = job1.getValue();
-            int pruneTarget2 = pruneStart1;
-            int pruneStart2 = job2.getKey();
-            int pruneStep2 = job2.getValue();
+            GarbageCollectorJob job1 = cleanupJobs.removeFirst();
+            GarbageCollectorJob job2 = cleanupJobs.removeFirst();
 
             // if both first job are done -> consolidate them and persists the changes
-            if(pruneStep1 == pruneTarget1 && pruneStep2 == pruneTarget2) {
-                cleanupJobs.addFirst(new Pair<>(pruneStart2, pruneTarget1));
+            if(job1.getCurrentIndex() == snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
+                cleanupJobs.addFirst(new GarbageCollectorJob(job2.getStartingIndex(), job1.getCurrentIndex()));
 
                 persistChanges();
             }
@@ -268,7 +256,7 @@ public class SnapshotGarbageCollector {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
-                () -> cleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getKey()) + ";" + Integer.toString(entry.getValue())).iterator()
+                () -> cleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getStartingIndex()) + ";" + Integer.toString(entry.getCurrentIndex())).iterator()
             );
         } catch(IOException e) {
             throw new SnapshotException("could not persists garbage collector state", e);
@@ -304,7 +292,7 @@ public class SnapshotGarbageCollector {
             while((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
                 if(parts.length >= 2) {
-                    cleanupJobs.addLast(new Pair<>(Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
+                    cleanupJobs.addLast(new GarbageCollectorJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
                 }
             }
 

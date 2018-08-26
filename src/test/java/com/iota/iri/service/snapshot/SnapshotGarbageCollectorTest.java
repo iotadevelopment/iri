@@ -36,8 +36,8 @@ public class SnapshotGarbageCollectorTest {
 
         // after processing all the jobs we should have only 1 entry left indicating the success of the processing
         Assert.assertTrue("", snapshotGarbageCollector1.cleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getKey() == mainnetConfig.getMilestoneStartIndex() + 20);
-        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getValue() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 20);
+        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
 
         // add some more jobs after the first processing
         snapshotGarbageCollector1.addCleanupJob(mainnetConfig.getMilestoneStartIndex() + 30);
@@ -47,8 +47,8 @@ public class SnapshotGarbageCollectorTest {
 
         // after processing all the jobs we should have only 1 entry left indicating the success of the processing
         Assert.assertTrue("", snapshotGarbageCollector1.cleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getKey() == mainnetConfig.getMilestoneStartIndex() + 30);
-        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getValue() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 30);
+        Assert.assertTrue(snapshotGarbageCollector1.cleanupJobs.getFirst().getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
     }
 
     @Test
@@ -63,10 +63,10 @@ public class SnapshotGarbageCollectorTest {
         // check if the restored cleanupJobs are the same as the saved ones
         SnapshotGarbageCollector snapshotGarbageCollector2 = new SnapshotGarbageCollector(tangle, snapshotManager);
         Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.size() == 2);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getKey() == 12);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getValue() == 12);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getKey() == 17);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getValue() == 17);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getStartingIndex() == 12);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getCurrentIndex() == 12);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getStartingIndex() == 17);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getCurrentIndex() == 17);
     }
 
     @AfterClass
