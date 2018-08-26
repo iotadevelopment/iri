@@ -125,24 +125,21 @@ public class SnapshotGarbageCollector {
                 Class<Persistable> milestoneClass = (Class<Persistable>) ((Persistable) new Milestone()).getClass();
                 Class<Persistable> transactionClass = (Class<Persistable>) ((Persistable) new Transaction()).getClass();
 
-                List<com.iota.iri.utils.Pair<Indexable, Class<Persistable>>> elementsToDelete = new ArrayList<>();
+                List<Pair<Indexable, Class<Persistable>>> elementsToDelete = new ArrayList<>();
 
-                elementsToDelete.add(
-                    new com.iota.iri.utils.Pair<>(new IntegerIndex(milestoneViewModel.index()), milestoneClass)
-                );
+                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), milestoneClass));
+                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), transactionClass));
 
                 dagUtils.traverseApprovees(
                     // start traversal at the milestone
                     milestoneViewModel,
 
                     // continue while the transaction belongs to the current milestone
-                    approvedTransaction -> approvedTransaction.snapshotIndex() == milestoneViewModel.index(),
+                    approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
 
                     // remove all approved transactions
                     approvedTransaction -> {
-                        elementsToDelete.add(
-                            new com.iota.iri.utils.Pair<>(approvedTransaction.getHash(), transactionClass)
-                        );
+                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), transactionClass));
 
                         // remove all orphaned transactions that are branching off of our deleted transactions
                         dagUtils.traverseApprovers(
@@ -151,9 +148,7 @@ public class SnapshotGarbageCollector {
                             approverTransaction -> approverTransaction.snapshotIndex() == 0,
 
                             approverTransaction -> {
-                                elementsToDelete.add(
-                                    new com.iota.iri.utils.Pair<>(approverTransaction.getHash(), transactionClass)
-                                );
+                                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), transactionClass));
                             }
                         );
                     }

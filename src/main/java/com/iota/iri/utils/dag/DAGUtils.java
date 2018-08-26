@@ -1,5 +1,6 @@
 package com.iota.iri.utils.dag;
 
+import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
@@ -22,8 +23,33 @@ public class DAGUtils {
         this.snapshotManager = snapshotManager;
     }
 
-    public void traverseApprovers(TransactionViewModel startingTransaction, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {
+    public void traverseApprovers(TransactionViewModel startingTransaction, TraversalCondition condition,
+                                  TraversalConsumer currentTransactionConsumer) throws Exception {
+        Set<Hash> processedTransactions = new HashSet<>();
 
+        final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
+        startingTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> {
+            try {
+                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, approverHash));
+            } catch(Exception e) { /* do nothing - just ignore the tx */ }
+        });
+
+        TransactionViewModel currentTransaction;
+        while((currentTransaction = transactionsToExamine.poll()) != null) {
+            if(
+                processedTransactions.add(currentTransaction.getHash()) &&
+                currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
+                condition.check(currentTransaction)
+            ) {
+                currentTransactionConsumer.consume(currentTransaction);
+
+                currentTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> {
+                    try {
+                        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, approverHash));
+                    } catch(Exception e) { /* do nothing - just ignore the tx */ }
+                });
+            }
+        }
     }
 
     /**
@@ -31,18 +57,18 @@ public class DAGUtils {
      * @param condition tust
      * @param currentTransactionConsumer tost
      */
-    public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {
-        // create a set where we collect the solid entry points
-        Set<Hash> seenTransactions = new HashSet<>();
+    public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
+                                  TraversalConsumer currentTransactionConsumer) throws Exception {
+        Set<Hash> processedTransactions = new HashSet<>();
 
-        // create a queue where we collect the transactions that shall be examined (starting with our milestone)
-        final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(Collections.singleton(startingTransaction));
+        final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
+        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
+        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
 
-        // traverse the transactions
         TransactionViewModel currentTransaction;
         while((currentTransaction = transactionsToExamine.poll()) != null) {
             if(
-                seenTransactions.add(currentTransaction.getHash()) &&
+                processedTransactions.add(currentTransaction.getHash()) &&
                 currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
                 condition.check(currentTransaction)
             ) {
