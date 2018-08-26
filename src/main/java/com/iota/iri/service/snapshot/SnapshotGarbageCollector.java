@@ -119,8 +119,6 @@ public class SnapshotGarbageCollector {
      */
     protected SnapshotGarbageCollector cleanupMilestone(int milestoneIndex) throws SnapshotException {
         try {
-            System.out.println("MI: " + milestoneIndex);
-
             MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, milestoneIndex);
             if(milestoneViewModel != null) {
                 // create references to the classes of the cleaned up entities
@@ -142,8 +140,6 @@ public class SnapshotGarbageCollector {
 
                     // remove all approved transactions
                     approvedTransaction -> {
-                        System.out.println("DELETING: " + approvedTransaction.getHash().toString());
-
                         elementsToDelete.add(
                             new com.iota.iri.utils.Pair<>(approvedTransaction.getHash(), transactionClass)
                         );
@@ -155,8 +151,6 @@ public class SnapshotGarbageCollector {
                             approverTransaction -> approverTransaction.snapshotIndex() == 0,
 
                             approverTransaction -> {
-                                System.out.println("DELETING: " + approverTransaction.getHash().toString());
-
                                 elementsToDelete.add(
                                     new com.iota.iri.utils.Pair<>(approverTransaction.getHash(), transactionClass)
                                 );
@@ -165,7 +159,9 @@ public class SnapshotGarbageCollector {
                     }
                 );
 
-                //tangle.deleteBatch(elementsToDelete);
+                tangle.deleteBatch(elementsToDelete);
+
+                System.out.println("MI: " + milestoneIndex + " / " + elementsToDelete.size());
             }
         } catch(Exception e) {
             throw new SnapshotException("failed to cleanup milestone #" + milestoneIndex, e);
