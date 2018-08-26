@@ -2,6 +2,7 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.conf.MainnetConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
 import org.junit.Assert;
@@ -23,7 +24,7 @@ public class SnapshotTest {
     public static void beforeClass() {
         try {
             IotaConfig config = new MainnetConfig();
-            SnapshotManager snapshotManager = new SnapshotManager(new Tangle(), config);
+            SnapshotManager snapshotManager = new SnapshotManager(new Tangle(), new TipsViewModel(), config);
             initSnapshot = snapshotManager.getInitialSnapshot();
         } catch (IOException e) {
             throw new UncheckedIOException("Problem initiating snapshot", e);

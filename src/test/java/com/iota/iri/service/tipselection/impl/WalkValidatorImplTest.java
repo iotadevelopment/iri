@@ -6,6 +6,7 @@ import com.iota.iri.TransactionTestUtils;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.conf.TipSelConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.controllers.TransactionViewModelTest;
 import com.iota.iri.model.Hash;
@@ -50,7 +51,7 @@ public class WalkValidatorImplTest {
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
-        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder

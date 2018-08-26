@@ -1,6 +1,7 @@
 package com.iota.iri.service.snapshot;
 
 import com.iota.iri.conf.MainnetConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
 import org.junit.AfterClass;
@@ -19,7 +20,7 @@ public class SnapshotGarbageCollectorTest {
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
-        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
     }
 
     @Test
@@ -27,7 +28,7 @@ public class SnapshotGarbageCollectorTest {
         MainnetConfig mainnetConfig = new MainnetConfig();
 
         // add some jobs to our queue
-        SnapshotGarbageCollector snapshotGarbageCollector1 = new SnapshotGarbageCollector(tangle, snapshotManager).reset();
+        SnapshotGarbageCollector snapshotGarbageCollector1 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
         snapshotGarbageCollector1.addCleanupJob(mainnetConfig.getMilestoneStartIndex() + 10);
         snapshotGarbageCollector1.addCleanupJob(mainnetConfig.getMilestoneStartIndex() + 20);
 
@@ -56,12 +57,12 @@ public class SnapshotGarbageCollectorTest {
         MainnetConfig mainnetConfig = new MainnetConfig();
 
         // add some jobs to our queue
-        SnapshotGarbageCollector snapshotGarbageCollector1 = new SnapshotGarbageCollector(tangle, snapshotManager).reset();
+        SnapshotGarbageCollector snapshotGarbageCollector1 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
         snapshotGarbageCollector1.addCleanupJob(12);
         snapshotGarbageCollector1.addCleanupJob(17);
 
         // check if the restored cleanupJobs are the same as the saved ones
-        SnapshotGarbageCollector snapshotGarbageCollector2 = new SnapshotGarbageCollector(tangle, snapshotManager);
+        SnapshotGarbageCollector snapshotGarbageCollector2 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel());
         Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.size() == 2);
         Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getStartingIndex() == 12);
         Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getCurrentIndex() == 12);
@@ -71,7 +72,7 @@ public class SnapshotGarbageCollectorTest {
 
     @AfterClass
     public static void tearDown() throws Exception {
-        new SnapshotGarbageCollector(tangle, snapshotManager).reset();
+        new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
         tangle.shutdown();
     }
 }

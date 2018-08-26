@@ -1,6 +1,7 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.conf.MainnetConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.HashId;
 import com.iota.iri.service.snapshot.SnapshotManager;
@@ -42,7 +43,7 @@ public class RatingOneTest {
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
         rating = new RatingOne(tangle);
-        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
     }
 
     @Test

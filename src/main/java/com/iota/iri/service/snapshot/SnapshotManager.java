@@ -3,10 +3,7 @@ package com.iota.iri.service.snapshot;
 import com.iota.iri.MilestoneTracker;
 import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.SnapshotConfig;
-import com.iota.iri.controllers.ApproveeViewModel;
-import com.iota.iri.controllers.MilestoneViewModel;
-import com.iota.iri.controllers.StateDiffViewModel;
-import com.iota.iri.controllers.TransactionViewModel;
+import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
@@ -38,6 +35,8 @@ public class SnapshotManager {
 
     private SnapshotGarbageCollector snapshotGarbageCollector;
 
+    private TipsViewModel tipsViewModel;
+
     private SnapshotConfig configuration;
 
     private Snapshot initialSnapshot;
@@ -60,9 +59,10 @@ public class SnapshotManager {
      * @param configuration configuration of the node
      * @throws IOException if something goes wrong while processing the snapshot files
      */
-    public SnapshotManager(Tangle tangle, SnapshotConfig configuration) throws IOException {
+    public SnapshotManager(Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) throws IOException {
         // save the necessary dependencies
         this.tangle = tangle;
+        this.tipsViewModel = tipsViewModel;
         this.configuration = configuration;
 
         // try to load a local snapshot first
@@ -77,7 +77,7 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-        snapshotGarbageCollector = new SnapshotGarbageCollector(tangle, this);
+        snapshotGarbageCollector = new SnapshotGarbageCollector(tangle, this, tipsViewModel);
     }
 
     public void init(MilestoneTracker milestoneTracker) {

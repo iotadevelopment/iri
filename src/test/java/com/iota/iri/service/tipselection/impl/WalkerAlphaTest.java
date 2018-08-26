@@ -1,6 +1,7 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.conf.MainnetConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
@@ -49,7 +50,7 @@ public class WalkerAlphaTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
         walker = new WalkerAlpha((Optional::of), tangle, messageQ, new Random(1), new MainnetConfig());

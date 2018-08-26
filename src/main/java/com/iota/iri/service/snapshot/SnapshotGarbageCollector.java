@@ -1,6 +1,8 @@
 package com.iota.iri.service.snapshot;
 
 import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.controllers.TipsViewModel;
+import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
@@ -37,6 +39,8 @@ public class SnapshotGarbageCollector {
 
     protected SnapshotManager snapshotManager;
 
+    protected TipsViewModel tipsViewModel;
+
     /**
      * List of cleanup jobs that shall get processed by the garbage collector.
      */
@@ -48,9 +52,10 @@ public class SnapshotGarbageCollector {
      * The constructor of this class stores the passed in parameters for future use and restores the previous state of
      * the garbage collector if there is a valid one.
      */
-    public SnapshotGarbageCollector(Tangle tangle, SnapshotManager snapshotManager) {
+    public SnapshotGarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
+        this.tipsViewModel = tipsViewModel;
         this.dagUtils = DAGUtils.get(tangle, snapshotManager);
 
         restoreCleanupJobs();
@@ -155,6 +160,13 @@ public class SnapshotGarbageCollector {
                 );
 
                 MilestoneViewModel.clear(milestoneIndex);
+
+                elementsToDelete.stream().forEach(element -> {
+                    if(transactionClass.equals(element.hi)) {
+                        tipsViewModel.removeTipHash((Hash) element.low);
+                    }
+                });
+                tipsViewModel.removeTipHash(milestoneViewModel.getHash());
 
                 tangle.deleteBatch(elementsToDelete);
 

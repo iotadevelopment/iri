@@ -22,7 +22,7 @@ public class TransactionRequesterTest {
 
     @Before
     public void setUp() throws Exception {
-        snapshotManager = new SnapshotManager(tangle, new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
     }
 
     @After
