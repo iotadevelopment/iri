@@ -86,8 +86,8 @@ public class TransactionValidator {
     }
 
     private boolean hasInvalidTimestamp(TransactionViewModel transactionViewModel) {
-        // ignore invalid timestamps for transactions that where requested by our node
-        if(transactionRequester.contains(transactionViewModel.getHash())) {
+        // ignore invalid timestamps for transactions that where requested by our node while solidifying a milestone
+        if(transactionRequester.containsMilestoneRequest(transactionViewModel.getHash())) {
             return false;
         }
 
