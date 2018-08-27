@@ -2,6 +2,7 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TipsViewModel;
+import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
@@ -20,6 +21,10 @@ import java.nio.file.Paths;
 import java.util.*;
 
 public class SnapshotGarbageCollector {
+    // create references to the classes of the cleaned up entities
+    protected static Class<Persistable> CLASS_MILESTONE = (Class<Persistable>) ((Persistable) new Milestone()).getClass();
+    protected static Class<Persistable> CLASS_TRANSACTION = (Class<Persistable>) ((Persistable) new Transaction()).getClass();
+
     /**
      * The interval in milliseconds that the garbage collector will check if new cleanup tasks are available.
      */
@@ -122,18 +127,14 @@ public class SnapshotGarbageCollector {
      * @return the instance of the {@link SnapshotGarbageCollector} that it was called on to allow chaining
      * @throws SnapshotException if something goes wrong while cleaning up the milestone
      */
-    protected SnapshotGarbageCollector cleanupMilestone(int milestoneIndex) throws SnapshotException {
+    protected SnapshotGarbageCollector cleanupMilestoneTransactions(int milestoneIndex) throws SnapshotException {
         try {
             MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, milestoneIndex);
             if(milestoneViewModel != null) {
-                // create references to the classes of the cleaned up entities
-                Class<Persistable> milestoneClass = (Class<Persistable>) ((Persistable) new Milestone()).getClass();
-                Class<Persistable> transactionClass = (Class<Persistable>) ((Persistable) new Transaction()).getClass();
-
                 List<Pair<Indexable, Class<Persistable>>> elementsToDelete = new ArrayList<>();
 
-                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), milestoneClass));
-                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), transactionClass));
+                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), CLASS_MILESTONE));
+                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), CLASS_TRANSACTION));
 
                 dagUtils.traverseApprovees(
                     // start traversal at the milestone
@@ -144,25 +145,16 @@ public class SnapshotGarbageCollector {
 
                     // remove all approved transactions
                     approvedTransaction -> {
-                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), transactionClass));
+                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), CLASS_TRANSACTION));
 
-                        // remove all orphaned transactions that are branching off of our deleted transactions
-                        dagUtils.traverseApprovers(
-                            approvedTransaction,
-
-                            approverTransaction -> approverTransaction.snapshotIndex() == 0,
-
-                            approverTransaction -> {
-                                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), transactionClass));
-                            }
-                        );
+                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete);
                     }
                 );
 
                 MilestoneViewModel.clear(milestoneIndex);
 
                 elementsToDelete.stream().forEach(element -> {
-                    if(transactionClass.equals(element.hi)) {
+                    if(CLASS_TRANSACTION.equals(element.hi)) {
                         tipsViewModel.removeTipHash((Hash) element.low);
                     }
                 });
@@ -179,9 +171,22 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
+    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, Class<Persistable>>> elementsToDelete) throws Exception {
+        // remove all orphaned transactions that are branching off of our deleted transactions
+        dagUtils.traverseApprovers(
+            transaction,
+
+            approverTransaction -> approverTransaction.snapshotIndex() == 0,
+
+            approverTransaction -> {
+                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), CLASS_TRANSACTION));
+            }
+        );
+    }
+
     protected SnapshotGarbageCollector processCleanupJob(GarbageCollectorJob job, int cleanupTarget) throws SnapshotException {
         while(!shuttingDown && cleanupTarget < job.getCurrentIndex()) {
-            cleanupMilestone(job.getCurrentIndex());
+            cleanupMilestoneTransactions(job.getCurrentIndex());
 
             job.setCurrentIndex(job.getCurrentIndex() - 1);
 
@@ -193,23 +198,21 @@ public class SnapshotGarbageCollector {
 
     protected SnapshotGarbageCollector processCleanupJobs() throws SnapshotException {
         // repeat until all jobs are processed
-        while(!shuttingDown) {
-            if(cleanupJobs.size() >= 1) {
-                GarbageCollectorJob firstJob = cleanupJobs.getFirst();
-                processCleanupJob(firstJob, snapshotManager.getConfiguration().getMilestoneStartIndex());
+        while(!shuttingDown && cleanupJobs.size() >= 1) {
+            GarbageCollectorJob firstJob = cleanupJobs.getFirst();
+            processCleanupJob(firstJob, snapshotManager.getConfiguration().getMilestoneStartIndex());
 
-                if(cleanupJobs.size() >= 2) {
-                    cleanupJobs.removeFirst();
-                    GarbageCollectorJob secondJob = cleanupJobs.getFirst();
-                    cleanupJobs.addFirst(firstJob);
+            if(cleanupJobs.size() >= 2) {
+                cleanupJobs.removeFirst();
+                GarbageCollectorJob secondJob = cleanupJobs.getFirst();
+                cleanupJobs.addFirst(firstJob);
 
-                    processCleanupJob(secondJob, firstJob.getStartingIndex());
+                processCleanupJob(secondJob, firstJob.getStartingIndex());
 
-                    // if both jobs are done we can consolidate them to one
-                    consolidateCleanupJobs();
-                } else {
-                    break;
-                }
+                // if both jobs are done we can consolidate them to one
+                consolidateCleanupJobs();
+            } else {
+                break;
             }
         }
 

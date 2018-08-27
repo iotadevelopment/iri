@@ -1,6 +1,5 @@
 package com.iota.iri.utils.dag;
 
-import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
@@ -52,15 +51,13 @@ public class DAGUtils {
         }
     }
 
-    /**
-     *
-     * @param condition tust
-     * @param currentTransactionConsumer tost
-     */
     public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
                                   TraversalConsumer currentTransactionConsumer) throws Exception {
-        Set<Hash> processedTransactions = new HashSet<>();
+        traverseApprovees(startingTransaction, condition, currentTransactionConsumer, new HashSet<>());
+    }
 
+    public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
+                                  TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
         transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
         transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
