@@ -24,8 +24,11 @@ public class DAGUtils {
 
     public void traverseApprovers(TransactionViewModel startingTransaction, TraversalCondition condition,
                                   TraversalConsumer currentTransactionConsumer) throws Exception {
-        Set<Hash> processedTransactions = new HashSet<>();
+        traverseApprovers(startingTransaction, condition, currentTransactionConsumer, new HashSet<>());
+    }
 
+    public void traverseApprovers(TransactionViewModel startingTransaction, TraversalCondition condition,
+                                  TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
         startingTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> {
             try {

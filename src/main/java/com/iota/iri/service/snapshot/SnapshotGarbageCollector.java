@@ -147,7 +147,7 @@ public class SnapshotGarbageCollector {
                     approvedTransaction -> {
                         elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), CLASS_TRANSACTION));
 
-                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete);
+                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
                     }
                 );
 
@@ -171,7 +171,7 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
-    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, Class<Persistable>>> elementsToDelete) throws Exception {
+    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, Class<Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws Exception {
         // remove all orphaned transactions that are branching off of our deleted transactions
         dagUtils.traverseApprovers(
             transaction,
@@ -180,7 +180,17 @@ public class SnapshotGarbageCollector {
 
             approverTransaction -> {
                 elementsToDelete.add(new Pair<>(approverTransaction.getHash(), CLASS_TRANSACTION));
-            }
+
+                dagUtils.traverseApprovees(
+                    approverTransaction,
+                    approvedTransaction -> !approvedTransaction.isSolid(),
+                    approvedTransaction -> {
+                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, processedTransactions);
+                    }
+                );
+            },
+
+            processedTransactions
         );
     }
 
