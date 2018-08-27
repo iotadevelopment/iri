@@ -181,13 +181,13 @@ public class SnapshotGarbageCollector {
             approverTransaction -> {
                 elementsToDelete.add(new Pair<>(approverTransaction.getHash(), CLASS_TRANSACTION));
 
-                dagUtils.traverseApprovees(
+                /*dagUtils.traverseApprovees(
                     approverTransaction,
                     approvedTransaction -> !approvedTransaction.isSolid(),
                     approvedTransaction -> {
                         cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, processedTransactions);
                     }
-                );
+                );*/
             },
 
             processedTransactions
