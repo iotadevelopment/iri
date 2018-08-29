@@ -117,8 +117,7 @@ public class Transaction implements Persistable {
         return buffer.array();
     }
 
-    @Override
-    public void readMetadata(byte[] bytes) {
+    public void readMetadataOld(byte[] bytes) {
         int i = 0;
         if(bytes != null) {
             address = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
@@ -161,24 +160,85 @@ public class Transaction implements Persistable {
             confirmed = bytes[i] == 1;
             i++;
             */
-
-            // decode the boolean byte by checking the bitmasks
-            solid      = (bytes[i] & IS_SOLID_BITMASK)    != 0;
-            isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
+            solid = bytes[i] == 1;
             i++;
-
-            // restore the milestone related members
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
-            referencedSnapshot = Serializer.getInteger(bytes, i);
-            i += Integer.BYTES;
-
             byte[] senderBytes = new byte[bytes.length - i];
             if (senderBytes.length != 0) {
                 System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
             }
             sender = new String(senderBytes);
             parsed = true;
+        }
+    }
+
+    @Override
+    public void readMetadata(byte[] bytes) {
+        try {
+            int i = 0;
+            if (bytes != null) {
+                address = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                bundle = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                trunk = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                branch = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                obsoleteTag = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                value = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                currentIndex = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                lastIndex = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                timestamp = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+
+                tag = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                i += Hash.SIZE_IN_BYTES;
+                attachmentTimestamp = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                attachmentTimestampLowerBound = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                attachmentTimestampUpperBound = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+
+                validity = Serializer.getInteger(bytes, i);
+                i += Integer.BYTES;
+                type = Serializer.getInteger(bytes, i);
+                i += Integer.BYTES;
+                arrivalTime = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+                height = Serializer.getLong(bytes, i);
+                i += Long.BYTES;
+            /*
+            confirmed = bytes[i] == 1;
+            i++;
+            */
+
+                // decode the boolean byte by checking the bitmasks
+                solid = (bytes[i] & IS_SOLID_BITMASK) != 0;
+                isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
+                i++;
+
+                // restore the milestone related members
+                snapshot = Serializer.getInteger(bytes, i);
+                i += Integer.BYTES;
+                referencedSnapshot = Serializer.getInteger(bytes, i);
+                i += Integer.BYTES;
+
+                byte[] senderBytes = new byte[bytes.length - i];
+                if (senderBytes.length != 0) {
+                    System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
+                }
+                sender = new String(senderBytes);
+                parsed = true;
+            }
+        } catch(Exception e) {
+            readMetadataOld(bytes);
         }
     }
 
