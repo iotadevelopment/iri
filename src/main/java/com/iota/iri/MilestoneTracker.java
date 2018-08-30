@@ -399,6 +399,8 @@ public class MilestoneTracker {
     public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone) throws Exception {
         AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(currentMilestone.index());
 
+        TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash()).setSnapshot(tangle, snapshotManager, 0);
+
         dagUtils.traverseApprovees(
             currentMilestone,
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
