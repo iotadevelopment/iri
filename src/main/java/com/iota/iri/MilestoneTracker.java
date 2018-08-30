@@ -326,6 +326,8 @@ public class MilestoneTracker {
         // reset the ledger state to the initial state
         snapshotManager.resetLatestSnapshot();
 
+        System.out.println("SOFT RESET TO: " + snapshotManager.getLatestSnapshot().getIndex());
+
         // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
         blockingSolidMilestoneTrackerTasks.decrementAndGet();
     }
