@@ -213,6 +213,7 @@ public class API {
                     try {
                         instance.milestoneTracker.hardReset(
                             MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))),
+                            Integer.parseInt(getParameterAsString(request, "transaction")) + 1,
                             "manual reset"
                         );
                     } catch(ValidationException e) {

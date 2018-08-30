@@ -17,6 +17,7 @@ import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
+import com.iota.iri.utils.dag.DAGUtils;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -63,6 +64,7 @@ public class MilestoneTracker {
     private final TransactionRequester transactionRequester;
     private final boolean testnet;
     private final MessageQ messageQ;
+    private final DAGUtils dagUtils;
     private final int numOfKeysInMilestone;
     private final boolean acceptAnyTestnetCoo;
     private final boolean isRescanning;
@@ -89,6 +91,7 @@ public class MilestoneTracker {
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
+        this.dagUtils = DAGUtils.get(tangle, snapshotManager);
 
         //configure
         this.testnet = config.isTestnet();
@@ -337,7 +340,7 @@ public class MilestoneTracker {
      *
      * @param targetMilestone the last correct milestone
      */
-    public void hardReset(MilestoneViewModel targetMilestone, String reason) {
+    public void hardReset(MilestoneViewModel targetMilestone, int highestErroneousSnapshotIndex, String reason) {
         // ignore errors due to old milestones
         if(targetMilestone == null || targetMilestone.index() < snapshotManager.getInitialSnapshot().getIndex()) {
             return;
@@ -354,9 +357,9 @@ public class MilestoneTracker {
         // prune all potentially invalid database fields
         try {
             MilestoneViewModel currentMilestone = targetMilestone;
-            while(currentMilestone != null) {
+            while(currentMilestone != null && currentMilestone.index() <= highestErroneousSnapshotIndex) {
                 // reset the snapshotIndex of the milestone and its referenced approvees + it's StateDiff
-                resetSnapshotIndexOfMilestone(currentMilestone);
+                highestErroneousSnapshotIndex = Math.max(highestErroneousSnapshotIndex, resetSnapshotIndexOfMilestone(currentMilestone));
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
 
                 int currentStep = latestMilestoneIndex - currentMilestone.index() + 2 - hardResetLogger.getStepCount();
@@ -390,36 +393,20 @@ public class MilestoneTracker {
      * @param currentMilestone the milestone that shall have its confirmed transactions reset
      * @throws Exception if something goes wrong while accessing the database
      */
-    public void resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone) throws Exception {
-        // initialize variables used for traversing the graph
-        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash());
-        Set<Hash> seenMilestoneTransactions = new HashSet<>();
-        Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>(Collections.singleton(milestoneTransaction));
+    public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone) throws Exception {
+        AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(currentMilestone.index());
 
-        // iterate through our queue and process all elements (while we iterate we add more)
-        TransactionViewModel currentTransaction;
-        while((currentTransaction = transactionsToExamine.poll()) != null) {
-            if(seenMilestoneTransactions.add(currentTransaction.getHash())) {
-                // reset the snapshotIndex to allow a repair
+        dagUtils.traverseApprovees(
+            currentMilestone,
+            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
+            currentTransaction -> {
+                maxErroneousMilestoneIndex.set(Math.max(maxErroneousMilestoneIndex.get(), currentTransaction.snapshotIndex()));
+
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
-
-                // only examine transactions that still belong to our milestone
-                if(!Hash.NULL_HASH.equals(currentTransaction.getBranchTransactionHash())) {
-                    TransactionViewModel branchTransaction = currentTransaction.getBranchTransaction(tangle, snapshotManager);
-                    if(branchTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && branchTransaction.snapshotIndex() >= currentMilestone.index()) {
-                        transactionsToExamine.add(branchTransaction);
-                    }
-                }
-
-                // only examine transactions that still belong to our milestone
-                if(!Hash.NULL_HASH.equals(currentTransaction.getTrunkTransactionHash())) {
-                    TransactionViewModel trunkTransaction = currentTransaction.getTrunkTransaction(tangle, snapshotManager);
-                    if(trunkTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && trunkTransaction.snapshotIndex() >= currentMilestone.index()) {
-                        transactionsToExamine.add(trunkTransaction);
-                    }
-                }
             }
-        }
+        );
+
+        return maxErroneousMilestoneIndex.get();
     }
 
     public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
@@ -464,7 +451,7 @@ public class MilestoneTracker {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotManager.getLatestSnapshot().getIndex()) {
-                                hardReset(newMilestoneViewModel, "previously unknown milestone (#" + index + ") appeared");
+                                hardReset(newMilestoneViewModel, snapshotManager.getLatestSnapshot().getIndex(), "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {
