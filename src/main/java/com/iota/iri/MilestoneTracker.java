@@ -401,7 +401,7 @@ public class MilestoneTracker {
 
         dagUtils.traverseApprovees(
             currentMilestone,
-            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
+            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
             currentTransaction -> {
                 maxErroneousMilestoneIndex.set(Math.max(maxErroneousMilestoneIndex.get(), currentTransaction.snapshotIndex()));
 
