@@ -484,6 +484,10 @@ public class MilestoneTracker {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
+            if(nextMilestone.index() == 664463 || nextMilestone.index() == 664462  || nextMilestone.index() == 664464) {
+                System.out.println(nextMilestone.index() + " => "  + snapshotManager.getLatestSnapshot().getBalance(new Hash("JRDWYYXTVDETRZEVIKQMWZTECODXFYYYYFPPKWCJDYSMIFCKKPAVZEUXTNSVGDOGXIYTFTXATHBQLJGGC")));
+            }
+
             // if the ledger can get updated
             if(ledgerValidator.updateSnapshot(nextMilestone)) {
                 // update our internal variables
