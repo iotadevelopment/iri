@@ -507,6 +507,7 @@ public class MilestoneTracker {
 
             // otherwise -> try to repair and abort our loop
             else {
+                log.error("error at " + nextMilestone.index());
                 // do a soft reset if we didn't do a hard reset yet
                 if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
                     softReset();
