@@ -84,7 +84,15 @@ public class DAGUtils {
         traverseApprovees(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransactionHash), condition, currentTransactionConsumer);
     }
 
+    public void traverseApprovees(Hash startingTransactionHash, TraversalCondition condition, TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
+        traverseApprovees(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransactionHash), condition, currentTransactionConsumer, processedTransactions);
+    }
+
     public void traverseApprovees(MilestoneViewModel milestoneViewModel, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {
-        traverseApprovees(milestoneViewModel.getHash(), condition, currentTransactionConsumer);
+        traverseApprovees(milestoneViewModel.getHash(), condition, currentTransactionConsumer, new HashSet<Hash>());
+    }
+
+    public void traverseApprovees(MilestoneViewModel milestoneViewModel, TraversalCondition condition, TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
+        traverseApprovees(milestoneViewModel.getHash(), condition, currentTransactionConsumer, processedTransactions);
     }
 }

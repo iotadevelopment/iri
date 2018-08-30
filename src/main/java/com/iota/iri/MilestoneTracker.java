@@ -354,6 +354,8 @@ public class MilestoneTracker {
             "Resetting ledger to milestone " + targetMilestone.index() + " due to \"" + reason + "\"", log
         ).start(latestMilestoneIndex - targetMilestone.index() + 2); // +1 for softReset and +1 for starting milestone
 
+        HashSet<Hash> processedTransactions = new HashSet<>();
+
         // prune all potentially invalid database fields
         try {
             MilestoneViewModel currentMilestone = targetMilestone;
@@ -362,7 +364,7 @@ public class MilestoneTracker {
                 System.out.println("RES: " + currentMilestone.index());
 
                 // reset the snapshotIndex of the milestone and its referenced approvees + it's StateDiff
-                highestErroneousSnapshotIndex = Math.max(highestErroneousSnapshotIndex, resetSnapshotIndexOfMilestone(currentMilestone));
+                highestErroneousSnapshotIndex = Math.max(highestErroneousSnapshotIndex, resetSnapshotIndexOfMilestone(currentMilestone, processedTransactions));
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
 
                 int currentStep = latestMilestoneIndex - currentMilestone.index() + 2 - hardResetLogger.getStepCount();
@@ -396,12 +398,13 @@ public class MilestoneTracker {
      * @param currentMilestone the milestone that shall have its confirmed transactions reset
      * @throws Exception if something goes wrong while accessing the database
      */
-    public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone) throws Exception {
+    public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash());
 
         AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(Math.max(currentMilestone.index(), milestoneTransaction.snapshotIndex()));
 
         milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
+        processedTransactions.add(milestoneTransaction.getHash());
 
         dagUtils.traverseApprovees(
             currentMilestone,
@@ -410,7 +413,8 @@ public class MilestoneTracker {
                 maxErroneousMilestoneIndex.set(Math.max(maxErroneousMilestoneIndex.get(), currentTransaction.snapshotIndex()));
 
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
-            }
+            },
+            processedTransactions
         );
 
         return maxErroneousMilestoneIndex.get();
