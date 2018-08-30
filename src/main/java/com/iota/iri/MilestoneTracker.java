@@ -397,9 +397,11 @@ public class MilestoneTracker {
      * @throws Exception if something goes wrong while accessing the database
      */
     public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone) throws Exception {
-        AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(currentMilestone.index());
+        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash());
 
-        TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash()).setSnapshot(tangle, snapshotManager, 0);
+        AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(Math.max(currentMilestone.index(), milestoneTransaction.snapshotIndex()));
+
+        milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
 
         dagUtils.traverseApprovees(
             currentMilestone,
@@ -486,10 +488,6 @@ public class MilestoneTracker {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
-            if(nextMilestone.index() == 664463 || nextMilestone.index() == 664462  || nextMilestone.index() == 664464) {
-                System.out.println(nextMilestone.index() + " => "  + snapshotManager.getLatestSnapshot().getBalance(new Hash("JRDWYYXTVDETRZEVIKQMWZTECODXFYYYYFPPKWCJDYSMIFCKKPAVZEUXTNSVGDOGXIYTFTXATHBQLJGGC")));
-            }
-
             // if the ledger can get updated
             if(ledgerValidator.updateSnapshot(nextMilestone)) {
                 // update our internal variables
