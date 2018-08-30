@@ -358,6 +358,9 @@ public class MilestoneTracker {
         try {
             MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null && currentMilestone.index() <= highestErroneousSnapshotIndex) {
+
+                System.out.println("RES: " + currentMilestone.index());
+
                 // reset the snapshotIndex of the milestone and its referenced approvees + it's StateDiff
                 highestErroneousSnapshotIndex = Math.max(highestErroneousSnapshotIndex, resetSnapshotIndexOfMilestone(currentMilestone));
                 tangle.delete(StateDiff.class, currentMilestone.getHash());
