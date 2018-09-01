@@ -510,7 +510,7 @@ public class SnapshotManager {
     String lastLogMessage;
 
     public void dumpLogMessage(String job, String task, int currentStep, int maxSteps) {
-        String logMessage = job + " [" + task + "]: " + (int) (((double) currentStep / (double) maxSteps) * 100) + "%";
+        String logMessage = job + " [" + task + "]: " + (int) (((double) currentStep / (double) maxSteps) * 100) + "% ...";
 
         if(!logMessage.equals(lastLogMessage) && (System.currentTimeMillis() - lastDumpTime >= 5000 || currentStep == 1 || currentStep == maxSteps)) {
             log.info(logMessage);

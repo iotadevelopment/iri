@@ -66,7 +66,7 @@ public class ProgressLogger {
             currentStep == stepCount                                           // always dump when finished
         ) {
             double progress = ((double) currentStep / (double) stepCount) * 100d;
-            String logMessage = taskName + ": " + new DecimalFormat("0.00").format(progress) + "% done ...";
+            String logMessage = taskName + ": " + new DecimalFormat("0.00").format(progress) + "% ..." + (currentStep == stepCount ? " [DONE]" : "");
 
             // only log when the message changes
             if (!lastLogMessage.equals(logMessage)) {
@@ -104,7 +104,7 @@ public class ProgressLogger {
 
     public ProgressLogger abort(Exception e) {
         double progress = (double) currentStep / (double) stepCount * 100;
-        String logMessage = taskName + ": " + new DecimalFormat("#.00").format(progress) + "% done ... [FAILED]";
+        String logMessage = taskName + ": " + new DecimalFormat("#.00").format(progress) + "% ... [FAILED]";
 
         logger.error(logMessage, e);
 
