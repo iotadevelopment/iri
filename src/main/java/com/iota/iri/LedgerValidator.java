@@ -242,7 +242,7 @@ public class LedgerValidator {
                         SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff());
 
                         if (snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent()) {
-                            snapshotManager.getLatestSnapshot().update(snapshotStateDiff, candidateMilestone.index());
+                            snapshotManager.getLatestSnapshot().update(snapshotStateDiff, candidateMilestone.index(), candidateMilestone.getHash());
                             consistentMilestone = candidateMilestone;
                         } else {
                             break;
@@ -286,7 +286,7 @@ public class LedgerValidator {
                         if(currentState.size() != 0) {
                             stateDiffViewModel.store(tangle);
                         }
-                        snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index());
+                        snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestoneVM.index(), milestoneVM.getHash());
                     }
                 }
             } finally {

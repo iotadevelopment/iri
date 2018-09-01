@@ -479,13 +479,11 @@ public class MilestoneTracker {
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // introduce some variables that help us to emit log messages while processing the milestones
-        int previousSolidSubtangleLatestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-        long scanStart = System.currentTimeMillis();
+        int prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+        long lastScan = System.currentTimeMillis();
 
         // get the next milestone
-        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-            tangle, previousSolidSubtangleLatestMilestoneIndex
-        );
+        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
 
         // while we have a milestone which is solid
         while(
@@ -494,49 +492,24 @@ public class MilestoneTracker {
             nextMilestone != null &&
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
-            // if the ledger can get updated
-            if(ledgerValidator.updateSnapshot(nextMilestone)) {
-                // update our internal variables
-                snapshotManager.getLatestSnapshot().getMetaData().setHash(nextMilestone.getHash());
-                snapshotManager.getLatestSnapshot().getMetaData().setIndex(nextMilestone.index());
+            // advance to the next milestone if we were able to update the ledger state
+            nextMilestone = ledgerValidator.updateSnapshot(nextMilestone)
+                          ? MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex())
+                          : null;
 
-                // dump a log message every 5 seconds
-                if(System.currentTimeMillis() - scanStart >= STATUS_LOG_INTERVAL) {
-                    messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, nextMilestone.index());
-                    messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
-                    log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                             + previousSolidSubtangleLatestMilestoneIndex + " to #"
-                             + nextMilestone.index());
+            // dump a log message in intervals and when we terminate
+            if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
+                System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
+            )) {
+                messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
+                messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
+                log.info("Latest SOLID SUBTANGLE milestone has changed from #"
+                        + prevSolidMilestoneIndex + " to #"
+                        + snapshotManager.getLatestSnapshot().getIndex());
 
-                    scanStart = System.currentTimeMillis();
-                    previousSolidSubtangleLatestMilestoneIndex = nextMilestone.index();
-                }
-
-                // iterate to the next milestone
-                nextMilestone = MilestoneViewModel.findClosestNextMilestone(
-                    tangle, snapshotManager.getLatestSnapshot().getIndex()
-                );
+                lastScan = System.currentTimeMillis();
+                prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
             }
-
-            // otherwise -> try to repair and abort our loop
-            else {
-                log.error("error at " + nextMilestone.index());
-                // do a soft reset if we didn't do a hard reset yet
-                if(snapshotManager.getLatestSnapshot().getIndex() != snapshotManager.getInitialSnapshot().getIndex()) {
-                    softReset();
-                }
-
-                nextMilestone = null;
-            }
-        }
-
-        // dump a log message when we finish
-        if(previousSolidSubtangleLatestMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex()) {
-            messageQ.publish("lmsi %d %d", previousSolidSubtangleLatestMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
-            messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
-            log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                     + previousSolidSubtangleLatestMilestoneIndex + " to #"
-                     + snapshotManager.getLatestSnapshot().getIndex());
         }
     }
 

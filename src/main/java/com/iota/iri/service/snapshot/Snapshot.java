@@ -172,7 +172,7 @@ public class Snapshot {
      * @param diff change in the balances
      * @param newIndex new milestone index
      */
-    public void update(SnapshotStateDiff diff, int newIndex) {
+    public void update(SnapshotStateDiff diff, int newIndex, Hash newTransactionHash) {
         // check the diff before we apply the update
         if(!diff.isConsistent()) {
             throw new IllegalStateException("the snapshot state diff is not consistent");
@@ -235,7 +235,7 @@ public class Snapshot {
      * @param hash address that we want to check
      * @return the balance of the given address
      */
-    public Long getBalance(Hash hash) {
+    public long getBalance(Hash hash) {
         return state.getBalance(hash);
     }
 

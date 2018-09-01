@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 public class SnapshotTest {
@@ -29,6 +30,65 @@ public class SnapshotTest {
         } catch (IOException e) {
             throw new UncheckedIOException("Problem initiating snapshot", e);
         }
+    }
+
+    @Test
+    public void cloneTest() {
+        Hash addressWithBalance1 = Hash.NULL_HASH;
+        Hash addressWithBalance2 = new Hash("JRDWYYXTVDETRZEVIKQMWZTECODXFYYYYFPPKWCJDYSMIFCKKPAVZEUXTNSVGDOGXIYTFTXATHBQLJGGC");
+
+        HashMap<Hash, Long> originalBalances = new HashMap<>();
+        originalBalances.put(addressWithBalance1, 1337L);
+        originalBalances.put(addressWithBalance2, 31337L);
+
+        Hash solidEntryPoint1Address = new Hash("SYHFAJFCXSEGCIYFNQQEBUSPGYRPQUWLXQKPDYESIZFSEZPJRHZPZHYKFSDTZSVB9ZB9SRDNIOYQ99999");
+        Hash solidEntryPoint2Address = new Hash("HFJDRRJLSHNWZSDWGMQCWTRKHEX9BRIOTCBSKVFDMPRLNPKFHCTXLNBCFYVNIYYKKQMOFIIELBDC99999");
+
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(solidEntryPoint1Address, 1);
+        solidEntryPoints.put(solidEntryPoint2Address, 2);
+
+        Hash seenMilestoneTransactionHash1 = new Hash("OBWNKDXYWLWEAPYKHMBFPAYHLKUAHZFR9WDZJOLDKDOXIDTLFCWLAVCNTAZBCMUQRSHSPLNNVZLJA9999");
+        Hash seenMilestoneTransactionHash2 = new Hash("GSIWHLPOFYWBQLICTAWAAAJ9JOA9NYTPX9DWLZSWRAMQPZJLFZITXTQTNZYOWJTKOVGDLAOQNDUDA9999");
+
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+        seenMilestones.put(seenMilestoneTransactionHash1, 3);
+        seenMilestones.put(seenMilestoneTransactionHash2, 4);
+
+        SnapshotState originalSnapshotState = new SnapshotState(originalBalances);
+        int originalSnapshotIndex = 12;
+        long originalSnapshotTimestamp = System.currentTimeMillis() / 1000L;
+
+        Hash originalSnapshotHash = new Hash("FZLZCSBEXOG9ADBVFYFTBHKIZROJUENNOASNPEXEIBDZ9U9SFZJDKHFJ9BVJUZW9RXBNLJWHH9AL99999");
+
+        Snapshot originalSnapshot = new Snapshot(
+            originalSnapshotState,
+            new SnapshotMetaData(
+                originalSnapshotHash,
+                originalSnapshotIndex,
+                originalSnapshotTimestamp,
+                solidEntryPoints,
+                seenMilestones
+            )
+        );
+
+        Snapshot clonedSnapshot = originalSnapshot.clone();
+
+        // modify all original values //////////////////////////////////////////////////////////////////////////////////
+
+        HashMap<Hash, Long> balanceChanges = new HashMap<>();
+        balanceChanges.put(addressWithBalance1, -1000L);
+        balanceChanges.put(addressWithBalance2, 1000L);
+        originalSnapshot.update(new SnapshotStateDiff(balanceChanges), 8, Hash.NULL_HASH);
+        originalSnapshot.getMetaData().setTimestamp(originalSnapshotTimestamp + 10);
+
+        // check if the cloned values are still the unmodified original values /////////////////////////////////////////
+
+        assertEquals(clonedSnapshot.getIndex(), originalSnapshotIndex);
+        assertEquals(clonedSnapshot.getHash(), originalSnapshotHash);
+        assertEquals(clonedSnapshot.getTimestamp(), originalSnapshotTimestamp);
+        assertEquals(clonedSnapshot.getBalance(addressWithBalance1), 1337L);
+        assertEquals(clonedSnapshot.getBalance(addressWithBalance2), 31337L);
     }
 
     @Test

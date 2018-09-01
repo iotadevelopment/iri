@@ -54,11 +54,17 @@ public class DAGUtils {
         }
     }
 
-    public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
-                                  TraversalConsumer currentTransactionConsumer) throws Exception {
-        traverseApprovees(startingTransaction, condition, currentTransactionConsumer, new HashSet<>());
-    }
-
+    /**
+     * This method offers a generic way of traversing the DAG in a depth first way towards the approvees.
+     *
+     *
+     *
+     * @param startingTransaction the starting point of the traversal
+     * @param condition lambda expression that is used to check when to abort the traversal
+     * @param currentTransactionConsumer lambda expression that is used to process the visited transactions
+     * @param processedTransactions
+     * @throws Exception
+     */
     public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
                                   TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
@@ -78,6 +84,11 @@ public class DAGUtils {
                 transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, currentTransaction.getTrunkTransactionHash()));
             }
         }
+    }
+
+    public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
+                                  TraversalConsumer currentTransactionConsumer) throws Exception {
+        traverseApprovees(startingTransaction, condition, currentTransactionConsumer, new HashSet<>());
     }
 
     public void traverseApprovees(Hash startingTransactionHash, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {

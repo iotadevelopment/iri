@@ -192,7 +192,8 @@ public class SnapshotManager {
             // apply the balance changes to the snapshot
             snapshot.update(
                 snapshotStateDiff,
-                currentMilestone.index()
+                currentMilestone.index(),
+                currentMilestone.getHash()
             );
 
             // this should never happen since we check the snapshots already when applying them but better give
