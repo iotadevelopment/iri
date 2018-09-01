@@ -286,7 +286,7 @@ public class SnapshotManager {
         }
 
         // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "1/2 calculating new snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
+        dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
 
         // iterate through the milestones to our target
         while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index() : currentMilestone.index() > targetMilestone.index()) {
@@ -310,7 +310,7 @@ public class SnapshotManager {
             currentMilestone = nextMilestone;
 
             // dump a progress message after every step
-            dumpLogMessage("Taking local snapshot", "1/2 calculating new snapshot state", ++stepCounter, amountOfMilestonesToProcess);
+            dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", ++stepCounter, amountOfMilestonesToProcess);
         }
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,7 +334,7 @@ public class SnapshotManager {
         final int OUTER_SHELL_SIZE = 50;
 
         // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", stepCounter = 0, amountOfMilestonesToProcess = Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshotIndex));
+        dumpLogMessage("Taking local snapshot", "2/3 preparing old transactions for pruning", stepCounter = 0, amountOfMilestonesToProcess = Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshotIndex));
 
         // iterate down through the tangle in "steps" (one milestone at a time) so the data structures don't get too big
         currentMilestone = targetMilestone;
@@ -415,7 +415,7 @@ public class SnapshotManager {
             }
 
             // dump the progress after every step
-            dumpLogMessage("Taking local snapshot", "2/2 preparing old transactions for pruning", ++stepCounter, amountOfMilestonesToProcess);
+            dumpLogMessage("Taking local snapshot", "2/3 preparing old transactions for pruning", ++stepCounter, amountOfMilestonesToProcess);
         }
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////

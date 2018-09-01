@@ -161,8 +161,6 @@ public class SnapshotGarbageCollector {
                 tipsViewModel.removeTipHash(milestoneViewModel.getHash());
 
                 tangle.deleteBatch(elementsToDelete);
-
-                System.out.println("MI: " + milestoneIndex + " / " + elementsToDelete.size());
             }
         } catch(Exception e) {
             throw new SnapshotException("failed to cleanup milestone #" + milestoneIndex, e);
