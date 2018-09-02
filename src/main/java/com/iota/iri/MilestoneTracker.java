@@ -220,22 +220,41 @@ public class MilestoneTracker {
                 });
 
                 // solidify known milestones
-                unsolidMilestones.forEach((milestoneHash, milestoneIndex) -> {
-                    try {
+                try {
+                    int milestonesProcessed = 0;
+                    int earliestMilestoneIndex = Integer.MAX_VALUE;
+                    Hash earlistMilestoneHash = null;
+
+                    for (Map.Entry<Hash, Integer> entry : unsolidMilestones.entrySet()) {
                         // remove old milestones that are not relevant anymore
-                        if(milestoneIndex <= snapshotManager.getLatestSnapshot().getIndex()) {
-                            unsolidMilestones.remove(milestoneHash);
+                        if(entry.getValue() <= snapshotManager.getLatestSnapshot().getIndex()) {
+                            unsolidMilestones.remove(entry.getKey());
                         }
 
                         // check milestones that are within our check range
-                        else if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
+                        else if(entry.getValue() < snapshotManager.getLatestSnapshot().getIndex() + 50) {
+                            milestonesProcessed++;
+
                             // remove milestones that have become solid
-                            if(transactionValidator.checkSolidity(milestoneHash, true)) {
-                                unsolidMilestones.remove(milestoneHash);
+                            if(transactionValidator.checkSolidity(entry.getKey(), true)) {
+                                unsolidMilestones.remove(entry.getKey());
                             }
                         }
-                    } catch(Exception e) { /* do nothing */ }
-                });
+
+                        // keep track of the earliest milestone that was not processed
+                        else if(entry.getValue() < earliestMilestoneIndex) {
+                            earliestMilestoneIndex = entry.getValue();
+                            earlistMilestoneHash = entry.getKey();
+                        }
+                    }
+
+                    // if we didnt process a single milestone but we have an unprocessed one -> try to solidify
+                    if(milestonesProcessed == 0 && earlistMilestoneHash != null) {
+                        if(transactionValidator.checkSolidity(earlistMilestoneHash, true)) {
+                            unsolidMilestones.remove(earlistMilestoneHash);
+                        }
+                    }
+                } catch(Exception e) { /* do nothing */ }
 
                 try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
             }
@@ -484,8 +503,6 @@ public class MilestoneTracker {
 
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
-
-        System.out.println(".");
 
         // while we have a milestone which is solid
         while(
