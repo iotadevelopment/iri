@@ -493,7 +493,7 @@ public class MilestoneTracker {
             transactionValidator.checkSolidity(nextMilestone.getHash(), true)
         ) {
             // advance to the next milestone if we were able to update the ledger state
-            nextMilestone = ledgerValidator.updateSnapshot(nextMilestone)
+            nextMilestone = ledgerValidator.applyMilestoneToLedger(nextMilestone)
                           ? MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex())
                           : null;
 
