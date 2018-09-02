@@ -235,7 +235,7 @@ public class MilestoneTracker {
                         else if(entry.getValue() < snapshotManager.getLatestSnapshot().getIndex() + 50) {
                             milestonesProcessed++;
 
-                            System.out.println("Trying to solidify: " + entry.getKey().toString());
+                            System.out.println("Trying to solidify: " + entry.getKey().toString() + " / " + entry.getValue());
 
                             // remove milestones that have become solid
                             if(transactionValidator.checkSolidity(entry.getKey(), true)) {
@@ -252,7 +252,7 @@ public class MilestoneTracker {
 
                     // if we didnt process a single milestone but we have an unprocessed one -> try to solidify
                     if(milestonesProcessed == 0 && earlistMilestoneHash != null) {
-                        System.out.println("Trying to solidify: " + earlistMilestoneHash.toString());
+                        System.out.println("Trying to solidify: " + earlistMilestoneHash.toString() + " / " + earliestMilestoneIndex);
                         if(transactionValidator.checkSolidity(earlistMilestoneHash, true)) {
                             unsolidMilestones.remove(earlistMilestoneHash);
                         }
