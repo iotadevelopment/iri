@@ -485,12 +485,13 @@ public class MilestoneTracker {
         // get the next milestone
         MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
 
+        System.out.println(".");
+
         // while we have a milestone which is solid
         while(
             blockingSolidMilestoneTrackerTasks.get() == 0 &&
             !shuttingDown &&
-            nextMilestone != null &&
-            transactionValidator.checkSolidity(nextMilestone.getHash(), true)
+            nextMilestone != null
         ) {
             // advance to the next milestone if we were able to update the ledger state
             nextMilestone = ledgerValidator.applyMilestoneToLedger(nextMilestone)

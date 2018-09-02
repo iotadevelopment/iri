@@ -167,26 +167,6 @@ public class LedgerValidator {
     }
 
     /**
-     * Descends through transactions, trunk and branch, beginning at {tip}, until it reaches a transaction marked as
-     * confirmed, or until it reaches a transaction that has already been added to the transient consistent set.
-     * @param tip
-     * @throws Exception
-     */
-    private void updateConsistentHashes(final Set<Hash> visitedHashes, Hash tip, int index) throws Exception {
-        final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
-        Hash hashPointer;
-        while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
-            final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
-            if((transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) ) {
-                if(visitedHashes.add(hashPointer)) {
-                    nonAnalyzedTransactions.offer(transactionViewModel2.getTrunkTransactionHash());
-                    nonAnalyzedTransactions.offer(transactionViewModel2.getBranchTransactionHash());
-                }
-            }
-        }
-    }
-
-    /**
      * Initializes the LedgerValidator. This updates the latest milestone and solid subtangle milestone, and then
      * builds up the confirmed until it reaches the latest consistent confirmed. If any inconsistencies are detected,
      * perhaps by database corruption, it will delete the milestone confirmed and all that follow.
@@ -195,10 +175,10 @@ public class LedgerValidator {
      * @throws Exception
      */
     protected void init() throws Exception {
-        MilestoneViewModel latestConsistentMilestone = buildSnapshot();
-        if(latestConsistentMilestone != null) {
-            log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
-        }
+        //MilestoneViewModel latestConsistentMilestone = buildSnapshot();
+        //if(latestConsistentMilestone != null) {
+        //    log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
+        //}
     }
 
     /**
@@ -313,9 +293,9 @@ public class LedgerValidator {
                     successfullyProcessed = snapshotManager.getLatestSnapshot().getState().patchedState(new SnapshotStateDiff(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
-                        StateDiffViewModel stateDiffViewModel = new StateDiffViewModel(balanceChanges, milestoneVM.getHash());
+
                         if(balanceChanges.size() != 0) {
-                            stateDiffViewModel.store(tangle);
+                            new StateDiffViewModel(balanceChanges, milestoneVM.getHash()).store(tangle);
                         }
                     }
                 }
