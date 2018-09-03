@@ -45,7 +45,7 @@ public class SnapshotManager {
 
     private boolean shuttingDown;
 
-    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 100;
+    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
 
     private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
 
@@ -332,7 +332,7 @@ public class SnapshotManager {
             }
         });
 
-        final int OUTER_SHELL_SIZE = 50;
+        final int OUTER_SHELL_SIZE = 500;
 
         // dump a progress message before we start
         dumpLogMessage("Taking local snapshot", "2/3 processing old transactions", stepCounter = 0, amountOfMilestonesToProcess = Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshotIndex));
