@@ -15,6 +15,7 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGUtils;
@@ -31,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import static com.iota.iri.MilestoneTracker.Validity.*;
+import static java.util.Comparator.comparingDouble;
 
 public class MilestoneTracker {
     /**
@@ -75,9 +77,10 @@ public class MilestoneTracker {
     public int latestMilestoneIndex;
 
     private final Set<Hash> analyzedMilestoneCandidates = new HashSet<>();
-    private final ConcurrentHashMap<Hash, Integer> unsolidMilestones = new ConcurrentHashMap<>();
 
     private boolean shuttingDown;
+
+    private MilestoneSolidifier milestoneSolidifier;
 
     public MilestoneTracker(Tangle tangle,
                      SnapshotManager snapshotManager,
@@ -91,6 +94,7 @@ public class MilestoneTracker {
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
+        this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator);
         this.dagUtils = DAGUtils.get(tangle, snapshotManager);
 
         //configure
@@ -111,6 +115,8 @@ public class MilestoneTracker {
         if(isRescanning) {
             blockingSolidMilestoneTrackerTasks.incrementAndGet();
         }
+
+        milestoneSolidifier.start();
 
         // start the threads
         spawnLatestMilestoneTracker();
@@ -219,46 +225,6 @@ public class MilestoneTracker {
                     } catch(Exception e) { /* do nothing */ }
                 });
 
-                // solidify known milestones
-                try {
-                    int milestonesProcessed = 0;
-                    int earliestMilestoneIndex = Integer.MAX_VALUE;
-                    Hash earlistMilestoneHash = null;
-
-                    for (Map.Entry<Hash, Integer> entry : unsolidMilestones.entrySet()) {
-                        // remove old milestones that are not relevant anymore
-                        if(entry.getValue() <= snapshotManager.getLatestSnapshot().getIndex()) {
-                            unsolidMilestones.remove(entry.getKey());
-                        }
-
-                        // check milestones that are within our check range
-                        else if(entry.getValue() < snapshotManager.getLatestSnapshot().getIndex() + 50) {
-                            milestonesProcessed++;
-
-                            System.out.println("Trying to solidify: " + entry.getKey().toString() + " / " + entry.getValue());
-
-                            // remove milestones that have become solid
-                            if(transactionValidator.checkSolidity(entry.getKey(), true)) {
-                                unsolidMilestones.remove(entry.getKey());
-                            }
-                        }
-
-                        // keep track of the earliest milestone that was not processed
-                        else if(entry.getValue() < earliestMilestoneIndex) {
-                            earliestMilestoneIndex = entry.getValue();
-                            earlistMilestoneHash = entry.getKey();
-                        }
-                    }
-
-                    // if we didnt process a single milestone but we have an unprocessed one -> try to solidify
-                    if(milestonesProcessed == 0 && earlistMilestoneHash != null) {
-                        System.out.println("Trying to solidify: " + earlistMilestoneHash.toString() + " / " + earliestMilestoneIndex);
-                        if(transactionValidator.checkSolidity(earlistMilestoneHash, true)) {
-                            unsolidMilestones.remove(earlistMilestoneHash);
-                        }
-                    }
-                } catch(Exception e) { /* do nothing */ }
-
                 try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
             }
         }, "Milestone Solidifier").start();
@@ -312,8 +278,8 @@ public class MilestoneTracker {
                         latestMilestoneIndex = milestoneIndex;
                     }
 
-                    if(!potentialMilestoneTransaction.isSolid() && milestoneIndex >= snapshotManager.getLatestSnapshot().getIndex()) {
-                        unsolidMilestones.put(potentialMilestoneTransaction.getHash(), milestoneIndex);
+                    if(!potentialMilestoneTransaction.isSolid()) {
+                        milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     }
 
                     potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
@@ -321,10 +287,7 @@ public class MilestoneTracker {
                     return VALID;
 
                 case INCOMPLETE:
-                    // issue a solidity check to solidify incomplete milestones
-                    if(milestoneIndex >= snapshotManager.getLatestSnapshot().getIndex()) {
-                        unsolidMilestones.put(potentialMilestoneTransaction.getHash(), milestoneIndex);
-                    }
+                    milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
 
                     potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
 
