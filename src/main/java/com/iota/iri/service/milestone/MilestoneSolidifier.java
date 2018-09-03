@@ -7,6 +7,7 @@ import com.iota.iri.service.snapshot.SnapshotManager;
 import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Comparator.comparingDouble;
@@ -30,13 +31,17 @@ public class MilestoneSolidifier {
     }
 
     public Map.Entry<Hash, Integer> getEarliestUnsolidMilestoneEntry() {
-        if(unsolidMilestones.size() == 0) {
-            return new AbstractMap.SimpleEntry<>(null, Integer.MAX_VALUE);
-        } else {
+        try {
             return Collections.min(unsolidMilestones.entrySet(), comparingDouble(Map.Entry::getValue));
+        } catch (NoSuchElementException e) {
+            return new AbstractMap.SimpleEntry<>(null, Integer.MAX_VALUE);
         }
     }
 
+    /**
+     * This method discards the current earliest milestone and advances to the next one.
+     *
+     */
     public void nextEarliestMilestone() {
         unsolidMilestones.remove(earliestMilestoneHash);
 
