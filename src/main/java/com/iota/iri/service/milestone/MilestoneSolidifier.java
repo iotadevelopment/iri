@@ -82,6 +82,10 @@ public class MilestoneSolidifier {
         }, "Milestone Solidifier").start();
     }
 
+    public void shutdown() {
+        running = false;
+    }
+
     public MilestoneSolidifier add(Hash milestoneHash, int milestoneIndex) {
         if(milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()) {
             if(milestoneIndex < earliestMilestoneIndex) {

@@ -503,6 +503,8 @@ public class MilestoneTracker {
 
     void shutDown() {
         shuttingDown = true;
+
+        milestoneSolidifier.shutdown();
     }
 
     public void reportToSlack(final int milestoneIndex, final int depth, final int nextDepth) {
