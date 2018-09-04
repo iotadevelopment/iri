@@ -104,6 +104,7 @@ public class Node {
         parseNeighborsConfig();
 
         executor.submit(spawnBroadcasterThread());
+        executor.submit(spawnRequesterThread());
         executor.submit(spawnTipRequesterThread());
         executor.submit(spawnNeighborDNSRefresherThread());
         executor.submit(spawnProcessReceivedThread());
@@ -474,6 +475,36 @@ public class Node {
         }
 
         sendPacketsCounter.getAndIncrement();
+    }
+
+    private Runnable spawnRequesterThread() {
+        return () -> {
+
+            log.info("Spawning Requester Thread");
+
+            while (!shuttingDown.get()) {
+
+                try {
+                    if(transactionRequester.numberOfTransactionsToRequest() > 50) {
+                        final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, getRandomTipPointer());
+                        if (transactionViewModel != null) {
+
+                            for (final Neighbor neighbor : neighbors) {
+                                try {
+                                    sendPacket(sendingPacket, transactionViewModel, neighbor);
+                                } catch (final Exception e) {
+                                    // ignore
+                                }
+                            }
+                        }
+                    }
+                    Thread.sleep(100);
+                } catch (final Exception e) {
+                    log.error("Requester Thread Exception:", e);
+                }
+            }
+            log.info("Shutting down Requester Thread");
+        };
     }
 
     private Runnable spawnBroadcasterThread() {
