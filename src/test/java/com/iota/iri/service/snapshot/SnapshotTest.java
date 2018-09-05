@@ -35,6 +35,7 @@ public class SnapshotTest {
         dbFolder.create();
         logFolder.create();
 
+        tangle = new Tangle();
         tangle.addPersistenceProvider(
             new RocksDBPersistenceProvider(
                 dbFolder.getRoot().getAbsolutePath(),
