@@ -292,6 +292,7 @@ public class Snapshot {
                 }
 
                 System.out.println("ROLLED BACK TO MILESTONE " + getIndex());
+                System.out.println(currentPatch.low.diff);
             } catch (Exception e) {
                 throw new SnapshotException("failed to completely roll back the state of the ledger", e);
             } finally {

@@ -5,9 +5,12 @@ import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,17 +22,44 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 public class SnapshotTest {
+    private static final TemporaryFolder dbFolder = new TemporaryFolder();
+
+    private static final TemporaryFolder logFolder = new TemporaryFolder();
+
     private static Snapshot initSnapshot;
 
+    private static Tangle tangle;
+
     @BeforeClass
-    public static void beforeClass() {
-        try {
-            IotaConfig config = new MainnetConfig();
-            SnapshotManager snapshotManager = new SnapshotManager(new Tangle(), new TipsViewModel(), config);
-            initSnapshot = snapshotManager.getInitialSnapshot();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Problem initiating snapshot", e);
-        }
+    public static void setup() throws Exception {
+        tangle.addPersistenceProvider(
+            new RocksDBPersistenceProvider(
+                dbFolder.getRoot().getAbsolutePath(),
+                logFolder.getRoot().getAbsolutePath(),
+                1000
+            )
+        );
+        tangle.init();
+
+        IotaConfig config = new MainnetConfig();
+        SnapshotManager snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), config);
+        initSnapshot = snapshotManager.getInitialSnapshot();
+    }
+
+    @AfterClass
+    public static void tearDown() throws Exception {
+        tangle.shutdown();
+        dbFolder.delete();
+        logFolder.delete();
+    }
+
+    @Test
+    public void rollBackMilestonesTest() {
+        //Snapshot exampleSnapshot = new Snapshot()
+    }
+
+    private SnapshotState generateSnapshotState() {
+        return null;
     }
 
     @Test
