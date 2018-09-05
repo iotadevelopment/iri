@@ -82,7 +82,7 @@ public class TipSelectorImpl implements TipSelector {
 
             //random walk
             List<Hash> tips = new LinkedList<>();
-            WalkValidator walkValidator = new WalkValidatorImpl(tangle, snapshotManager, ledgerValidator, milestone, config);
+            WalkValidator walkValidator = new WalkValidatorImpl(tangle, snapshotManager, ledgerValidator, config);
             Hash tip = walker.walk(entryPoint, rating, walkValidator);
             tips.add(tip);
 

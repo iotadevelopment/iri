@@ -63,7 +63,7 @@ public class Iota {
         replicator = new Replicator(node, configuration);
         udpReceiver = new UDPReceiver(node, configuration);
         ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestoneTracker, transactionRequester, messageQ);
-        tipsSolidifier = new TipsSolidifier(tangle, snapshotManager, transactionValidator, tipsViewModel);
+        tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(configuration);
     }
 
@@ -151,7 +151,7 @@ public class Iota {
     private TipSelector createTipSelector(TipSelConfig config) {
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestoneTracker, config);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
-        TailFinder tailFinder = new TailFinderImpl(tangle, snapshotManager);
+        TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
         return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, entryPointSelector, ratingCalculator,
                 walker, milestoneTracker, config);

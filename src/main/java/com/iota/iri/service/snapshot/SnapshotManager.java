@@ -346,7 +346,7 @@ public class SnapshotManager {
             // retrieve the transaction belonging to our current milestone
             TransactionViewModel milestoneTransaction;
             try {
-                milestoneTransaction = TransactionViewModel.fromHash(tangle, this, currentMilestone.getHash());
+                milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
             } catch(Exception e) {
                 throw new SnapshotException("could not retrieve the transaction belonging to " + currentMilestone.toString(), e);
             }
@@ -373,7 +373,7 @@ public class SnapshotManager {
                         // retrieve the branch transaction of our current transaction
                         TransactionViewModel branchTransaction;
                         try {
-                            branchTransaction = currentTransaction.getBranchTransaction(tangle, this);
+                            branchTransaction = currentTransaction.getBranchTransaction(tangle);
                         } catch(Exception e) {
                             throw new SnapshotException("could not retrieve the branch transaction of " + currentTransaction.toString(), e);
                         }
@@ -392,7 +392,7 @@ public class SnapshotManager {
                         // retrieve the trunk transaction of our current transaction
                         TransactionViewModel trunkTransaction;
                         try {
-                            trunkTransaction = currentTransaction.getTrunkTransaction(tangle, this);
+                            trunkTransaction = currentTransaction.getTrunkTransaction(tangle);
                         } catch(Exception e) {
                             throw new SnapshotException("could not retrieve the trunk transaction of " + currentTransaction.toString(), e);
                         }
@@ -447,7 +447,7 @@ public class SnapshotManager {
         // retrieve the transaction belonging to our targetMilestone
         TransactionViewModel targetMilestoneTransaction;
         try {
-            targetMilestoneTransaction = TransactionViewModel.fromHash(tangle, this, targetMilestone.getHash());
+            targetMilestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
         } catch(Exception e) {
             throw new SnapshotException("could not retrieve the transaction belonging to " + targetMilestone.toString(), e);
         }
@@ -490,7 +490,7 @@ public class SnapshotManager {
                 // retrieve the transaction belonging to our approver hash
                 TransactionViewModel approverTransaction;
                 try {
-                    approverTransaction = TransactionViewModel.fromHash(tangle, this, approverHash);
+                    approverTransaction = TransactionViewModel.fromHash(tangle, approverHash);
                 } catch(Exception e) {
                     throw new SnapshotException("could not retrieve the transaction belonging to hash " + approverHash.toString(), e);
                 }

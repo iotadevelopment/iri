@@ -26,7 +26,7 @@ public class TailFinderImplTest {
     private TailFinderImpl tailFinder;
 
     public TailFinderImplTest() {
-        tailFinder = new TailFinderImpl(tangle, snapshotManager);
+        tailFinder = new TailFinderImpl(tangle);
     }
 
     @AfterClass

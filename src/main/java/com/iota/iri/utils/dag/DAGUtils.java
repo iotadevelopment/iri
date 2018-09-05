@@ -3,7 +3,6 @@ package com.iota.iri.utils.dag;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 
 import java.util.*;
@@ -11,15 +10,12 @@ import java.util.*;
 public class DAGUtils {
     protected Tangle tangle;
 
-    protected SnapshotManager snapshotManager;
-
-    public static DAGUtils get(Tangle tangle, SnapshotManager snapshotManager) {
-        return new DAGUtils(tangle, snapshotManager);
+    public static DAGUtils get(Tangle tangle) {
+        return new DAGUtils(tangle);
     }
 
-    public DAGUtils(Tangle tangle, SnapshotManager snapshotManager) {
+    public DAGUtils(Tangle tangle) {
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
     }
 
     public void traverseApprovers(TransactionViewModel startingTransaction, TraversalCondition condition,
@@ -32,7 +28,7 @@ public class DAGUtils {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
         startingTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> {
             try {
-                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, approverHash));
+                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, approverHash));
             } catch(Exception e) { /* do nothing - just ignore the tx */ }
         });
 
@@ -47,7 +43,7 @@ public class DAGUtils {
 
                 currentTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> {
                     try {
-                        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, approverHash));
+                        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, approverHash));
                     } catch(Exception e) { /* do nothing - just ignore the tx */ }
                 });
             }
@@ -68,8 +64,8 @@ public class DAGUtils {
     public void traverseApprovees(TransactionViewModel startingTransaction, TraversalCondition condition,
                                   TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
-        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
-        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransaction.getBranchTransactionHash()));
+        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, startingTransaction.getBranchTransactionHash()));
+        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, startingTransaction.getBranchTransactionHash()));
 
         TransactionViewModel currentTransaction;
         while((currentTransaction = transactionsToExamine.poll()) != null) {
@@ -80,8 +76,8 @@ public class DAGUtils {
             ) {
                 currentTransactionConsumer.consume(currentTransaction);
 
-                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, currentTransaction.getBranchTransactionHash()));
-                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, snapshotManager, currentTransaction.getTrunkTransactionHash()));
+                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, currentTransaction.getBranchTransactionHash()));
+                transactionsToExamine.add(TransactionViewModel.fromHash(tangle, currentTransaction.getTrunkTransactionHash()));
             }
         }
     }
@@ -92,11 +88,11 @@ public class DAGUtils {
     }
 
     public void traverseApprovees(Hash startingTransactionHash, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {
-        traverseApprovees(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransactionHash), condition, currentTransactionConsumer);
+        traverseApprovees(TransactionViewModel.fromHash(tangle, startingTransactionHash), condition, currentTransactionConsumer);
     }
 
     public void traverseApprovees(Hash startingTransactionHash, TraversalCondition condition, TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
-        traverseApprovees(TransactionViewModel.fromHash(tangle, snapshotManager, startingTransactionHash), condition, currentTransactionConsumer, processedTransactions);
+        traverseApprovees(TransactionViewModel.fromHash(tangle, startingTransactionHash), condition, currentTransactionConsumer, processedTransactions);
     }
 
     public void traverseApprovees(MilestoneViewModel milestoneViewModel, TraversalCondition condition, TraversalConsumer currentTransactionConsumer) throws Exception {

@@ -121,7 +121,7 @@ public class TransactionViewModelTest {
             Hash hash = getRandomTransactionHash();
             TransactionViewModel transactionViewModel = new TransactionViewModel(trits, hash);
             transactionViewModel.store(tangle, snapshotManager);
-            assertArrayEquals(transactionViewModel.trits(), TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModel.getHash()).trits());
+            assertArrayEquals(transactionViewModel.trits(), TransactionViewModel.fromHash(tangle, transactionViewModel.getHash()).trits());
         }
     }
 
@@ -134,7 +134,7 @@ public class TransactionViewModelTest {
             Hash hash = getRandomTransactionHash();
             TransactionViewModel transactionViewModel = new TransactionViewModel(trits, hash);
             transactionViewModel.store(tangle, snapshotManager);
-            assertArrayEquals(transactionViewModel.getBytes(), TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModel.getHash()).getBytes());
+            assertArrayEquals(transactionViewModel.getBytes(), TransactionViewModel.fromHash(tangle, transactionViewModel.getHash()).getBytes());
         }
     }
 
@@ -300,7 +300,7 @@ public class TransactionViewModelTest {
         transactionViewModels[count-1].updateHeights(tangle, snapshotManager);
 
         for(int i = count; i > 1; ) {
-            assertEquals(i, TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModels[--i].getHash()).getHeight());
+            assertEquals(i, TransactionViewModel.fromHash(tangle, transactionViewModels[--i].getHash()).getHeight());
         }
     }
 
@@ -318,7 +318,7 @@ public class TransactionViewModelTest {
         transactionViewModels[count-1].updateHeights(tangle, snapshotManager);
 
         for(int i = count; i > 1; ) {
-            assertEquals(0, TransactionViewModel.fromHash(tangle, snapshotManager, transactionViewModels[--i].getHash()).getHeight());
+            assertEquals(0, TransactionViewModel.fromHash(tangle, transactionViewModels[--i].getHash()).getHeight());
         }
     }
 
@@ -328,7 +328,7 @@ public class TransactionViewModelTest {
         TransactionViewModel transactionViewModel = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
         transactionViewModel.store(tangle, snapshotManager);
         Hash hash = transactionViewModel.getHash();
-        Assert.assertArrayEquals(TransactionViewModel.find(tangle, snapshotManager,
+        Assert.assertArrayEquals(TransactionViewModel.find(tangle,
                 Arrays.copyOf(hash.bytes(), MainnetConfig.Defaults.REQ_HASH_SIZE)).getBytes(),
                 transactionViewModel.getBytes());
     }
@@ -341,7 +341,7 @@ public class TransactionViewModelTest {
         TransactionViewModel transactionViewModelNoSave = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
         transactionViewModel.store(tangle, snapshotManager);
         Hash hash = transactionViewModelNoSave.getHash();
-        Assert.assertFalse(Arrays.equals(TransactionViewModel.find(tangle, snapshotManager,
+        Assert.assertFalse(Arrays.equals(TransactionViewModel.find(tangle,
                 Arrays.copyOf(hash.bytes(), new MainnetConfig().getRequestHashSize())).getBytes(), transactionViewModel.getBytes()));
     }
 
@@ -374,7 +374,7 @@ public class TransactionViewModelTest {
             }
             hash = hashes.get(seed.nextInt(j));
             start = System.nanoTime();
-            TransactionViewModel.fromHash(tangle, snapshotManager, hash);
+            TransactionViewModel.fromHash(tangle, hash);
             diffget = System.nanoTime() - start;
             hashes.add(hash);
             if(pop || i > 1000) {

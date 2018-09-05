@@ -16,23 +16,21 @@ import java.util.Set;
 public class TailFinderImpl implements TailFinder {
 
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
 
-    public TailFinderImpl(Tangle tangle, SnapshotManager snapshotManager) {
+    public TailFinderImpl(Tangle tangle) {
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
     }
 
     @Override
     public Optional<Hash> findTail(Hash hash) throws Exception {
-        TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
+        TransactionViewModel tx = TransactionViewModel.fromHash(tangle, hash);
         final Hash bundleHash = tx.getBundleHash();
         long index = tx.getCurrentIndex();
         while (index-- > 0 && bundleHash.equals(tx.getBundleHash())) {
             Set<Hash> approvees = tx.getApprovers(tangle).getHashes();
             boolean foundApprovee = false;
             for (Hash approvee : approvees) {
-                TransactionViewModel nextTx = TransactionViewModel.fromHash(tangle, snapshotManager, approvee);
+                TransactionViewModel nextTx = TransactionViewModel.fromHash(tangle, approvee);
                 if (nextTx.getCurrentIndex() == index && bundleHash.equals(nextTx.getBundleHash())) {
                     tx = nextTx;
                     foundApprovee = true;

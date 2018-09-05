@@ -2,7 +2,9 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
+import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.model.Milestone;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Pair;
 
@@ -289,10 +291,13 @@ public class Snapshot {
                     state.applyStateDiff(currentPatch.low);
                     metaData.setIndex(currentPatch.hi.index());
                     metaData.setHash(currentPatch.hi.getHash());
+                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle, currentPatch.hi.getHash());
+                    if(currentMilestoneTransaction != null && currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+                        metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
+                    }
                 }
 
                 System.out.println("ROLLED BACK TO MILESTONE " + getIndex());
-                System.out.println(currentPatch.low.diff);
             } catch (Exception e) {
                 throw new SnapshotException("failed to completely roll back the state of the ledger", e);
             } finally {
@@ -303,8 +308,33 @@ public class Snapshot {
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
     }
 
-    public void replayMilestones(int milestoneIndex) throws SnapshotException {
+    public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
+        lockWrite();
 
+        try {
+            for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
+                MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
+                if (currentMilestone != null) {
+                    StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
+                    if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                        state.applyStateDiff(new SnapshotStateDiff(stateDiffViewModel.getDiff()));
+                    }
+
+                    metaData.setIndex(currentMilestone.index());
+                    metaData.setHash(currentMilestone.getHash());
+                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
+                    if(currentMilestoneTransaction != null && currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+                        metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
+                    }
+                } else {
+                    //skippedMilestones.add(currentMilestone.index());
+                }
+            }
+        } catch (Exception e) {
+            throw new SnapshotException("failed to completely replay the the state of the ledger", e);
+        } finally {
+            unlockWrite();
+        }
     }
 
     /**

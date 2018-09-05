@@ -61,7 +61,7 @@ public class SnapshotGarbageCollector {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
-        this.dagUtils = DAGUtils.get(tangle, snapshotManager);
+        this.dagUtils = DAGUtils.get(tangle);
 
         restoreCleanupJobs();
     }

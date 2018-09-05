@@ -172,9 +172,9 @@ public class TransactionValidatorTest {
             txValidator.propagateSolidTransactions();
         }
 
-        parent = TransactionViewModel.fromHash(tangle, snapshotManager, parent.getHash());
+        parent = TransactionViewModel.fromHash(tangle, parent.getHash());
         Assert.assertTrue("Parent tx was expected to be solid", parent.isSolid());
-        grandParent = TransactionViewModel.fromHash(tangle, snapshotManager, grandParent.getHash());
+        grandParent = TransactionViewModel.fromHash(tangle, grandParent.getHash());
         Assert.assertTrue("Grandparent  was expected to be solid", grandParent.isSolid());
     }
 
@@ -208,9 +208,9 @@ public class TransactionValidatorTest {
       txValidator.propagateSolidTransactions();
     }
 
-    parent = TransactionViewModel.fromHash(tangle, snapshotManager, parent.getHash());
+    parent = TransactionViewModel.fromHash(tangle, parent.getHash());
     Assert.assertTrue("Parent tx was expected to be solid", parent.isSolid());
-    grandParent = TransactionViewModel.fromHash(tangle, snapshotManager, grandParent.getHash());
+    grandParent = TransactionViewModel.fromHash(tangle, grandParent.getHash());
     Assert.assertFalse("GrandParent tx was expected to be not solid", grandParent.isSolid());
   }
 

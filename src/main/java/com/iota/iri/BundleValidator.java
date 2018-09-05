@@ -13,12 +13,12 @@ import java.util.*;
 public class BundleValidator {
 
     public static List<List<TransactionViewModel>> validate(Tangle tangle, SnapshotManager snapshotManager, Hash tailHash) throws Exception {
-        TransactionViewModel tail = TransactionViewModel.fromHash(tangle, snapshotManager, tailHash);
+        TransactionViewModel tail = TransactionViewModel.fromHash(tangle, tailHash);
         List<List<TransactionViewModel>> transactions = new LinkedList<>();
         if (tail.getCurrentIndex() != 0) {
             return transactions;
         }
-        final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, snapshotManager, tail);
+        final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail);
 
         for (TransactionViewModel transactionViewModel : bundleTransactions.values()) {
 
@@ -143,7 +143,7 @@ public class BundleValidator {
         return (value != 0 || transactionViewModels.size() == 0);
     }
 
-    private static Map<Hash, TransactionViewModel> loadTransactionsFromTangle(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel tail) {
+    private static Map<Hash, TransactionViewModel> loadTransactionsFromTangle(Tangle tangle, TransactionViewModel tail) {
         final Map<Hash, TransactionViewModel> bundleTransactions = new HashMap<>();
         final Hash bundleHash = tail.getBundleHash();
         try {
@@ -151,7 +151,7 @@ public class BundleValidator {
             long i = 0, end = tx.lastIndex();
             do {
                 bundleTransactions.put(tx.getHash(), tx);
-                tx = tx.getTrunkTransaction(tangle, snapshotManager);
+                tx = tx.getTrunkTransaction(tangle);
             } while (i++ < end && tx.getCurrentIndex() != 0 && tx.getBundleHash().equals(bundleHash));
         } catch (Exception e) {
             e.printStackTrace();

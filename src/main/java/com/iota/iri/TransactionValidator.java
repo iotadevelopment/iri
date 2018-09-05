@@ -140,7 +140,7 @@ public class TransactionValidator {
     private final AtomicInteger nextSubSolidGroup = new AtomicInteger(1);
 
     public boolean checkSolidity(Hash hash, boolean milestone) throws Exception {
-        if(TransactionViewModel.fromHash(tangle, snapshotManager, hash).isSolid()) {
+        if(TransactionViewModel.fromHash(tangle, hash).isSolid()) {
             return true;
         }
         Set<Hash> analyzedHashes = new HashSet<>();
@@ -152,7 +152,7 @@ public class TransactionValidator {
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
-                final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hashPointer);
+                final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(hashPointer)) {
                         transactionRequester.requestTransaction(hashPointer, milestone);
@@ -214,10 +214,10 @@ public class TransactionValidator {
         while(cascadeIterator.hasNext() && !shuttingDown.get()) {
             try {
                 Hash hash = cascadeIterator.next();
-                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, snapshotManager, hash);
+                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hash);
                 Set<Hash> approvers = transaction.getApprovers(tangle).getHashes();
                 for(Hash h: approvers) {
-                    TransactionViewModel tx = TransactionViewModel.fromHash(tangle, snapshotManager, h);
+                    TransactionViewModel tx = TransactionViewModel.fromHash(tangle, h);
                     if(quietQuickSetSolid(tx)) {
                         tx.update(tangle, snapshotManager, "solid|height");
                         tipsViewModel.setSolid(h);
@@ -257,10 +257,10 @@ public class TransactionValidator {
     private boolean quickSetSolid(final TransactionViewModel transactionViewModel) throws Exception {
         if(!transactionViewModel.isSolid()) {
             boolean solid = true;
-            if (!checkApproovee(transactionViewModel.getTrunkTransaction(tangle, snapshotManager))) {
+            if (!checkApproovee(transactionViewModel.getTrunkTransaction(tangle))) {
                 solid = false;
             }
-            if (!checkApproovee(transactionViewModel.getBranchTransaction(tangle, snapshotManager))) {
+            if (!checkApproovee(transactionViewModel.getBranchTransaction(tangle))) {
                 solid = false;
             }
             if(solid) {

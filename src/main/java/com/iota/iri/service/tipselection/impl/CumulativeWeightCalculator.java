@@ -120,7 +120,7 @@ public class CumulativeWeightCalculator implements RatingCalculator{
                     Set<HashId>> txHashToApprovers, Hash txHash) throws Exception {
         Set<HashId> approvers = SetUtils.emptyIfNull(txHashToApprovers.get(txHash));
 
-        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, snapshotManager, txHash);
+        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, txHash);
         Hash trunkHash = transactionViewModel.getTrunkTransactionHash();
         Hash branchHash = transactionViewModel.getBranchTransactionHash();
 

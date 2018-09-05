@@ -4,7 +4,6 @@ import com.iota.iri.TransactionValidator;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +12,6 @@ public class TipsSolidifier {
 
     private final Logger log = LoggerFactory.getLogger(TipsSolidifier.class);
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
     private final TipsViewModel tipsViewModel;
     private final TransactionValidator transactionValidator;
 
@@ -22,11 +20,9 @@ public class TipsSolidifier {
     private Thread solidityRescanHandle;
 
     public TipsSolidifier(final Tangle tangle,
-                          final SnapshotManager snapshotManager,
                           final TransactionValidator transactionValidator,
                           final TipsViewModel tipsViewModel) {
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
         this.tipsViewModel = tipsViewModel;
     }
@@ -63,7 +59,7 @@ public class TipsSolidifier {
         if (size != 0) {
             Hash hash = tipsViewModel.getRandomNonSolidTipHash();
             boolean isTip = true;
-            if (hash != null && TransactionViewModel.fromHash(tangle, snapshotManager, hash).getApprovers(tangle).size() != 0) {
+            if (hash != null && TransactionViewModel.fromHash(tangle, hash).getApprovers(tangle).size() != 0) {
                 tipsViewModel.removeTipHash(hash);
                 isTip = false;
             }

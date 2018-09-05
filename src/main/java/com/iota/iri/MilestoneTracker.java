@@ -95,7 +95,7 @@ public class MilestoneTracker {
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator);
-        this.dagUtils = DAGUtils.get(tangle, snapshotManager);
+        this.dagUtils = DAGUtils.get(tangle);
 
         //configure
         this.testnet = config.isTestnet();
@@ -215,7 +215,7 @@ public class MilestoneTracker {
 
                         // check milestones that are within our check range
                         else if(milestoneIndex < snapshotManager.getLatestSnapshot().getIndex() + 50) {
-                            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, milestoneHash);
+                            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, milestoneHash);
                             if(milestoneTransaction == null || milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
                                 transactionRequester.requestTransaction(milestoneHash, true);
                             } else {
@@ -246,7 +246,7 @@ public class MilestoneTracker {
      * @throws Exception if something goes wrong while retrieving information from the database
      */
     public Validity analyzeMilestoneCandidate(Hash potentialMilestoneTransactionHash) throws Exception {
-        return analyzeMilestoneCandidate(TransactionViewModel.fromHash(tangle, snapshotManager, potentialMilestoneTransactionHash));
+        return analyzeMilestoneCandidate(TransactionViewModel.fromHash(tangle, potentialMilestoneTransactionHash));
     }
 
     /**
@@ -324,7 +324,7 @@ public class MilestoneTracker {
 
         try {
             // roll back the state of the ledger
-            snapshotManager.getLatestSnapshot().rollBackMilestones(targetMilestone.index(), tangle);
+            snapshotManager.getLatestSnapshot().rollBackMilestones(targetMilestone.index() - 1, tangle);
 
             // prune all potentially invalid database fields
             HashSet<Hash> processedTransactions = new HashSet<>();
@@ -369,7 +369,7 @@ public class MilestoneTracker {
      * @throws Exception if something goes wrong while accessing the database
      */
     public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
-        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, snapshotManager, currentMilestone.getHash());
+        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
 
         AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(Math.max(currentMilestone.index(), milestoneTransaction.snapshotIndex()));
 
@@ -410,7 +410,7 @@ public class MilestoneTracker {
                 if (bundleTransactionViewModels.get(0).getHash().equals(transactionViewModel.getHash())) {
 
                     //final TransactionViewModel transactionViewModel2 = StorageTransactions.instance().loadTransaction(transactionViewModel.trunkTransactionPointer);
-                    final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle, snapshotManager);
+                    final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle);
                     if (transactionViewModel2.getType() == TransactionViewModel.FILLED_SLOT
                             && transactionViewModel.getBranchTransactionHash().equals(transactionViewModel2.getTrunkTransactionHash())
                             && transactionViewModel.getBundleHash().equals(transactionViewModel2.getBundleHash())) {
