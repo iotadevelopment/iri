@@ -32,6 +32,9 @@ public class SnapshotTest {
 
     @BeforeClass
     public static void setup() throws Exception {
+        dbFolder.create();
+        logFolder.create();
+
         tangle.addPersistenceProvider(
             new RocksDBPersistenceProvider(
                 dbFolder.getRoot().getAbsolutePath(),
