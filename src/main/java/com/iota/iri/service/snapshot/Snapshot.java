@@ -1,10 +1,17 @@
 package com.iota.iri.service.snapshot;
 
+import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.Pair;
 
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 public class Snapshot {
     // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,6 +192,7 @@ public class Snapshot {
         try {
             state.applyStateDiff(diff, false);
             metaData.setIndex(newIndex, false);
+            metaData.setHash(newTransactionHash);
             metaData.setTimestamp(System.currentTimeMillis() / 1000L, false);
         }
 
@@ -192,6 +200,76 @@ public class Snapshot {
         finally {
             unlockWrite();
         }
+    }
+
+    /**
+     * This method reverts the state of the Snapshot back to a point in time in the past.
+     *
+     * The method cycles through all previous milestones and their corresponding StateDiffs in reverse order, inverts
+     * their values and applies them to the current state. Instead of applying them as we go, we first collect all the
+     * patches in a linked list and apply them afterwards, so if an error occurs while creating the list of patches we
+     * do not end up with an invalid Snapshot state.
+     *
+     * @param targetMilestoneIndex the milestone index that we want to roll back to
+     * @param tangle the database interface that is needed for retrieving the required information
+     */
+    public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
+        if(targetMilestoneIndex > getIndex()) {
+            throw new SnapshotException("the target milestone index is bigger than the current milestone index - consider using replayChanges instead");
+        }
+
+        lockWrite();
+
+        try {
+            // create the list of patches that need to be applied
+            LinkedList<Pair<SnapshotStateDiff, MilestoneViewModel>> statePatches = new LinkedList<>();
+            try {
+                for(int currentMilestoneIndex = getIndex(); currentMilestoneIndex > targetMilestoneIndex; currentMilestoneIndex--) {
+                    MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
+                    if(currentMilestone != null) {
+                        StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
+
+                        SnapshotStateDiff snapshotStateDiff;
+                        if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                            // create the SnapshotStateDiff object for our changes
+                            snapshotStateDiff = new SnapshotStateDiff(
+                                stateDiffViewModel.getDiff().entrySet().stream().map(
+                                    hashLongEntry -> new HashMap.SimpleEntry<>(
+                                        hashLongEntry.getKey(), -1 * hashLongEntry.getValue()
+                                    )
+                                ).collect(
+                                    Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                                )
+                            );
+
+                            // this shouldn't happen since we check the StateDiffs already when creating them but better
+                            // give a reasonable error message if it ever does
+                            if (!snapshotStateDiff.isConsistent()) {
+                                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent");
+                            }
+                        } else {
+                            snapshotStateDiff = new SnapshotStateDiff(new HashMap<>());
+                        }
+
+                        statePatches.addLast(new Pair<>(snapshotStateDiff, currentMilestone));
+                    }
+                }
+            } catch (Exception e) {
+                throw new SnapshotException("failed to create the list of state patches while rolling back", e);
+            }
+
+            // apply the patches
+            Pair<SnapshotStateDiff, MilestoneViewModel> currentPatch;
+            while((currentPatch = statePatches.pollFirst()) != null) {
+                update(currentPatch.low, currentPatch.hi.index(), currentPatch.hi.getHash());;
+            }
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    public void replayMilestones(int milestoneIndex) throws SnapshotException {
+
     }
 
     /**

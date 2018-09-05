@@ -299,25 +299,6 @@ public class MilestoneTracker {
     }
 
     /**
-     * This method allows us to soft reset the ledger state, in case we face an inconsistent SnapshotState.
-     *
-     * It simply resets the latest snapshot to the initial one and rebuilds the ledger state. This will also make the
-     * updateLatestSolidSubtangleMilestone trigger again and give it a chance to detect corruptions.
-     */
-    public void softReset() {
-        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
-        blockingSolidMilestoneTrackerTasks.incrementAndGet();
-
-        // reset the ledger state to the initial state
-        snapshotManager.resetLatestSnapshot();
-
-        System.out.println("SOFT RESET TO: " + snapshotManager.getLatestSnapshot().getIndex());
-
-        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
-        blockingSolidMilestoneTrackerTasks.decrementAndGet();
-    }
-
-    /**
      * This method allows us to hard reset the ledger state, in case we detect that milestones were processed in the
      * wrong order.
      *
@@ -341,10 +322,12 @@ public class MilestoneTracker {
             "Resetting ledger to milestone " + targetMilestone.index() + " due to \"" + reason + "\"", log
         ).start(latestMilestoneIndex - targetMilestone.index() + 2); // +1 for softReset and +1 for starting milestone
 
-        HashSet<Hash> processedTransactions = new HashSet<>();
-
-        // prune all potentially invalid database fields
         try {
+            // roll back the state of the ledger
+            snapshotManager.getLatestSnapshot().rollBackMilestones(targetMilestone.index(), tangle);
+
+            // prune all potentially invalid database fields
+            HashSet<Hash> processedTransactions = new HashSet<>();
             MilestoneViewModel currentMilestone = targetMilestone;
             while(currentMilestone != null && currentMilestone.index() <= highestErroneousSnapshotIndex) {
 
@@ -365,7 +348,7 @@ public class MilestoneTracker {
         }
 
         // after we have cleaned up the database we do a soft reset to rescan the existing data
-        softReset();
+        //softReset();
 
         // dump message when we are done
         hardResetLogger.finish();
