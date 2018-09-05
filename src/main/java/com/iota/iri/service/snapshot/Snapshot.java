@@ -261,6 +261,7 @@ public class Snapshot {
             // apply the patches
             Pair<SnapshotStateDiff, MilestoneViewModel> currentPatch;
             while((currentPatch = statePatches.pollFirst()) != null) {
+                System.out.println("ROLLING BACK TO: " + currentPatch.hi.index());
                 update(currentPatch.low, currentPatch.hi.index(), currentPatch.hi.getHash());;
             }
         } finally {
