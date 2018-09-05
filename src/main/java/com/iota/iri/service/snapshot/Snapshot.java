@@ -238,7 +238,8 @@ public class Snapshot {
             lockWrite();
 
             try {
-                // create a variable for the last SnapshotStateDiff since we need to "shift" the indexes
+                // create a variable for the last SnapshotStateDiff since we need to "shift" the indexes (reverting
+                // snapshot 10 brings us back to snapshot 9)
                 SnapshotStateDiff lastStateDiff = null;
 
                 // create the list of patches that need to be applied
@@ -268,8 +269,6 @@ public class Snapshot {
                             snapshotStateDiff = new SnapshotStateDiff(new HashMap<>());
                         }
 
-                        // we wait with adding the patch until the next milestone because reverting milestone 10 will
-                        // take us back to the milestone 9 (the one that happend before)
                         if(lastStateDiff != null) {
                             statePatches.addLast(new Pair<>(lastStateDiff, currentMilestone));
                         }
@@ -291,6 +290,8 @@ public class Snapshot {
                     metaData.setIndex(currentPatch.hi.index());
                     metaData.setHash(currentPatch.hi.getHash());
                 }
+
+                System.out.println("ROLLED BACK TO MILESTONE " + getIndex());
             } catch (Exception e) {
                 throw new SnapshotException("failed to completely roll back the state of the ledger", e);
             } finally {
