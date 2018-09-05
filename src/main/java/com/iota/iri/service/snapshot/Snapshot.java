@@ -214,17 +214,36 @@ public class Snapshot {
      * @param tangle the database interface that is needed for retrieving the required information
      */
     public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
-        if(targetMilestoneIndex > getIndex()) {
-            throw new SnapshotException("the target milestone index is bigger than the current milestone index - consider using replayChanges instead");
+        //region SANITIZE PARAMETERS ///////////////////////////////////////////////////////////////////////////////////
+
+        MilestoneViewModel targetMilestone;
+        try {
+            targetMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, targetMilestoneIndex - 1);
+        } catch (Exception e) {
+            throw new SnapshotException("error while determining the target milestone for the rollback operation", e);
+        }
+        if(targetMilestone == null) {
+            throw new SnapshotException("could not find a milestone with the given index #" + targetMilestoneIndex);
         }
 
-        lockWrite();
+        if(targetMilestone.index() > getIndex()) {
+            throw new SnapshotException("rollback failed: the target milestone index is bigger than the current index");
+        }
 
-        try {
-            // create the list of patches that need to be applied
-            LinkedList<Pair<SnapshotStateDiff, MilestoneViewModel>> statePatches = new LinkedList<>();
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        //region ROLLBACK BALANCE CHANGES //////////////////////////////////////////////////////////////////////////////
+
+        if(targetMilestone.index() < getIndex()) {
+            lockWrite();
+
             try {
-                for(int currentMilestoneIndex = getIndex(); currentMilestoneIndex > targetMilestoneIndex; currentMilestoneIndex--) {
+                // create a variable for the last SnapshotStateDiff since we need to "shift" the indexes
+                SnapshotStateDiff lastStateDiff = null;
+
+                // create the list of patches that need to be applied
+                LinkedList<Pair<SnapshotStateDiff, MilestoneViewModel>> statePatches = new LinkedList<>();
+                for(int currentMilestoneIndex = getIndex(); currentMilestoneIndex > targetMilestone.index(); currentMilestoneIndex--) {
                     MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                     if(currentMilestone != null) {
                         StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
@@ -242,8 +261,6 @@ public class Snapshot {
                                 )
                             );
 
-                            // this shouldn't happen since we check the StateDiffs already when creating them but better
-                            // give a reasonable error message if it ever does
                             if (!snapshotStateDiff.isConsistent()) {
                                 throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent");
                             }
@@ -251,22 +268,37 @@ public class Snapshot {
                             snapshotStateDiff = new SnapshotStateDiff(new HashMap<>());
                         }
 
-                        statePatches.addLast(new Pair<>(snapshotStateDiff, currentMilestone));
+                        // we wait with adding the patch until the next milestone because reverting milestone 10 will
+                        // take us back to the milestone 9 (the one that happend before)
+                        if(lastStateDiff != null) {
+                            statePatches.addLast(new Pair<>(lastStateDiff, currentMilestone));
+                        }
+                        lastStateDiff = snapshotStateDiff;
                     }
                 }
-            } catch (Exception e) {
-                throw new SnapshotException("failed to create the list of state patches while rolling back", e);
-            }
+                if(lastStateDiff != null) {
+                    statePatches.addLast(new Pair<>(lastStateDiff, targetMilestone));
+                }
 
-            // apply the patches
-            Pair<SnapshotStateDiff, MilestoneViewModel> currentPatch;
-            while((currentPatch = statePatches.pollFirst()) != null) {
-                System.out.println("ROLLING BACK TO: " + currentPatch.hi.index());
-                update(currentPatch.low, currentPatch.hi.index(), currentPatch.hi.getHash());;
+                // apply the patches
+                Pair<SnapshotStateDiff, MilestoneViewModel> currentPatch;
+                while((currentPatch = statePatches.pollFirst()) != null) {
+                    if(!state.patchedState(currentPatch.low).isConsistent()) {
+                        throw new SnapshotException("failed to apply patch belonging to " + currentPatch.hi);
+                    }
+
+                    state.applyStateDiff(currentPatch.low);
+                    metaData.setIndex(currentPatch.hi.index());
+                    metaData.setHash(currentPatch.hi.getHash());
+                }
+            } catch (Exception e) {
+                throw new SnapshotException("failed to completely roll back the state of the ledger", e);
+            } finally {
+                unlockWrite();
             }
-        } finally {
-            unlockWrite();
         }
+
+        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
     }
 
     public void replayMilestones(int milestoneIndex) throws SnapshotException {
