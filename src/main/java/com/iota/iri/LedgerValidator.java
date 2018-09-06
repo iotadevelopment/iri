@@ -240,7 +240,13 @@ public class LedgerValidator {
     }
 
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
-        return updateMilestoneTransaction(milestone) && applyStateDiffToLedger(milestone);
+        if(updateMilestoneTransaction(milestone)) {
+            snapshotManager.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
+
+            return true;
+        }
+
+        return false;
     }
 
     private boolean applyStateDiffToLedger(MilestoneViewModel milestone) throws Exception {

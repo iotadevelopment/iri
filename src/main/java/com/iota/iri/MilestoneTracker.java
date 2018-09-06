@@ -456,7 +456,6 @@ public class MilestoneTracker {
 
             // while we have a milestone which is solid
             while(
-                blockingSolidMilestoneTrackerTasks.get() == 0 &&
                 !shuttingDown &&
                 nextMilestone != null
             ) {
