@@ -7,14 +7,9 @@ import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.hash.SpongeFactory;
-import com.iota.iri.model.Address;
-import com.iota.iri.model.Hash;
-import com.iota.iri.model.Milestone;
-import com.iota.iri.model.Transaction;
+import com.iota.iri.model.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
-import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.Pair;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -22,9 +17,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -42,6 +34,8 @@ public class SnapshotTest {
     private static Snapshot initSnapshot;
 
     private static Tangle tangle;
+
+    private static SnapshotManager snapshotManager;
 
     private static Hash INITIAL_SNAPSHOT_HASH = Hash.NULL_HASH;
 
@@ -83,6 +77,14 @@ public class SnapshotTest {
         ),
 
         MILESTONE_2(
+            "DNLMVSDQCOSJRQMXDPF9TCNQAIJIGUQVZHDF9CFDRVY9APH99UCEYFMEL9MOG9LNAUAXABCLWFQ9A9999",
+            config.getMilestoneStartIndex() + 2,
+            INITIAL_SNAPSHOT_TIMESTAMP + 9300,
+            new Pair<>(AddressesWithBalance.ADDRESS_1.getHash(), 80L),
+            new Pair<>(AddressesWithBalance.ADDRESS_3.getHash(), -80L)
+        ),
+
+        MILESTONE_3(
             "QVZHDF9CFDRVY9APH99UCDNLMVSDQCOSJRQMXDPF9TCNQAIJIGUEYFMEL9MOG9LNAUAXABCLWFQ9A9999",
             config.getMilestoneStartIndex() + 3,
             INITIAL_SNAPSHOT_TIMESTAMP + 1300,
@@ -90,7 +92,7 @@ public class SnapshotTest {
             new Pair<>(AddressesWithBalance.ADDRESS_2.getHash(), -200L)
         ),
 
-        MILESTONE_3(
+        MILESTONE_4(
             "F9MVSDQF9TCNQAIJIGUEYFMCOSJRQMXDPQVZHDEL9MOG9LNAUAXCFDRVY9APH99UCDNLABCLWFQ9A9999",
             config.getMilestoneStartIndex() + 4,
             INITIAL_SNAPSHOT_TIMESTAMP + 700,
@@ -147,20 +149,46 @@ public class SnapshotTest {
             )
         );
         tangle.init();
-
-        // create the milestones in our database
-        for (Milestones currentMilestone : Milestones.values()) {
-            new MilestoneViewModel(currentMilestone.getIndex(), currentMilestone.getHash()).store(tangle);
-            new StateDiffViewModel(currentMilestone.getBalanceChanges(), currentMilestone.getHash()).store(tangle);
-
-            TransactionViewModel transaction = TransactionTestUtils.createTransactionWithTrytes("FAKETX", currentMilestone.getHash());
-            TransactionTestUtils.setTimestamp(transaction, currentMilestone.getTimestamp());
-            transaction.store(tangle, new SnapshotManager(tangle, new TipsViewModel(), config));
-        }
-
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), config);
         IotaConfig config = new MainnetConfig();
         SnapshotManager snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), config);
         initSnapshot = snapshotManager.getInitialSnapshot();
+    }
+
+    private static void createMilestonesInDatabase(Milestones... milestones) throws Exception {
+        for (Milestones currentMilestone: milestones) {
+            createMilestoneInDatabase(currentMilestone.getIndex(), currentMilestone.getHash(), currentMilestone.getTimestamp(), currentMilestone.getBalanceChanges());
+        }
+    }
+
+    private static void createMilestoneInDatabase(int milestoneIndex, Hash transactionHash, long timestamp, HashMap<Hash, Long> balanceChanges) throws Exception {
+        new MilestoneViewModel(milestoneIndex, transactionHash).store(tangle);
+        new StateDiffViewModel(balanceChanges, transactionHash).store(tangle);
+
+        TransactionViewModel transaction = TransactionTestUtils.createTransactionWithTrytes("FAKEMILESTONETX", transactionHash);
+        TransactionTestUtils.setTimestamp(transaction, timestamp);
+        transaction.store(tangle, snapshotManager);
+    }
+
+    private static void removeMilestonesFromDatabase(Milestones... milestones) throws Exception {
+        for (Milestones currentMilestone: milestones) {
+            removeMilestoneFromDatabase(currentMilestone.getIndex(), currentMilestone.getHash());
+        }
+    }
+
+    /**
+     * This method is a utility method that allows us to remove created fake milestones from the database.
+     *
+     * @param milestoneIndex
+     * @param transactionHash
+     * @throws Exception
+     */
+    private static void removeMilestoneFromDatabase(int milestoneIndex, Hash transactionHash) throws Exception {
+        tangle.delete(new Milestone().getClass(), new IntegerIndex(milestoneIndex));
+        tangle.delete(new StateDiff().getClass(), transactionHash);
+        tangle.delete(new Transaction().getClass(), transactionHash);
+
+        MilestoneViewModel.clear(milestoneIndex);
     }
 
     @AfterClass
@@ -171,19 +199,26 @@ public class SnapshotTest {
     }
 
     @Test
-    public void rollBackMilestonesTest() throws SnapshotException {
+    public void rollBackMilestonesTest() throws Exception {
+        // generate our starting milestone
         Snapshot testSnapshot = getTestSnapshot();
 
+        // initialize the database with some milestones
+        createMilestonesInDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_3, Milestones.MILESTONE_4);
+
         // apply the changes
-        testSnapshot.replayMilestones(Milestones.MILESTONE_3.getIndex(), tangle);
+        testSnapshot.replayMilestones(Milestones.MILESTONE_4.getIndex(), tangle);
 
         // check if the starting values are correct
-        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_3.getIndex());
-        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_3.getHash());
-        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_3.getTimestamp());
+        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_4.getIndex());
+        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_4.getHash());
+        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_4.getTimestamp());
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1067L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 800L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 267L);
+
+        // create a previously unknown milestone in the applied range before we revert -> should be ignored by the reversion
+        createMilestonesInDatabase(Milestones.MILESTONE_2);
 
         // revert the changes
         testSnapshot.rollBackMilestones(Milestones.MILESTONE_1.getIndex(), tangle);
@@ -195,11 +230,18 @@ public class SnapshotTest {
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1400L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 1000L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 400L);
+
+        // clean up
+        removeMilestonesFromDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_2, Milestones.MILESTONE_3, Milestones.MILESTONE_4);
     }
 
     @Test
-    public void replayMilestonesTest() throws SnapshotException {
+    public void replayMilestonesTest() throws Exception {
+        // generate our starting milestone
         Snapshot testSnapshot = getTestSnapshot();
+
+        // initialize the database with some milestones
+        createMilestonesInDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_3, Milestones.MILESTONE_4);
 
         // check if the starting values are correct
         assertEquals(testSnapshot.getIndex(), INITIAL_SNAPSHOT_INDEX);
@@ -210,26 +252,32 @@ public class SnapshotTest {
         }
 
         // apply the changes
-        testSnapshot.replayMilestones(Milestones.MILESTONE_2.getIndex(), tangle);
-
-        // check if the values have changed
-        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_2.getIndex());
-        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_2.getHash());
-        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_2.getTimestamp());
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1200L);
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 800L);
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 400L);
-
-        // apply additional changes
         testSnapshot.replayMilestones(Milestones.MILESTONE_3.getIndex(), tangle);
 
         // check if the values have changed
         assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_3.getIndex());
         assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_3.getHash());
         assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_3.getTimestamp());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1200L);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 800L);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 400L);
+
+        // create a previously unknown milestone which should be ignored since its not in range anymore
+        createMilestonesInDatabase(Milestones.MILESTONE_2);
+
+        // apply additional changes
+        testSnapshot.replayMilestones(Milestones.MILESTONE_4.getIndex(), tangle);
+
+        // check if the values have changed
+        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_4.getIndex());
+        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_4.getHash());
+        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_4.getTimestamp());
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1067L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 800L);
         assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 267L);
+
+        // clean up
+        removeMilestonesFromDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_2, Milestones.MILESTONE_3, Milestones.MILESTONE_4);
     }
 
     private SnapshotState generateSnapshotState() {

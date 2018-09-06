@@ -347,9 +347,6 @@ public class MilestoneTracker {
             hardResetLogger.abort(e);
         }
 
-        // after we have cleaned up the database we do a soft reset to rescan the existing data
-        //softReset();
-
         // dump message when we are done
         hardResetLogger.finish();
 
@@ -446,37 +443,44 @@ public class MilestoneTracker {
     }
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        // introduce some variables that help us to emit log messages while processing the milestones
-        int prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-        long lastScan = System.currentTimeMillis();
+        // acquire a write lock for our snapshot
+        snapshotManager.getLatestSnapshot().lockWrite();
 
-        // get the next milestone
-        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
+        try {
+            // introduce some variables that help us to emit log messages while processing the milestones
+            int prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+            long lastScan = System.currentTimeMillis();
 
-        // while we have a milestone which is solid
-        while(
-            blockingSolidMilestoneTrackerTasks.get() == 0 &&
-            !shuttingDown &&
-            nextMilestone != null
-        ) {
-            // advance to the next milestone if we were able to update the ledger state
-            nextMilestone = ledgerValidator.applyMilestoneToLedger(nextMilestone)
-                          ? MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex())
-                          : null;
+            // get the next milestone
+            MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
 
-            // dump a log message in intervals and when we terminate
-            if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
-                System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
-            )) {
-                messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
-                messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
-                log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                        + prevSolidMilestoneIndex + " to #"
-                        + snapshotManager.getLatestSnapshot().getIndex());
+            // while we have a milestone which is solid
+            while(
+                blockingSolidMilestoneTrackerTasks.get() == 0 &&
+                !shuttingDown &&
+                nextMilestone != null
+            ) {
+                // advance to the next milestone if we were able to update the ledger state
+                nextMilestone = ledgerValidator.applyMilestoneToLedger(nextMilestone)
+                              ? MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex())
+                              : null;
 
-                lastScan = System.currentTimeMillis();
-                prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+                // dump a log message in intervals and when we terminate
+                if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
+                    System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
+                )) {
+                    messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
+                    messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
+                    log.info("Latest SOLID SUBTANGLE milestone has changed from #"
+                            + prevSolidMilestoneIndex + " to #"
+                            + snapshotManager.getLatestSnapshot().getIndex());
+
+                    lastScan = System.currentTimeMillis();
+                    prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+                }
             }
+        } finally {
+            snapshotManager.getLatestSnapshot().unlockWrite();
         }
     }
 

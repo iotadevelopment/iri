@@ -9,6 +9,7 @@ import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Pair;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -248,7 +249,7 @@ public class Snapshot {
                 LinkedList<Pair<SnapshotStateDiff, MilestoneViewModel>> statePatches = new LinkedList<>();
                 for(int currentMilestoneIndex = getIndex(); currentMilestoneIndex > targetMilestone.index(); currentMilestoneIndex--) {
                     MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
-                    if(currentMilestone != null) {
+                    if(currentMilestone != null && !skippedMilestones.remove(currentMilestoneIndex)) {
                         StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
 
                         SnapshotStateDiff snapshotStateDiff;
@@ -296,8 +297,6 @@ public class Snapshot {
                         metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
                     }
                 }
-
-                System.out.println("ROLLED BACK TO MILESTONE " + getIndex());
             } catch (Exception e) {
                 throw new SnapshotException("failed to completely roll back the state of the ledger", e);
             } finally {
@@ -307,6 +306,8 @@ public class Snapshot {
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
     }
+
+    private HashSet<Integer> skippedMilestones = new HashSet<>();
 
     public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         lockWrite();
@@ -327,7 +328,7 @@ public class Snapshot {
                         metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
                     }
                 } else {
-                    //skippedMilestones.add(currentMilestone.index());
+                    skippedMilestones.add(currentMilestoneIndex);
                 }
             }
         } catch (Exception e) {
