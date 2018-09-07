@@ -429,9 +429,13 @@ public class MilestoneTracker {
                 nextMilestone != null
             ) {
                 // advance to the next milestone if we were able to update the ledger state
-                nextMilestone = ledgerValidator.applyMilestoneToLedger(nextMilestone)
-                              ? MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex())
-                              : null;
+                if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
+                    nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
+                } else {
+                    resetCorruptedMilestone(nextMilestone.index(), "updateLatestSolidSubtangleMilestone");
+
+                    nextMilestone = null;
+                }
 
                 // dump a log message in intervals and when we terminate
                 if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
