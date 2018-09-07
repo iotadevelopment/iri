@@ -438,8 +438,6 @@ public class MilestoneTracker {
                 if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                     nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
                 } else {
-                    resetCorruptedMilestone(nextMilestone.index(), "updateLatestSolidSubtangleMilestone");
-
                     nextMilestone = null;
                 }
 

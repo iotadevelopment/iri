@@ -158,7 +158,7 @@ public class LedgerValidator {
                         milestone.resetCorruptedMilestone(index, "updateSnapshotIndexOfMilestoneTransactions");
 
                         updateSnapshotIndexOfMilestoneTransactions(hash, index);
-                        
+
                         return;
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
