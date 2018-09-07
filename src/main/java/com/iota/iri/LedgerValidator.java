@@ -58,6 +58,7 @@ public class LedgerValidator {
         Map<Hash, Long> state = new HashMap<>();
         int numberOfAnalyzedTransactions = 0;
         Set<Hash> countedTx = new HashSet<>();
+        Set<Integer> resettedMilestones = new HashSet<>();
 
         snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
             visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);
@@ -71,8 +72,8 @@ public class LedgerValidator {
 
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
-                    if(transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
-                        this.milestone.resetCorruptedMilestone(transactionViewModel.snapshotIndex());
+                    if(transactionViewModel.snapshotIndex() > latestSnapshotIndex && resettedMilestones.add(latestSnapshotIndex)) {
+                        this.milestone.resetCorruptedMilestone(latestSnapshotIndex, "getLatestDiff");
                     }
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
@@ -148,6 +149,7 @@ public class LedgerValidator {
      * @throws Exception
      */
     private void updateSnapshotIndexOfMilestoneTransactions(Hash hash, int index) throws Exception {
+        Set<Integer> resettedMilestones = new HashSet<>();
         Set<Hash> visitedHashes = new HashSet<>();
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
@@ -155,8 +157,8 @@ public class LedgerValidator {
             if (visitedHashes.add(hashPointer)) {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
-                    if(transactionViewModel2.snapshotIndex() > index) {
-                        milestone.resetCorruptedMilestone(transactionViewModel2.snapshotIndex());
+                    if(transactionViewModel2.snapshotIndex() > index && resettedMilestones.add(index)) {
+                        milestone.resetCorruptedMilestone(index, "updateSnapshotIndexOfMilestoneTransactions");
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
@@ -291,10 +293,10 @@ public class LedgerValidator {
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
-                milestone.resetCorruptedMilestone(transactionSnapshotIndex);
+                milestone.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
                 //hardReset(milestoneVM, transactionSnapshotIndex, "milestones processed in the wrong order (#" + transactionSnapshotIndex +" before #" + milestoneVM.index() + ")");
 
-                return false;
+                transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
             }
 
             snapshotManager.getLatestSnapshot().lockRead();

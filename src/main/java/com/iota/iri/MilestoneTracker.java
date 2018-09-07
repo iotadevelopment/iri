@@ -297,12 +297,12 @@ public class MilestoneTracker {
         return INVALID;
     }
 
-    public void resetCorruptedMilestone(int milestoneIndex) {
-        resetCorruptedMilestone(milestoneIndex, new HashSet<>());
+    public void resetCorruptedMilestone(int milestoneIndex, String identifier) {
+        resetCorruptedMilestone(milestoneIndex, identifier, new HashSet<>());
     }
 
-    public void resetCorruptedMilestone(int milestoneIndex, HashSet<Hash> processedTransactions) {
-        System.out.println("REPAIRING: " + milestoneIndex);
+    public void resetCorruptedMilestone(int milestoneIndex, String identifier, HashSet<Hash> processedTransactions) {
+        System.out.println("REPAIRING: " + milestoneIndex + " => " + identifier);
 
         try {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
@@ -331,9 +331,11 @@ public class MilestoneTracker {
      * @throws Exception if something goes wrong while accessing the database
      */
     public void resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
+        Set<Integer> resettedMilestones = new HashSet<>();
+
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
         if(milestoneTransaction.snapshotIndex() > currentMilestone.index()) {
-            resetCorruptedMilestone(milestoneTransaction.snapshotIndex(), processedTransactions);
+            resetCorruptedMilestone(milestoneTransaction.snapshotIndex(), "recursive", processedTransactions);
         }
         milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
         processedTransactions.add(milestoneTransaction.getHash());
@@ -342,8 +344,8 @@ public class MilestoneTracker {
             currentMilestone,
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
             currentTransaction -> {
-                if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-                    resetCorruptedMilestone(currentTransaction.snapshotIndex(), processedTransactions);
+                if(currentTransaction.snapshotIndex() > currentMilestone.index() && resettedMilestones.add(currentTransaction.snapshotIndex())) {
+                    resetCorruptedMilestone(currentTransaction.snapshotIndex(), "resetSnapshotIndexOfMilestone", processedTransactions);
                 }
 
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
