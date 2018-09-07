@@ -32,7 +32,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import static com.iota.iri.MilestoneTracker.Validity.*;
-import static java.util.Comparator.comparingDouble;
 
 public class MilestoneTracker {
     /**
@@ -298,11 +297,11 @@ public class MilestoneTracker {
         return INVALID;
     }
 
-    public void repairCorruptedMilestone(int milestoneIndex) {
-        repairCorruptedMilestone(milestoneIndex, new HashSet<>());
+    public void resetCorruptedMilestone(int milestoneIndex) {
+        resetCorruptedMilestone(milestoneIndex, new HashSet<>());
     }
 
-    public void repairCorruptedMilestone(int milestoneIndex, HashSet<Hash> processedTransactions) {
+    public void resetCorruptedMilestone(int milestoneIndex, HashSet<Hash> processedTransactions) {
         System.out.println("REPAIRING: " + milestoneIndex);
 
         try {
@@ -333,7 +332,9 @@ public class MilestoneTracker {
      */
     public void resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-
+        if(milestoneTransaction.snapshotIndex() > currentMilestone.index()) {
+            resetCorruptedMilestone(milestoneTransaction.snapshotIndex(), processedTransactions);
+        }
         milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
         processedTransactions.add(milestoneTransaction.getHash());
 
@@ -342,7 +343,7 @@ public class MilestoneTracker {
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
             currentTransaction -> {
                 if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-                    repairCorruptedMilestone(currentTransaction.snapshotIndex(), processedTransactions);
+                    resetCorruptedMilestone(currentTransaction.snapshotIndex(), processedTransactions);
                 }
 
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
