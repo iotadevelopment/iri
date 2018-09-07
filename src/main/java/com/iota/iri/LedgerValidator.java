@@ -73,6 +73,7 @@ public class LedgerValidator {
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
                     if(transactionViewModel.snapshotIndex() > latestSnapshotIndex && resettedMilestones.add(latestSnapshotIndex)) {
+                        System.out.println("RES: " + transactionViewModel.snapshotIndex());
                         this.milestone.resetCorruptedMilestone(latestSnapshotIndex, "getLatestDiff");
                     }
                     numberOfAnalyzedTransactions++;
