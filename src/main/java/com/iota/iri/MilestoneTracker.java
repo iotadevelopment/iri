@@ -298,60 +298,26 @@ public class MilestoneTracker {
         return INVALID;
     }
 
-    /**
-     * This method allows us to hard reset the ledger state, in case we detect that milestones were processed in the
-     * wrong order.
-     *
-     * It resets the snapshotIndex of all milestones following the one provided in the parameters, removes all
-     * potentially corrupt StateDiffs and restores the initial ledger state, so we can start rebuilding it. This allows
-     * us to recover from the invalid ledger state without repairing or pruning the database.
-     *
-     * @param targetMilestone the last correct milestone
-     */
-    public void hardReset(MilestoneViewModel targetMilestone, int highestErroneousSnapshotIndex, String reason) {
-        // ignore errors due to old milestones
-        if(targetMilestone == null || targetMilestone.index() < snapshotManager.getInitialSnapshot().getIndex()) {
-            return;
-        }
+    public void repairCorruptedMilestone(int milestoneIndex) {
+        repairCorruptedMilestone(milestoneIndex, new HashSet<>());
+    }
 
-        // increase a counter for the background tasks to pause the "Solid Milestone Tracker"
-        blockingSolidMilestoneTrackerTasks.incrementAndGet();
-
-        // create a progress logger and start the logging
-        ProgressLogger hardResetLogger = new ProgressLogger(
-            "Resetting ledger to milestone " + targetMilestone.index() + " due to \"" + reason + "\"", log
-        ).start(latestMilestoneIndex - targetMilestone.index() + 2); // +1 for softReset and +1 for starting milestone
+    public void repairCorruptedMilestone(int milestoneIndex, HashSet<Hash> processedTransactions) {
+        System.out.println("REPAIRING: " + milestoneIndex);
 
         try {
-            // roll back the state of the ledger
-            snapshotManager.getLatestSnapshot().rollBackMilestones(targetMilestone.index() - 1, tangle);
+            MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
 
-            // prune all potentially invalid database fields
-            HashSet<Hash> processedTransactions = new HashSet<>();
-            MilestoneViewModel currentMilestone = targetMilestone;
-            while(currentMilestone != null && currentMilestone.index() <= highestErroneousSnapshotIndex) {
-
-                System.out.println("RES: " + currentMilestone.index());
-
-                // reset the snapshotIndex of the milestone and its referenced approvees + it's StateDiff
-                highestErroneousSnapshotIndex = Math.max(highestErroneousSnapshotIndex, resetSnapshotIndexOfMilestone(currentMilestone, processedTransactions));
-                tangle.delete(StateDiff.class, currentMilestone.getHash());
-
-                int currentStep = latestMilestoneIndex - currentMilestone.index() + 2 - hardResetLogger.getStepCount();
-                hardResetLogger.progress(currentStep);
-
-                // iterate to the next milestone
-                currentMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, currentMilestone.index());
+            // reset the ledger to the state before the erroneous milestone appeared
+            if(milestoneToRepair.index() <= snapshotManager.getLatestSnapshot().getIndex()) {
+                snapshotManager.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
             }
-        } catch(Exception e) {
-            hardResetLogger.abort(e);
+
+            resetSnapshotIndexOfMilestone(milestoneToRepair, processedTransactions);
+            tangle.delete(StateDiff.class, milestoneToRepair.getHash());
+        } catch (Exception e) {
+            log.error("failed to repair corrupted milestone with index #" + milestoneIndex, e);
         }
-
-        // dump message when we are done
-        hardResetLogger.finish();
-
-        // decrease the counter for the background tasks to unpause the "Solid Milestone Tracker"
-        blockingSolidMilestoneTrackerTasks.decrementAndGet();
     }
 
     /**
@@ -365,10 +331,8 @@ public class MilestoneTracker {
      * @param currentMilestone the milestone that shall have its confirmed transactions reset
      * @throws Exception if something goes wrong while accessing the database
      */
-    public int resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
+    public void resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-
-        AtomicInteger maxErroneousMilestoneIndex = new AtomicInteger(Math.max(currentMilestone.index(), milestoneTransaction.snapshotIndex()));
 
         milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
         processedTransactions.add(milestoneTransaction.getHash());
@@ -377,14 +341,14 @@ public class MilestoneTracker {
             currentMilestone,
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
             currentTransaction -> {
-                maxErroneousMilestoneIndex.set(Math.max(maxErroneousMilestoneIndex.get(), currentTransaction.snapshotIndex()));
+                if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
+                    repairCorruptedMilestone(currentTransaction.snapshotIndex(), processedTransactions);
+                }
 
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
             },
             processedTransactions
         );
-
-        return maxErroneousMilestoneIndex.get();
     }
 
     public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
@@ -429,7 +393,9 @@ public class MilestoneTracker {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotManager.getLatestSnapshot().getIndex()) {
-                                hardReset(newMilestoneViewModel, snapshotManager.getLatestSnapshot().getIndex(), "previously unknown milestone (#" + index + ") appeared");
+                                snapshotManager.getLatestSnapshot().rollBackMilestones(newMilestoneViewModel.index(), tangle);
+
+                                //hardReset(newMilestoneViewModel, snapshotManager.getLatestSnapshot().getIndex(), "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {

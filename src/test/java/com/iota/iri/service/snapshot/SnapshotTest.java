@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class SnapshotTest {
     private static final MainnetConfig config = new MainnetConfig();
@@ -199,6 +200,49 @@ public class SnapshotTest {
     }
 
     @Test
+    public void rollbackLastMilestoneTest() throws Exception {
+        // generate our starting milestone
+        Snapshot testSnapshot = getTestSnapshot();
+
+        // initialize the database with some milestones
+        createMilestonesInDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_4);
+
+        // replay the two milestones
+        testSnapshot.replayMilestones(Milestones.MILESTONE_4.getIndex(), tangle);
+
+        // create some milestones to check if additional milestones get handled correctly
+        createMilestonesInDatabase(Milestones.MILESTONE_2, Milestones.MILESTONE_3);
+
+        // rollback milestone #4
+        assertTrue(testSnapshot.rollbackLastMilestone(tangle));
+
+        // check if values are correct after the rollback
+        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_1.getIndex());
+        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_1.getHash());
+        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_1.getTimestamp());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1400L);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 1000L);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 400L);
+
+        // rollback milestone #1
+        assertTrue(testSnapshot.rollbackLastMilestone(tangle));
+
+        // check if values are correct after the rollback
+        assertEquals(testSnapshot.getIndex(), INITIAL_SNAPSHOT_INDEX);
+        assertEquals(testSnapshot.getHash(), INITIAL_SNAPSHOT_HASH);
+        assertEquals(testSnapshot.getTimestamp(), INITIAL_SNAPSHOT_TIMESTAMP);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance());
+
+        // rollback non existent milestone
+        assertFalse(testSnapshot.rollbackLastMilestone(tangle));
+
+        // clean up
+        removeMilestonesFromDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_2, Milestones.MILESTONE_3, Milestones.MILESTONE_4);
+    }
+
+    @Test
     public void rollBackMilestonesTest() throws Exception {
         // generate our starting milestone
         Snapshot testSnapshot = getTestSnapshot();
@@ -224,12 +268,12 @@ public class SnapshotTest {
         testSnapshot.rollBackMilestones(Milestones.MILESTONE_1.getIndex(), tangle);
 
         // check if the values were rolled back
-        assertEquals(testSnapshot.getIndex(), Milestones.MILESTONE_1.getIndex());
-        assertEquals(testSnapshot.getHash(), Milestones.MILESTONE_1.getHash());
-        assertEquals(testSnapshot.getTimestamp(), Milestones.MILESTONE_1.getTimestamp());
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance() - 1400L);
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance() + 1000L);
-        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance() + 400L);
+        assertEquals(testSnapshot.getIndex(), INITIAL_SNAPSHOT_INDEX);
+        assertEquals(testSnapshot.getHash(), INITIAL_SNAPSHOT_HASH);
+        assertEquals(testSnapshot.getTimestamp(), INITIAL_SNAPSHOT_TIMESTAMP);
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_1.getHash()), AddressesWithBalance.ADDRESS_1.getBalance());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_2.getHash()), AddressesWithBalance.ADDRESS_2.getBalance());
+        assertEquals(testSnapshot.getBalance(AddressesWithBalance.ADDRESS_3.getHash()), AddressesWithBalance.ADDRESS_3.getBalance());
 
         // clean up
         removeMilestonesFromDatabase(Milestones.MILESTONE_1, Milestones.MILESTONE_2, Milestones.MILESTONE_3, Milestones.MILESTONE_4);

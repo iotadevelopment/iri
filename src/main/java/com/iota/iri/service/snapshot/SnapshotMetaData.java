@@ -18,10 +18,14 @@ public class SnapshotMetaData implements Cloneable {
      */
     public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
+    protected Hash initialHash;
+
     /**
      * Holds the transaction hash of the milestone.
      */
     private Hash hash;
+
+    protected int initialIndex;
 
     /**
      * Holds the current index of this snapshot.
@@ -29,6 +33,8 @@ public class SnapshotMetaData implements Cloneable {
      * The initial snapshot has its index set to the start index.
      */
     private int index;
+
+    protected long initialTimestamp;
 
     /**
      * Holds the timestamp when this snapshot was created or updated the last time.
@@ -168,8 +174,11 @@ public class SnapshotMetaData implements Cloneable {
      */
     public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
         // store our parameters
+        this.initialHash = hash;
         this.hash = hash;
+        this.initialIndex = index;
         this.index = index;
+        this.initialTimestamp = timestamp;
         this.timestamp = timestamp;
         this.solidEntryPoints = solidEntryPoints;
         this.seenMilestones = seenMilestones;

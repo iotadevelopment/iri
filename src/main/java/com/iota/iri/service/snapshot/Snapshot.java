@@ -163,6 +163,36 @@ public class Snapshot {
 
     // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
 
+    public Hash getInitialHash() {
+        lockRead();
+
+        try {
+            return metaData.initialHash;
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public int getInitialIndex() {
+        lockRead();
+
+        try {
+            return metaData.initialIndex;
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public long getInitialTimestamp() {
+        lockRead();
+
+        try {
+            return metaData.initialTimestamp;
+        } finally {
+            unlockRead();
+        }
+    }
+
     public Hash getHash() {
         lockRead();
 
@@ -206,6 +236,35 @@ public class Snapshot {
     }
 
     /**
+     * This method rolls back the latest milestones until it reaches the state that the snapshot had before applying
+     * the milestone indicated by the given parameter.
+     *
+     * After checking the validity of the parameters we simply roll back the last milestone until we reach a point that
+     *
+     * @param targetMilestoneIndex
+     * @param tangle
+     */
+    public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
+        if(targetMilestoneIndex <= getInitialIndex()) {
+            throw new SnapshotException("the target milestone index is lower than the initial snapshot index - cannot revert back to an unknown milestone");
+        }
+
+        if(targetMilestoneIndex > getIndex()) {
+            throw new SnapshotException("the target milestone index is higher than the current one - consider using replayMilestones instead");
+        }
+
+        lockWrite();
+
+        try {
+            while (targetMilestoneIndex <= getIndex() && rollbackLastMilestone(tangle)) {
+                /* do nothing but rollback */
+            }
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
      * This method reverts the state of the Snapshot back to a point in time in the past.
      *
      * The method cycles through all previous milestones and their corresponding StateDiffs in reverse order, inverts
@@ -216,7 +275,7 @@ public class Snapshot {
      * @param targetMilestoneIndex the milestone index that we want to roll back to
      * @param tangle the database interface that is needed for retrieving the required information
      */
-    public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
+    public void rollBackMilestoness(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         //region SANITIZE PARAMETERS ///////////////////////////////////////////////////////////////////////////////////
 
         MilestoneViewModel targetMilestone;
@@ -308,6 +367,65 @@ public class Snapshot {
     }
 
     private HashSet<Integer> skippedMilestones = new HashSet<>();
+
+    public boolean rollbackLastMilestone(Tangle tangle) throws SnapshotException {
+        lockWrite();
+
+        try {
+            if(getIndex() == getInitialIndex()) {
+                return false;
+            }
+
+            // revert the last balance changes
+            StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, getHash());
+            if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
+                    stateDiffViewModel.getDiff().entrySet().stream().map(
+                        hashLongEntry -> new HashMap.SimpleEntry<>(
+                            hashLongEntry.getKey(), -1 * hashLongEntry.getValue()
+                        )
+                    ).collect(
+                        Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                    )
+                );
+
+                if (!snapshotStateDiff.isConsistent()) {
+                    throw new SnapshotException("the StateDiff belonging to milestone #" + getIndex() + " (" + getHash().toString() + ") is inconsistent");
+                } else if (!state.patchedState(snapshotStateDiff).isConsistent()) {
+                    throw new SnapshotException("Snapshot would be inconsistent after applying patch belonging to milestone #" + getIndex() + " (" + getHash().toString() + ")");
+                }
+
+                state.applyStateDiff(snapshotStateDiff);
+            }
+
+            // jump skipped milestones
+            int currentIndex = getIndex();
+            while(skippedMilestones.remove(--currentIndex)) {
+                /* do nothing */
+            }
+
+            // check if we arrived at the start
+            if(currentIndex <= getInitialIndex()) {
+                metaData.setIndex(getInitialIndex());
+                metaData.setHash(getInitialHash());
+                metaData.setTimestamp(getInitialTimestamp());
+
+                return true;
+            }
+
+            // otherwise set metadata of the previous milestone
+            MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentIndex);
+            metaData.setIndex(currentMilestone.index());
+            metaData.setHash(currentMilestone.getHash());
+            metaData.setTimestamp(TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).getTimestamp());
+
+            return true;
+        } catch (Exception e) {
+            throw new SnapshotException("failed to rollback last milestone", e);
+        } finally {
+            unlockWrite();
+        }
+    }
 
     public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         lockWrite();
