@@ -75,6 +75,8 @@ public class LedgerValidator {
                     if(transactionViewModel.snapshotIndex() > latestSnapshotIndex && resettedMilestones.add(latestSnapshotIndex)) {
                         System.out.println("RES: " + transactionViewModel.snapshotIndex());
                         this.milestone.resetCorruptedMilestone(latestSnapshotIndex, "getLatestDiff");
+
+                        return null;
                     }
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
@@ -160,6 +162,10 @@ public class LedgerValidator {
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
                     if(transactionViewModel2.snapshotIndex() > index && resettedMilestones.add(index)) {
                         milestone.resetCorruptedMilestone(index, "updateSnapshotIndexOfMilestoneTransactions");
+
+                        updateSnapshotIndexOfMilestoneTransactions(hash, index);
+
+                        return;
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
@@ -297,7 +303,7 @@ public class LedgerValidator {
                 milestone.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
                 //hardReset(milestoneVM, transactionSnapshotIndex, "milestones processed in the wrong order (#" + transactionSnapshotIndex +" before #" + milestoneVM.index() + ")");
 
-                transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
+                return false;
             }
 
             snapshotManager.getLatestSnapshot().lockRead();
