@@ -335,7 +335,7 @@ public class MilestoneTracker {
 
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
         if(milestoneTransaction.snapshotIndex() > currentMilestone.index()) {
-            resetCorruptedMilestone(milestoneTransaction.snapshotIndex(), "recursive", processedTransactions);
+            resettedMilestones.add(milestoneTransaction.snapshotIndex());
         }
         milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
         processedTransactions.add(milestoneTransaction.getHash());
@@ -344,14 +344,18 @@ public class MilestoneTracker {
             currentMilestone,
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
             currentTransaction -> {
-                if(currentTransaction.snapshotIndex() > currentMilestone.index() && resettedMilestones.add(currentTransaction.snapshotIndex())) {
-                    resetCorruptedMilestone(currentTransaction.snapshotIndex(), "resetSnapshotIndexOfMilestone", processedTransactions);
+                if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
+                    resettedMilestones.add(currentTransaction.snapshotIndex());
                 }
 
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
             },
             processedTransactions
         );
+
+        for (int resettedMilestoneIndex : resettedMilestones) {
+            resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestone", processedTransactions);
+        }
     }
 
     public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
