@@ -302,7 +302,7 @@ public class MilestoneTracker {
     }
 
     public void resetCorruptedMilestone(int milestoneIndex, String identifier, HashSet<Hash> processedTransactions) {
-        System.out.println("REPAIRING: " + milestoneIndex + " => " + identifier);
+        System.out.println("REPAIRING: " + snapshotManager.getLatestSnapshot().getIndex() + " <=> " + milestoneIndex + " => " + identifier);
 
         try {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
