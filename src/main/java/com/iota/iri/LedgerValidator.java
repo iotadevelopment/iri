@@ -71,6 +71,9 @@ public class LedgerValidator {
 
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
+                    if(transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
+                        this.milestone.repairCorruptedMilestone(transactionViewModel.snapshotIndex());
+                    }
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
                         transactionRequester.requestTransaction(transactionViewModel.getHash(), milestone);
@@ -153,7 +156,7 @@ public class LedgerValidator {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
                     if(transactionViewModel2.snapshotIndex() > index) {
-                        //milestone.hardReset();
+                        milestone.repairCorruptedMilestone(transactionViewModel2.snapshotIndex());
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
