@@ -210,15 +210,11 @@ public class API {
 
             switch (command) {
                 case "hardReset": {
-                    try {
-                        instance.milestoneTracker.hardReset(
+                        /*instance.milestoneTracker.hardReset(
                             MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))),
                                 Integer.parseInt(getParameterAsString(request, "transactionUntil")),
                             "manual reset"
-                        );
-                    } catch(ValidationException e) {
-
-                    }
+                        );*/
 
                     return ErrorResponse.create("reset successfull");
                 }
