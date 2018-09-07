@@ -307,13 +307,15 @@ public class MilestoneTracker {
         try {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
 
-            // reset the ledger to the state before the erroneous milestone appeared
-            if(milestoneToRepair.index() <= snapshotManager.getLatestSnapshot().getIndex()) {
-                snapshotManager.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
-            }
+            if(milestoneToRepair != null) {
+                // reset the ledger to the state before the erroneous milestone appeared
+                if(milestoneToRepair.index() <= snapshotManager.getLatestSnapshot().getIndex()) {
+                    snapshotManager.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
+                }
 
-            resetSnapshotIndexOfMilestone(milestoneToRepair, processedTransactions);
-            tangle.delete(StateDiff.class, milestoneToRepair.getHash());
+                resetSnapshotIndexOfMilestone(milestoneToRepair, processedTransactions);
+                tangle.delete(StateDiff.class, milestoneToRepair.getHash());
+            }
         } catch (Exception e) {
             log.error("failed to repair corrupted milestone with index #" + milestoneIndex, e);
         }

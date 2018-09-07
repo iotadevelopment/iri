@@ -72,12 +72,6 @@ public class LedgerValidator {
 
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
-                    if(transactionViewModel.snapshotIndex() > latestSnapshotIndex && resettedMilestones.add(latestSnapshotIndex)) {
-                        System.out.println("RES: " + transactionViewModel.snapshotIndex());
-                        this.milestone.resetCorruptedMilestone(latestSnapshotIndex, "getLatestDiff");
-
-                        return null;
-                    }
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
                         transactionRequester.requestTransaction(transactionViewModel.getHash(), milestone);
@@ -164,7 +158,7 @@ public class LedgerValidator {
                         milestone.resetCorruptedMilestone(index, "updateSnapshotIndexOfMilestoneTransactions");
 
                         updateSnapshotIndexOfMilestoneTransactions(hash, index);
-
+                        
                         return;
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
