@@ -154,12 +154,8 @@ public class LedgerValidator {
             if (visitedHashes.add(hashPointer)) {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
-                    if(transactionViewModel2.snapshotIndex() > index && resettedMilestones.add(index)) {
-                        milestone.resetCorruptedMilestone(index, "updateSnapshotIndexOfMilestoneTransactions");
-
-                        updateSnapshotIndexOfMilestoneTransactions(hash, index);
-
-                        return;
+                    if(transactionViewModel2.snapshotIndex() > index) {
+                        resettedMilestones.add(transactionViewModel2.snapshotIndex());
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
@@ -172,6 +168,10 @@ public class LedgerValidator {
                     nonAnalyzedTransactions.offer(transactionViewModel2.getBranchTransactionHash());
                 }
             }
+        }
+
+        for (int resettedMilestoneIndex : resettedMilestones) {
+            milestone.resetCorruptedMilestone(resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
         }
     }
 
