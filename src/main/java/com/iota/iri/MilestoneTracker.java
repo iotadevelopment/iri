@@ -417,6 +417,10 @@ public class MilestoneTracker {
         return INVALID;
     }
 
+    int errorCausingMilestone = Integer.MAX_VALUE;
+
+    int binaryBackoffCounter = 0;
+
     void updateLatestSolidSubtangleMilestone() throws Exception {
         // acquire a write lock for our snapshot
         snapshotManager.getLatestSnapshot().lockWrite();
@@ -434,11 +438,20 @@ public class MilestoneTracker {
                 !shuttingDown &&
                 nextMilestone != null
             ) {
+                if(nextMilestone.index() >= errorCausingMilestone) {
+                    binaryBackoffCounter = 0;
+                    errorCausingMilestone = Integer.MAX_VALUE;
+                }
+
                 // advance to the next milestone if we were able to update the ledger state
                 if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                     nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
                 } else {
-                    resetCorruptedMilestone(nextMilestone.index(), "updateLatestSolidSubtangleMilestone");
+                    resetCorruptedMilestone(nextMilestone.index() - 2^binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
+
+                    if(binaryBackoffCounter++ == 0) {
+                        errorCausingMilestone = nextMilestone.index();
+                    }
 
                     nextMilestone = null;
                 }
