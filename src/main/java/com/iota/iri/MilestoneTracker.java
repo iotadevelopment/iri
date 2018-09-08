@@ -438,7 +438,7 @@ public class MilestoneTracker {
                 !shuttingDown &&
                 nextMilestone != null
             ) {
-                if(nextMilestone.index() >= errorCausingMilestone) {
+                if(nextMilestone.index() > errorCausingMilestone) {
                     binaryBackoffCounter = 0;
                     errorCausingMilestone = Integer.MAX_VALUE;
                 }
