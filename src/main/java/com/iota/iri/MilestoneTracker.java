@@ -436,7 +436,8 @@ public class MilestoneTracker {
             // while we have a milestone which is solid
             while(
                 !shuttingDown &&
-                nextMilestone != null
+                nextMilestone != null &&
+                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()
             ) {
                 if(nextMilestone.index() > errorCausingMilestone) {
                     binaryBackoffCounter = 0;
