@@ -726,7 +726,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
         boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = false;
         String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "snapshotMainnet";
         String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "snapshotMainnet";
-        int LOCAL_SNAPSHOTS_DEPTH = 10000;
+        int LOCAL_SNAPSHOTS_DEPTH = 500;
         String SNAPSHOT_FILE = "/snapshotMainnet.txt";
         String SNAPSHOT_SIG_FILE = "/snapshotMainnet.sig";
         String PREVIOUS_EPOCHS_SPENT_ADDRESSES_TXT = "/previousEpochsSpentAddresses.txt";

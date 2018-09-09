@@ -106,7 +106,7 @@ public class SnapshotManager {
             while(!shuttingDown) {
                 long scanStart = System.currentTimeMillis();
 
-                if(milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                if(latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                     try {
                         takeLocalSnapshot();
                     } catch(SnapshotException e) {
