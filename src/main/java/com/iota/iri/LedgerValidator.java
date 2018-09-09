@@ -58,7 +58,6 @@ public class LedgerValidator {
         Map<Hash, Long> state = new HashMap<>();
         int numberOfAnalyzedTransactions = 0;
         Set<Hash> countedTx = new HashSet<>();
-        Set<Integer> resettedMilestones = new HashSet<>();
 
         snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
             visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);

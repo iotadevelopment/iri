@@ -172,7 +172,7 @@ public class MilestoneTracker {
                     int i = 0;
                     while(!shuttingDown && i++ < 1000) {
                         Hash currentMilestone;
-                        if((currentMilestone = latestMilestoneQueue.pop()) != null) {
+                        if((currentMilestone = latestMilestoneQueue.poll()) != null) {
                             if(analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
                                 analyzedMilestoneCandidates.remove(currentMilestone);
                             }
@@ -337,6 +337,10 @@ public class MilestoneTracker {
     }
 
     public void resetCorruptedMilestone(int milestoneIndex, String identifier, HashSet<Hash> processedTransactions) {
+        if(milestoneIndex <= snapshotManager.getInitialSnapshot().getIndex()) {
+            return;
+        }
+
         System.out.println("REPAIRING: " + snapshotManager.getLatestSnapshot().getIndex() + " <=> " + milestoneIndex + " => " + identifier);
 
         try {
