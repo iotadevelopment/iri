@@ -436,8 +436,7 @@ public class MilestoneTracker {
             // while we have a milestone which is solid
             while(
                 !shuttingDown &&
-                nextMilestone != null &&
-                TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()
+                nextMilestone != null
             ) {
                 if(nextMilestone.index() > errorCausingMilestone) {
                     binaryBackoffCounter = 0;
@@ -447,7 +446,7 @@ public class MilestoneTracker {
                 // advance to the next milestone if we were able to update the ledger state
                 if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                     nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
-                } else {
+                } else if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
                     resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
 
                     if(binaryBackoffCounter++ == 0) {

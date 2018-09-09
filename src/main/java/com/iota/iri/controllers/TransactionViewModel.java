@@ -5,12 +5,22 @@ import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.storage.cache.Cache;
+import com.iota.iri.storage.cache.Cacheable;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.Pair;
 
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class TransactionViewModel {
+public class TransactionViewModel implements Cacheable {
+    public Hash getId() {
+        return hash;
+    }
+
+    private static Cache<TransactionViewModel> cache = new Cache<>();
 
     public final com.iota.iri.model.Transaction transaction;
 
@@ -69,8 +79,13 @@ public class TransactionViewModel {
     }
 
     public static TransactionViewModel fromHash(Tangle tangle, final Hash hash) throws Exception {
-        TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
-        fillMetadata(tangle, transactionViewModel);
+        TransactionViewModel transactionViewModel = cache.get(hash);
+        if (transactionViewModel == null) {
+            transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
+            fillMetadata(tangle, transactionViewModel);
+            cache.add(transactionViewModel);
+        }
+
         return transactionViewModel;
     }
 

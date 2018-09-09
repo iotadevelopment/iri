@@ -200,6 +200,23 @@ public class SnapshotTest {
     }
 
     @Test
+    public void concurrencyTest() throws Exception {
+        createMilestonesInDatabase(Milestones.MILESTONE_1);
+
+        long scanStart = System.currentTimeMillis();
+
+        for (int i = 0; i < 100000; i++) {
+            TransactionViewModel.fromHash(tangle, Milestones.MILESTONE_1.getHash()).setSnapshot(tangle, snapshotManager, i);
+            assertEquals(TransactionViewModel.fromHash(tangle, Milestones.MILESTONE_1.getHash()).snapshotIndex(), i);
+        }
+
+        System.out.println(System.currentTimeMillis() - scanStart);
+
+        // clean up
+        removeMilestonesFromDatabase(Milestones.MILESTONE_1);
+    }
+
+    @Test
     public void rollbackLastMilestoneTest() throws Exception {
         // generate our starting milestone
         Snapshot testSnapshot = getTestSnapshot();
