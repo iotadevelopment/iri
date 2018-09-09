@@ -83,7 +83,6 @@ public class TransactionViewModel implements Cacheable {
         if (transactionViewModel == null) {
             transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
             fillMetadata(tangle, transactionViewModel);
-            cache.add(transactionViewModel);
         }
 
         return transactionViewModel;
@@ -97,6 +96,8 @@ public class TransactionViewModel implements Cacheable {
         this.transaction = transaction == null || transaction.bytes == null ? new Transaction(): transaction;
         this.hash = hash == null ? Hash.NULL_HASH : hash;
         weightMagnitude = this.hash.trailingZeros();
+
+        cache.add(this);
     }
 
     public TransactionViewModel(final byte[] trits, Hash hash) {
@@ -122,6 +123,8 @@ public class TransactionViewModel implements Cacheable {
             weightMagnitude = this.hash.trailingZeros();
             transaction.type = FILLED_SLOT;
         }
+
+        cache.add(this);
     }
 
     public static int getNumberOfStoredTransactions(Tangle tangle) throws Exception {

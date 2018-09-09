@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 public class SnapshotManager {
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
 
+    private static Snapshot builtinSnapshot = null;
+
     public static int GENERATE_FROM_INITIAL = 1;
 
     public static int GENERATE_FROM_LATEST = -1;
@@ -574,51 +576,55 @@ public class SnapshotManager {
     }
 
     public Snapshot loadBuiltInSnapshot() throws IOException, IllegalStateException {
-        // read the config vars for the built in snapshot files
-        boolean testnet = configuration.isTestnet();
-        String snapshotPath = configuration.getSnapshotFile();
-        String snapshotSigPath = configuration.getSnapshotSignatureFile();
-        int milestoneStartIndex = testnet ? 0 : configuration.getMilestoneStartIndex();
+        if (builtinSnapshot == null) {
+            // read the config vars for the built in snapshot files
+            boolean testnet = configuration.isTestnet();
+            String snapshotPath = configuration.getSnapshotFile();
+            String snapshotSigPath = configuration.getSnapshotSignatureFile();
+            int milestoneStartIndex = testnet ? 0 : configuration.getMilestoneStartIndex();
 
-        // verify the signature of the builtin snapshot file
-        if(!testnet && !SignedFiles.isFileSignatureValid(
-            snapshotPath,
-            snapshotSigPath,
-            SNAPSHOT_PUBKEY,
-            SNAPSHOT_PUBKEY_DEPTH,
-            SNAPSHOT_INDEX
-        )) {
-            throw new IllegalStateException("the snapshot signature is invalid");
+            // verify the signature of the builtin snapshot file
+            if(!testnet && !SignedFiles.isFileSignatureValid(
+                snapshotPath,
+                snapshotSigPath,
+                SNAPSHOT_PUBKEY,
+                SNAPSHOT_PUBKEY_DEPTH,
+                SNAPSHOT_INDEX
+            )) {
+                throw new IllegalStateException("the snapshot signature is invalid");
+            }
+
+            // restore the snapshot state from its file
+            SnapshotState snapshotState = SnapshotState.fromFile(snapshotPath);
+
+            // check the supply of the snapshot state
+            if(!snapshotState.hasCorrectSupply()) {
+                throw new IllegalStateException("the snapshot state file has an invalid supply");
+            }
+
+            // check the consistency of the snaphot state
+            if(!snapshotState.isConsistent()) {
+                throw new IllegalStateException("the snapshot state file is not consistent");
+            }
+
+            // create solid entry points
+            HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+            solidEntryPoints.put(Hash.NULL_HASH, milestoneStartIndex);
+
+            // return our snapshot
+            builtinSnapshot = new Snapshot(
+                snapshotState,
+                new SnapshotMetaData(
+                    Hash.NULL_HASH,
+                    milestoneStartIndex,
+                    configuration.getSnapshotTime(),
+                    solidEntryPoints,
+                    new HashMap<>()
+                )
+            );
         }
 
-        // restore the snapshot state from its file
-        SnapshotState snapshotState = SnapshotState.fromFile(snapshotPath);
-
-        // check the supply of the snapshot state
-        if(!snapshotState.hasCorrectSupply()) {
-            throw new IllegalStateException("the snapshot state file has an invalid supply");
-        }
-
-        // check the consistency of the snaphot state
-        if(!snapshotState.isConsistent()) {
-            throw new IllegalStateException("the snapshot state file is not consistent");
-        }
-
-        // create solid entry points
-        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        solidEntryPoints.put(Hash.NULL_HASH, milestoneStartIndex);
-
-        // return our snapshot
-        return new Snapshot(
-            snapshotState,
-            new SnapshotMetaData(
-                Hash.NULL_HASH,
-                milestoneStartIndex,
-                configuration.getSnapshotTime(),
-                solidEntryPoints,
-                new HashMap<>()
-            )
-        );
+        return builtinSnapshot.clone();
     }
 
     public Snapshot takeLocalSnapshot() throws SnapshotException {
