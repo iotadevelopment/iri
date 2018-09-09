@@ -348,7 +348,7 @@ public class MilestoneTracker {
                     snapshotManager.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
                 }
 
-                resetSnapshotIndexOfMilestone(milestoneToRepair, processedTransactions);
+                resetSnapshotIndexOfMilestoneTransactions(milestoneToRepair, processedTransactions);
                 tangle.delete(StateDiff.class, milestoneToRepair.getHash());
             }
         } catch (Exception e) {
@@ -367,32 +367,33 @@ public class MilestoneTracker {
      * @param currentMilestone the milestone that shall have its confirmed transactions reset
      * @throws Exception if something goes wrong while accessing the database
      */
-    public void resetSnapshotIndexOfMilestone(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
+    public void resetSnapshotIndexOfMilestoneTransactions(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
         Set<Integer> resettedMilestones = new HashSet<>();
 
         TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-        if(milestoneTransaction.snapshotIndex() > currentMilestone.index()) {
-            resettedMilestones.add(milestoneTransaction.snapshotIndex());
-        }
-        milestoneTransaction.setSnapshot(tangle, snapshotManager, 0);
+        resetSnapshotIndexOfMilestoneTransaction(milestoneTransaction, currentMilestone, resettedMilestones);
         processedTransactions.add(milestoneTransaction.getHash());
 
         dagUtils.traverseApprovees(
             currentMilestone,
             currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
-            currentTransaction -> {
-                if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-                    resettedMilestones.add(currentTransaction.snapshotIndex());
-                }
-
-                currentTransaction.setSnapshot(tangle, snapshotManager, 0);
-            },
+            currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
             processedTransactions
         );
 
         for (int resettedMilestoneIndex : resettedMilestones) {
-            resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestone", processedTransactions);
+            resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestoneTransactions", processedTransactions);
         }
+    }
+
+    protected void resetSnapshotIndexOfMilestoneTransaction(TransactionViewModel currentTransaction,
+                                                            MilestoneViewModel currentMilestone,
+                                                            Set<Integer> resettedMilestones) throws Exception {
+        if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
+            resettedMilestones.add(currentTransaction.snapshotIndex());
+        }
+
+        currentTransaction.setSnapshot(tangle, snapshotManager, 0);
     }
 
     public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
@@ -457,63 +458,56 @@ public class MilestoneTracker {
     int binaryBackoffCounter = 0;
 
     void updateLatestSolidSubtangleMilestone() throws Exception {
-        // acquire a write lock for our snapshot
-        snapshotManager.getLatestSnapshot().lockWrite();
+        // introduce some variables that help us to emit log messages while processing the milestones
+        int prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+        long lastScan = System.currentTimeMillis();
 
-        try {
-            // introduce some variables that help us to emit log messages while processing the milestones
-            int prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-            long lastScan = System.currentTimeMillis();
+        // get the next milestone
+        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
 
-            // get the next milestone
-            MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
-
-            // while we have a milestone which is solid
-            while(
-                !shuttingDown &&
-                nextMilestone != null
-            ) {
-                if(nextMilestone.index() > errorCausingMilestone) {
-                    binaryBackoffCounter = 0;
-                    errorCausingMilestone = Integer.MAX_VALUE;
-                }
-
-                // advance to the next milestone if we were able to update the ledger state
-                if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
-                    if(nextMilestone.index() > latestMilestoneIndex) {
-                        latestMilestoneIndex = nextMilestone.index();
-                        latestMilestone = nextMilestone.getHash();
-                    }
-
-                    nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
-                } else {
-                    if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
-                        resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
-
-                        if(binaryBackoffCounter++ == 0) {
-                            errorCausingMilestone = nextMilestone.index();
-                        }
-                    }
-
-                    nextMilestone = null;
-                }
-
-                // dump a log message in intervals and when we terminate
-                if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
-                    System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
-                )) {
-                    messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
-                    messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
-                    log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                            + prevSolidMilestoneIndex + " to #"
-                            + snapshotManager.getLatestSnapshot().getIndex());
-
-                    lastScan = System.currentTimeMillis();
-                    prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
-                }
+        // while we have a milestone which is solid
+        while(
+            !shuttingDown &&
+            nextMilestone != null
+        ) {
+            if(nextMilestone.index() > errorCausingMilestone) {
+                binaryBackoffCounter = 0;
+                errorCausingMilestone = Integer.MAX_VALUE;
             }
-        } finally {
-            snapshotManager.getLatestSnapshot().unlockWrite();
+
+            // advance to the next milestone if we were able to update the ledger state
+            if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
+                if(nextMilestone.index() > latestMilestoneIndex) {
+                    latestMilestoneIndex = nextMilestone.index();
+                    latestMilestone = nextMilestone.getHash();
+                }
+
+                nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
+            } else {
+                if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
+                    resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
+
+                    if(binaryBackoffCounter++ == 0) {
+                        errorCausingMilestone = nextMilestone.index();
+                    }
+                }
+
+                nextMilestone = null;
+            }
+
+            // dump a log message in intervals and when we terminate
+            if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
+                System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
+            )) {
+                messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
+                messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
+                log.info("Latest SOLID SUBTANGLE milestone has changed from #"
+                        + prevSolidMilestoneIndex + " to #"
+                        + snapshotManager.getLatestSnapshot().getIndex());
+
+                lastScan = System.currentTimeMillis();
+                prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
+            }
         }
     }
 
