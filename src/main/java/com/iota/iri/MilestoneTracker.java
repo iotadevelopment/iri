@@ -157,9 +157,9 @@ public class MilestoneTracker {
                     }
 
                     int i = 0;
-                    while(i++ < 1000) {
-                        Hash currentMilestone;
-                        if(!shuttingDown && (currentMilestone = latestMilestoneQueue.pop()) != null && analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
+                    Hash currentMilestone;
+                    while(!shuttingDown && (currentMilestone = latestMilestoneQueue.pop()) != null && i++ < 1000) {
+                        if(analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
                             analyzedMilestoneCandidates.remove(currentMilestone);
                         }
 
