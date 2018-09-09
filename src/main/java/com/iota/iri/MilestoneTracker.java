@@ -152,7 +152,7 @@ public class MilestoneTracker {
                     LinkedList<Hash> reversedHashes = new LinkedList<>();
                     for(Hash hash: hashes) {
                         if(!shuttingDown) {
-                            reversedHashes.addLast(hash);
+                            reversedHashes.addFirst(hash);
                         }
                     }
 
