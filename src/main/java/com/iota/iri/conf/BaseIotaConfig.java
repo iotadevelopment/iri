@@ -80,6 +80,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
     //Snapshot
     protected boolean localSnapshotsEnabled = Defaults.LOCAL_SNAPSHOTS_ENABLED;
     protected boolean localSnapshotsPruningEnabled = Defaults.LOCAL_SNAPSHOTS_PRUNING_ENABLED;
+    protected int localSnapshotsPruningDelay = Defaults.LOCAL_SNAPSHOTS_PRUNING_DELAY;
     protected int localSnapshotsDepth = Defaults.LOCAL_SNAPSHOTS_DEPTH;
     protected String localSnapshotsMainnetBasePath = Defaults.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH;
     protected String localSnapshotsTestnetBasePath = Defaults.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH;
@@ -474,6 +475,17 @@ public abstract class BaseIotaConfig implements IotaConfig {
     }
 
     @Override
+    public int getLocalSnapshotsPruningDelay() {
+        return this.localSnapshotsPruningDelay;
+    }
+
+    @JsonProperty
+    @Parameter(names = {"--local-snapshots-pruning-delay"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_PRUNING_DELAY)
+    protected void setLocalSnapshotsPruningDelay(int localSnapshotsPruningDelay) {
+        this.localSnapshotsPruningDelay = localSnapshotsPruningDelay;
+    }
+
+    @Override
     public int getLocalSnapshotsDepth() {
         return this.localSnapshotsDepth;
     }
@@ -723,7 +735,8 @@ public abstract class BaseIotaConfig implements IotaConfig {
 
         //Snapshot
         boolean LOCAL_SNAPSHOTS_ENABLED = true;
-        boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = false;
+        boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = true;
+        int LOCAL_SNAPSHOTS_PRUNING_DELAY = 500;
         String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "snapshotMainnet";
         String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "snapshotMainnet";
         int LOCAL_SNAPSHOTS_DEPTH = 500;

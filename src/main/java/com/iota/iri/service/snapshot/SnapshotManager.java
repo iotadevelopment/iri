@@ -662,7 +662,7 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the snapshot");
         }
 
-        snapshotGarbageCollector.addCleanupJob(targetMilestone.index());
+        snapshotGarbageCollector.addCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
 
         try {
             targetSnapshot.getState().writeFile(basePath + ".snapshot.state");
