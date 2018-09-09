@@ -37,11 +37,21 @@ public class MilestoneTracker {
     /**
      * Validity states of transactions regarding their milestone status.
      */
+    enum Status {
+        INITIALIZING,
+        INITIALIZED
+    }
+
+    /**
+     * Validity states of transactions regarding their milestone status.
+     */
     enum Validity {
         VALID,
         INVALID,
         INCOMPLETE
     }
+
+    protected Status status = Status.INITIALIZING;
 
     private static int RESCAN_INTERVAL = 5000;
 
@@ -148,7 +158,6 @@ public class MilestoneTracker {
                 try {
                     // analyze all found milestone candidates
                     Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
-                    scanningMilestonesProgress.setEnabled(firstRun).start(hashes.size());
 
                     for(Hash hash: hashes) {
                         if(!shuttingDown && analyzedMilestoneCandidates.add(hash)) {
@@ -156,16 +165,20 @@ public class MilestoneTracker {
                         }
                     }
 
+                    // process the latest milestones in chunks of 1000 to allow new milestones to be processed as well
                     int i = 0;
-                    Hash currentMilestone;
-                    while(!shuttingDown && (currentMilestone = latestMilestoneQueue.pop()) != null && i++ < 1000) {
-                        if(analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
-                            analyzedMilestoneCandidates.remove(currentMilestone);
+                    while(!shuttingDown && i++ < 1000) {
+                        Hash currentMilestone;
+                        if((currentMilestone = latestMilestoneQueue.pop()) != null) {
+                            if(analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
+                                analyzedMilestoneCandidates.remove(currentMilestone);
+                            }
+                        } else {
+                            this.status = Status.INITIALIZED;
                         }
-
-                        scanningMilestonesProgress.progress();
                     }
-                    scanningMilestonesProgress.finish();
+
+                    log.info("Milestone Tracker: Processing milestones ... " + latestMilestoneQueue.size() + " milestones remaining");
 
                     // allow the "Solid Milestone Tracker" to continue if we finished the first run in rescanning mode
                     if(firstRun && isRescanning) {
