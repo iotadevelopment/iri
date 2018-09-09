@@ -350,6 +350,8 @@ public class MilestoneTracker {
                     resettedMilestones.add(currentTransaction.snapshotIndex());
                 }
 
+                System.out.println(currentTransaction.getHash());
+
                 currentTransaction.setSnapshot(tangle, snapshotManager, 0);
             },
             processedTransactions
