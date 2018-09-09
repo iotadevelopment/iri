@@ -446,11 +446,13 @@ public class MilestoneTracker {
                 // advance to the next milestone if we were able to update the ledger state
                 if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                     nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
-                } else if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
-                    resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
+                } else {
+                    if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
+                        resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
 
-                    if(binaryBackoffCounter++ == 0) {
-                        errorCausingMilestone = nextMilestone.index();
+                        if(binaryBackoffCounter++ == 0) {
+                            errorCausingMilestone = nextMilestone.index();
+                        }
                     }
 
                     nextMilestone = null;
