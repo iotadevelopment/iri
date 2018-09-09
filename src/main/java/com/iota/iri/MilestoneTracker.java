@@ -477,6 +477,11 @@ public class MilestoneTracker {
 
                 // advance to the next milestone if we were able to update the ledger state
                 if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
+                    if(nextMilestone.index() > latestMilestoneIndex) {
+                        latestMilestoneIndex = nextMilestone.index();
+                        latestMilestone = nextMilestone.getHash();
+                    }
+
                     nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
                 } else {
                     if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
