@@ -16,6 +16,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
+
 public class SnapshotManager {
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
 
@@ -104,7 +106,7 @@ public class SnapshotManager {
             while(!shuttingDown) {
                 long scanStart = System.currentTimeMillis();
 
-                if(latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                if(milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex && latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                     try {
                         takeLocalSnapshot();
                     } catch(SnapshotException e) {

@@ -32,12 +32,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import static com.iota.iri.MilestoneTracker.Validity.*;
+import static com.iota.iri.MilestoneTracker.Status.*;
 
 public class MilestoneTracker {
     /**
      * Validity states of transactions regarding their milestone status.
      */
-    enum Status {
+    public enum Status {
         INITIALIZING,
         INITIALIZED
     }
@@ -51,7 +52,7 @@ public class MilestoneTracker {
         INCOMPLETE
     }
 
-    protected Status status = Status.INITIALIZING;
+    protected Status status = INITIALIZING;
 
     private static int RESCAN_INTERVAL = 5000;
 
@@ -71,7 +72,6 @@ public class MilestoneTracker {
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
     private final Hash coordinator;
-    private final TransactionValidator transactionValidator;
     private final TransactionRequester transactionRequester;
     private final boolean testnet;
     private final MessageQ messageQ;
@@ -100,7 +100,6 @@ public class MilestoneTracker {
     ) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
-        this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator);
@@ -114,6 +113,10 @@ public class MilestoneTracker {
         this.isRescanning = config.isRescanDb() || config.isRevalidate();
         this.latestMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
         this.latestMilestone = snapshotManager.getLatestSnapshot().getHash();
+    }
+
+    public Status getStatus() {
+        return this.status;
     }
 
     public void init (LedgerValidator ledgerValidator) {
@@ -174,7 +177,7 @@ public class MilestoneTracker {
                                 analyzedMilestoneCandidates.remove(currentMilestone);
                             }
                         } else {
-                            this.status = Status.INITIALIZED;
+                            this.status = INITIALIZED;
                         }
                     }
 
