@@ -155,7 +155,6 @@ public class LedgerValidator {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
                     if(transactionViewModel2.snapshotIndex() > index) {
-                        System.out.println(transactionViewModel2.getHash().toString() + ": " + transactionViewModel2.snapshotIndex() + " <-> " + index);
                         resettedMilestones.add(transactionViewModel2.snapshotIndex());
                     }
                     transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
@@ -296,8 +295,6 @@ public class LedgerValidator {
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
                 milestone.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
-
-                System.out.println(transactionViewModel.snapshotIndex() + " / " + transactionSnapshotIndex);
             }
 
             snapshotManager.getLatestSnapshot().lockRead();
