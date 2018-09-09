@@ -357,6 +357,8 @@ public class MilestoneTracker {
             processedTransactions
         );
 
+        System.out.println("===============");
+
         for (int resettedMilestoneIndex : resettedMilestones) {
             resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestone", processedTransactions);
         }
