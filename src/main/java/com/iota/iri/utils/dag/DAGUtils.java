@@ -65,7 +65,7 @@ public class DAGUtils {
                                   TraversalConsumer currentTransactionConsumer, Set<Hash> processedTransactions) throws Exception {
         final Queue<TransactionViewModel> transactionsToExamine = new LinkedList<>();
         transactionsToExamine.add(TransactionViewModel.fromHash(tangle, startingTransaction.getBranchTransactionHash()));
-        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, startingTransaction.getBranchTransactionHash()));
+        transactionsToExamine.add(TransactionViewModel.fromHash(tangle, startingTransaction.getTrunkTransactionHash()));
 
         TransactionViewModel currentTransaction;
         while((currentTransaction = transactionsToExamine.poll()) != null) {
