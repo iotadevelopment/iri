@@ -148,7 +148,15 @@ public class MilestoneTracker {
                     // analyze all found milestone candidates
                     Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
                     scanningMilestonesProgress.setEnabled(firstRun).start(hashes.size());
+
+                    LinkedList<Hash> reversedHashes = new LinkedList<>();
                     for(Hash hash: hashes) {
+                        if(!shuttingDown) {
+                            reversedHashes.addLast(hash);
+                        }
+                    }
+
+                    for(Hash hash: reversedHashes) {
                         if(!shuttingDown && analyzedMilestoneCandidates.add(hash) && analyzeMilestoneCandidate(hash) == INCOMPLETE) {
                             analyzedMilestoneCandidates.remove(hash);
                         }
@@ -275,6 +283,15 @@ public class MilestoneTracker {
 
                         latestMilestone = potentialMilestoneTransaction.getHash();
                         latestMilestoneIndex = milestoneIndex;
+                    } else {
+                        MilestoneViewModel latestMilestoneViewModel = MilestoneViewModel.latest(tangle);
+                        if (latestMilestoneViewModel.index() > latestMilestoneIndex) {
+                            messageQ.publish("lmi %d %d", latestMilestoneIndex, latestMilestoneViewModel.index());
+                            log.info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + latestMilestoneViewModel.index());
+
+                            latestMilestone = latestMilestoneViewModel.getHash();
+                            latestMilestoneIndex = latestMilestoneViewModel.index();
+                        }
                     }
 
                     if(!potentialMilestoneTransaction.isSolid()) {
