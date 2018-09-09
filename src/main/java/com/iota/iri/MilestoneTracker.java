@@ -139,6 +139,7 @@ public class MilestoneTracker {
                 analyzeMilestoneCandidate(MilestoneViewModel.latest(tangle).getHash());
             } catch(Exception e) { /* do nothing */ }
 
+            LinkedList<Hash> latestMilestoneQueue = new LinkedList<>();
             log.info("Tracker started.");
             boolean firstRun = true;
             while (!shuttingDown) {
@@ -149,16 +150,17 @@ public class MilestoneTracker {
                     Set<Hash> hashes = AddressViewModel.load(tangle, coordinator).getHashes();
                     scanningMilestonesProgress.setEnabled(firstRun).start(hashes.size());
 
-                    LinkedList<Hash> reversedHashes = new LinkedList<>();
                     for(Hash hash: hashes) {
-                        if(!shuttingDown) {
-                            reversedHashes.addFirst(hash);
+                        if(!shuttingDown && analyzedMilestoneCandidates.add(hash)) {
+                            latestMilestoneQueue.push(hash);
                         }
                     }
 
-                    for(Hash hash: reversedHashes) {
-                        if(!shuttingDown && analyzedMilestoneCandidates.add(hash) && analyzeMilestoneCandidate(hash) == INCOMPLETE) {
-                            analyzedMilestoneCandidates.remove(hash);
+                    int i = 0;
+                    while(i++ < 1000) {
+                        Hash currentMilestone;
+                        if(!shuttingDown && (currentMilestone = latestMilestoneQueue.pop()) != null && analyzeMilestoneCandidate(currentMilestone) == INCOMPLETE) {
+                            analyzedMilestoneCandidates.remove(currentMilestone);
                         }
 
                         scanningMilestonesProgress.progress();
