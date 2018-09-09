@@ -87,7 +87,9 @@ public class SnapshotManager {
         if(configuration.getLocalSnapshotsEnabled()) {
             spawnMonitorThread(milestoneTracker);
 
-            snapshotGarbageCollector.start();
+            if(configuration.getLocalSnapshotsPruningEnabled()) {
+                snapshotGarbageCollector.start();
+            }
         }
     }
 

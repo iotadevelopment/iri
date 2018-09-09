@@ -11,6 +11,11 @@ public interface SnapshotConfig extends Config {
     boolean getLocalSnapshotsEnabled();
 
     /**
+     * @return {@value Descriptions#LOCAL_SNAPSHOTS_PRUNING_ENABLED}
+     */
+    boolean getLocalSnapshotsPruningEnabled();
+
+    /**
      * @return {@value Descriptions#LOCAL_SNAPSHOTS_DEPTH}
      */
     int getLocalSnapshotsDepth();
@@ -63,6 +68,7 @@ public interface SnapshotConfig extends Config {
     interface Descriptions {
 
         String LOCAL_SNAPSHOTS_ENABLED = "Flag that determines if local snapshots are enabled.";
+        String LOCAL_SNAPSHOTS_PRUNING_ENABLED = "Flag that determines if local snapshots are enabled.";
         String LOCAL_SNAPSHOTS_DEPTH = "Number of milestones to keep.";
         String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "Path to the testnet snapshot files (without file extensions).";
         String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "Path to the testnet snapshot files (without file extensions).";
