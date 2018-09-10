@@ -79,6 +79,7 @@ public class SnapshotGarbageCollector {
         cleanupJobs.addLast(new GarbageCollectorJob(milestoneIndex, milestoneIndex));
 
         persistChanges();
+        consolidateCleanupJobs();
     }
 
     public SnapshotGarbageCollector start() {
@@ -257,7 +258,8 @@ public class SnapshotGarbageCollector {
         }
 
         // if we have at least 2 jobs -> check if we can consolidate them at the end
-        if(cleanupJobs.size() >= 2) {
+        boolean cleanupSuccessfull = true;
+        while(cleanupJobs.size() >= 2 && cleanupSuccessfull) {
             // retrieve the last two jobs
             GarbageCollectorJob job1 = cleanupJobs.removeLast();
             GarbageCollectorJob job2 = cleanupJobs.removeLast();
@@ -273,6 +275,8 @@ public class SnapshotGarbageCollector {
             else {
                 cleanupJobs.addLast(job2);
                 cleanupJobs.addLast(job1);
+
+                cleanupSuccessfull = false;
             }
         }
 
