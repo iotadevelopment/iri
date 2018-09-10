@@ -155,6 +155,7 @@ public class TransactionValidator {
             if (analyzedHashes.add(hashPointer)) {
                 counter++;
                 if(counter >= 100) {
+                    System.out.println("ABORTING COLISIDITY CHECK: TAKES TOO LONG FOR " + hash.toString());
                     return false;
                 }
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
