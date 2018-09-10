@@ -55,7 +55,7 @@ public class SnapshotGarbageCollector {
 
     /**
      * The constructor of this class stores the passed in parameters for future use and restores the previous state of
-     * the garbage collector if there is a valid one.
+     * the garbage collector if there is a valid one (to continue with cleaning up after IRI restarts).
      */
     public SnapshotGarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
         this.tangle = tangle;
