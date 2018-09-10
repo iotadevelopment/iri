@@ -282,33 +282,40 @@ public class LedgerValidator {
 
     public boolean updateMilestoneTransaction(MilestoneViewModel milestoneVM) throws Exception {
         TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
-
+System.out.println(1);
         if(!transactionViewModel.isSolid()) {
             return false;
         }
-
+        System.out.println(2);
         final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
         boolean successfullyProcessed = transactionSnapshotIndex == milestoneVM.index();
         if (!successfullyProcessed) {
+            System.out.println(3);
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
+                System.out.println(4);
                 milestone.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
             }
 
             snapshotManager.getLatestSnapshot().lockRead();
             try {
+                System.out.println(5);
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
                 if(successfullyProcessed) {
+                    System.out.println(6);
                     successfullyProcessed = snapshotManager.getLatestSnapshot().getState().patchedState(new SnapshotStateDiff(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
+                        System.out.println(7);
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
 
                         if(balanceChanges.size() != 0) {
+                            System.out.println(8);
                             new StateDiffViewModel(balanceChanges, milestoneVM.getHash()).store(tangle);
                         }
+                        System.out.println(9);
                     }
                 }
             } finally {
