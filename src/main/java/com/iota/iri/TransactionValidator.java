@@ -150,12 +150,9 @@ public class TransactionValidator {
         boolean solid = true;
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
-        int counter = 0;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
-                counter++;
-                if(counter >= 1000) {
-                    System.out.println("ABORTING COLISIDITY CHECK: TAKES TOO LONG FOR " + hash.toString());
+                if(analyzedHashes.size() >= 1000) {
                     return false;
                 }
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
