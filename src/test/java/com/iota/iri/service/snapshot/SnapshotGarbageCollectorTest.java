@@ -56,18 +56,24 @@ public class SnapshotGarbageCollectorTest {
     public void testStatePersistence() throws SnapshotException {
         MainnetConfig mainnetConfig = new MainnetConfig();
 
-        // add some jobs to our queue
+        // add a job to our queue
         SnapshotGarbageCollector snapshotGarbageCollector1 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
         snapshotGarbageCollector1.addCleanupJob(12);
-        snapshotGarbageCollector1.addCleanupJob(17);
 
         // check if the restored cleanupJobs are the same as the saved ones
         SnapshotGarbageCollector snapshotGarbageCollector2 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel());
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.size() == 2);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getStartingIndex() == 12);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getFirst().getCurrentIndex() == 12);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getStartingIndex() == 17);
-        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getCurrentIndex() == 17);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.size() == 1);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getStartingIndex() == 12);
+        Assert.assertTrue(snapshotGarbageCollector2.cleanupJobs.getLast().getCurrentIndex() == 12);
+
+        // add another job to our queue
+        snapshotGarbageCollector1.addCleanupJob(17);
+
+        // check if the restored cleanupJobs are the same as the saved ones
+        SnapshotGarbageCollector snapshotGarbageCollector3 = new SnapshotGarbageCollector(tangle, snapshotManager, new TipsViewModel());
+        Assert.assertTrue(snapshotGarbageCollector3.cleanupJobs.size() == 1);
+        Assert.assertTrue(snapshotGarbageCollector3.cleanupJobs.getLast().getStartingIndex() == 17);
+        Assert.assertTrue(snapshotGarbageCollector3.cleanupJobs.getLast().getCurrentIndex() == 17);
     }
 
     @AfterClass
