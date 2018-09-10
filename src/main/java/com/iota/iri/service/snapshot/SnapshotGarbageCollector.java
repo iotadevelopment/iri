@@ -236,7 +236,7 @@ public class SnapshotGarbageCollector {
      * @throws SnapshotException if an error occurs while persisting the state
      */
     protected SnapshotGarbageCollector consolidateCleanupJobs() throws SnapshotException {
-        // if we have at least 2 jobs -> check if we can consolidate them
+        // if we have at least 2 jobs -> check if we can consolidate them at the beginning
         if(cleanupJobs.size() >= 2) {
             // retrieve the first two jobs
             GarbageCollectorJob job1 = cleanupJobs.removeFirst();
@@ -253,6 +253,26 @@ public class SnapshotGarbageCollector {
             else {
                 cleanupJobs.addFirst(job2);
                 cleanupJobs.addFirst(job1);
+            }
+        }
+
+        // if we have at least 2 jobs -> check if we can consolidate them at the end
+        if(cleanupJobs.size() >= 2) {
+            // retrieve the last two jobs
+            GarbageCollectorJob job1 = cleanupJobs.removeLast();
+            GarbageCollectorJob job2 = cleanupJobs.removeLast();
+
+            // if both jobs are pending -> consolidate them and persists the changes
+            if(job1.getCurrentIndex() == job1.getStartingIndex() && job2.getCurrentIndex() == job2.getStartingIndex()) {
+                cleanupJobs.addLast(new GarbageCollectorJob(job1.getStartingIndex(), job1.getCurrentIndex()));
+
+                persistChanges();
+            }
+
+            // otherwise just add them back to the queue
+            else {
+                cleanupJobs.addLast(job2);
+                cleanupJobs.addLast(job1);
             }
         }
 
