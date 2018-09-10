@@ -386,8 +386,6 @@ public class Node {
             }
             neighbor.incNewTransactions();
             broadcast(receivedTransactionViewModel);
-        } else {
-            System.out.println(receivedTransactionViewModel.getHash());
         }
 
     }
