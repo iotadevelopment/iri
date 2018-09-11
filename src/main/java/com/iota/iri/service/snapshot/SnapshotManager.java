@@ -332,7 +332,7 @@ public class SnapshotManager {
 
         // create a set where we collect the solid entry points
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        solidEntryPoints.put(Hash.NULL_HASH, testnet ? 0 : configuration.getMilestoneStartIndex());
+        solidEntryPoints.put(Hash.NULL_HASH, configuration.getMilestoneStartIndex());
 
         // copy the old solid entry points which are still valid
         snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
@@ -586,7 +586,7 @@ public class SnapshotManager {
             boolean testnet = configuration.isTestnet();
             String snapshotPath = configuration.getSnapshotFile();
             String snapshotSigPath = configuration.getSnapshotSignatureFile();
-            int milestoneStartIndex = testnet ? 0 : configuration.getMilestoneStartIndex();
+            int milestoneStartIndex = configuration.getMilestoneStartIndex();
 
             // verify the signature of the builtin snapshot file
             if(!testnet && !SignedFiles.isFileSignatureValid(
