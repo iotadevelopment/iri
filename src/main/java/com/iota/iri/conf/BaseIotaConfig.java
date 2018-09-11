@@ -504,7 +504,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
     }
 
     @JsonProperty
-    @Parameter(names = {"--local-snapshots-interval-synced"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED)
+    @Parameter(names = {"--local-snapshots-interval-unsynced"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED)
     protected void setLocalSnapshotsIntervalUnsynced(int localSnapshotsIntervalUnsynced) {
         this.localSnapshotsIntervalUnsynced = localSnapshotsIntervalUnsynced;
     }
