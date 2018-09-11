@@ -101,10 +101,13 @@ public class SnapshotManager {
 
             // load necessary configuration parameters
             int snapshotDepth = configuration.getLocalSnapshotsDepth();
-            int LOCAL_SNAPSHOT_INTERVAL = 10;
 
             while(!shuttingDown) {
                 long scanStart = System.currentTimeMillis();
+
+                int LOCAL_SNAPSHOT_INTERVAL = milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex
+                                            ? configuration.getLocalSnapshotsIntervalSynced()
+                                            : configuration.getLocalSnapshotsIntervalUnsynced();
 
                 if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
                     try {

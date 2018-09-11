@@ -81,6 +81,8 @@ public abstract class BaseIotaConfig implements IotaConfig {
     protected boolean localSnapshotsEnabled = Defaults.LOCAL_SNAPSHOTS_ENABLED;
     protected boolean localSnapshotsPruningEnabled = Defaults.LOCAL_SNAPSHOTS_PRUNING_ENABLED;
     protected int localSnapshotsPruningDelay = Defaults.LOCAL_SNAPSHOTS_PRUNING_DELAY;
+    protected int localSnapshotsIntervalSynced = Defaults.LOCAL_SNAPSHOTS_INTERVAL_SYNCED;
+    protected int localSnapshotsIntervalUnsynced = Defaults.LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED;
     protected int localSnapshotsDepth = Defaults.LOCAL_SNAPSHOTS_DEPTH;
     protected String localSnapshotsMainnetBasePath = Defaults.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH;
     protected String localSnapshotsTestnetBasePath = Defaults.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH;
@@ -486,6 +488,28 @@ public abstract class BaseIotaConfig implements IotaConfig {
     }
 
     @Override
+    public int getLocalSnapshotsIntervalSynced() {
+        return this.localSnapshotsIntervalSynced;
+    }
+
+    @JsonProperty
+    @Parameter(names = {"--local-snapshots-interval-synced"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_INTERVAL_SYNCED)
+    protected void setLocalSnapshotsIntervalSynced(int localSnapshotsIntervalSynced) {
+        this.localSnapshotsIntervalSynced = localSnapshotsIntervalSynced;
+    }
+
+    @Override
+    public int getLocalSnapshotsIntervalUnsynced() {
+        return this.localSnapshotsIntervalUnsynced;
+    }
+
+    @JsonProperty
+    @Parameter(names = {"--local-snapshots-interval-synced"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED)
+    protected void setLocalSnapshotsIntervalUnsynced(int localSnapshotsIntervalUnsynced) {
+        this.localSnapshotsIntervalUnsynced = localSnapshotsIntervalUnsynced;
+    }
+
+    @Override
     public int getLocalSnapshotsDepth() {
         return this.localSnapshotsDepth;
     }
@@ -735,8 +759,10 @@ public abstract class BaseIotaConfig implements IotaConfig {
 
         //Snapshot
         boolean LOCAL_SNAPSHOTS_ENABLED = true;
-        boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = true;
-        int LOCAL_SNAPSHOTS_PRUNING_DELAY = 500;
+        boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = false;
+        int LOCAL_SNAPSHOTS_PRUNING_DELAY = 1000;
+        int LOCAL_SNAPSHOTS_INTERVAL_SYNCED = 10;
+        int LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED = 5000;
         String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "snapshotMainnet";
         String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "snapshotMainnet";
         int LOCAL_SNAPSHOTS_DEPTH = 500;

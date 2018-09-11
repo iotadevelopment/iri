@@ -21,6 +21,16 @@ public interface SnapshotConfig extends Config {
     int getLocalSnapshotsPruningDelay();
 
     /**
+     * @return {@value Descriptions#LOCAL_SNAPSHOTS_INTERVAL_SYNCED}
+     */
+    int getLocalSnapshotsIntervalSynced();
+
+    /**
+     * @return {@value Descriptions#LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED}
+     */
+    int getLocalSnapshotsIntervalUnsynced();
+
+    /**
      * @return {@value Descriptions#LOCAL_SNAPSHOTS_DEPTH}
      */
     int getLocalSnapshotsDepth();
@@ -75,6 +85,8 @@ public interface SnapshotConfig extends Config {
         String LOCAL_SNAPSHOTS_ENABLED = "Flag that determines if local snapshots are enabled.";
         String LOCAL_SNAPSHOTS_PRUNING_ENABLED = "Flag that determines if pruning of old data is enabled.";
         String LOCAL_SNAPSHOTS_PRUNING_DELAY = "Number of milestones before the latest snapshot to keep.";
+        String LOCAL_SNAPSHOTS_INTERVAL_SYNCED = "Take local snapshots every n milestones if the node is fully synced.";
+        String LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED = "Take local snapshots every n milestones if the node is syncing.";
         String LOCAL_SNAPSHOTS_DEPTH = "Number of milestones to keep.";
         String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "Path to the testnet snapshot files (without file extensions).";
         String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "Path to the testnet snapshot files (without file extensions).";
