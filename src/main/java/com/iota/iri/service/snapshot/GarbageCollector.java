@@ -20,11 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
-public class SnapshotGarbageCollector {
-    // create references to the classes of the cleaned up entities
-    protected static Class<Persistable> CLASS_MILESTONE = (Class<Persistable>) ((Persistable) new Milestone()).getClass();
-    protected static Class<Persistable> CLASS_TRANSACTION = (Class<Persistable>) ((Persistable) new Transaction()).getClass();
-
+public class GarbageCollector {
     /**
      * The interval in milliseconds that the garbage collector will check if new cleanup tasks are available.
      */
@@ -33,7 +29,7 @@ public class SnapshotGarbageCollector {
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
-    protected static final Logger log = LoggerFactory.getLogger(SnapshotGarbageCollector.class);
+    protected static final Logger log = LoggerFactory.getLogger(GarbageCollector.class);
 
     /**
      * Boolean flag that indicates if the node is being shutdown.
@@ -57,7 +53,7 @@ public class SnapshotGarbageCollector {
      * The constructor of this class stores the passed in parameters for future use and restores the previous state of
      * the garbage collector if there is a valid one (to continue with cleaning up after IRI restarts).
      */
-    public SnapshotGarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
+    public GarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
@@ -82,7 +78,7 @@ public class SnapshotGarbageCollector {
         consolidateCleanupJobs();
     }
 
-    public SnapshotGarbageCollector start() {
+    public GarbageCollector start() {
         (new Thread(() -> {
             log.info("Snapshot Garbage Collector started ...");
 
@@ -104,13 +100,13 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
-    public SnapshotGarbageCollector shutdown() {
+    public GarbageCollector shutdown() {
         shuttingDown = true;
 
         return this;
     }
 
-    public SnapshotGarbageCollector reset() {
+    public GarbageCollector reset() {
         cleanupJobs = new LinkedList<>();
 
         getStateFile().delete();
@@ -125,17 +121,17 @@ public class SnapshotGarbageCollector {
      * fails.
      *
      * @param milestoneIndex
-     * @return the instance of the {@link SnapshotGarbageCollector} that it was called on to allow chaining
+     * @return the instance of the {@link GarbageCollector} that it was called on to allow chaining
      * @throws SnapshotException if something goes wrong while cleaning up the milestone
      */
-    protected SnapshotGarbageCollector cleanupMilestoneTransactions(int milestoneIndex) throws SnapshotException {
+    protected GarbageCollector cleanupMilestoneTransactions(int milestoneIndex) throws SnapshotException {
         try {
             MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, milestoneIndex);
             if(milestoneViewModel != null) {
-                List<Pair<Indexable, Class<Persistable>>> elementsToDelete = new ArrayList<>();
+                List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
 
-                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), CLASS_MILESTONE));
-                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), CLASS_TRANSACTION));
+                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
+                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
 
                 dagUtils.traverseApprovees(
                     // start traversal at the milestone
@@ -146,7 +142,7 @@ public class SnapshotGarbageCollector {
 
                     // remove all approved transactions
                     approvedTransaction -> {
-                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), CLASS_TRANSACTION));
+                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
                         cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
                     }
@@ -155,7 +151,7 @@ public class SnapshotGarbageCollector {
                 MilestoneViewModel.clear(milestoneIndex);
 
                 elementsToDelete.stream().forEach(element -> {
-                    if(CLASS_TRANSACTION.equals(element.hi)) {
+                    if(Transaction.class.equals(element.hi)) {
                         tipsViewModel.removeTipHash((Hash) element.low);
                     }
                 });
@@ -170,7 +166,7 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
-    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, Class<Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws Exception {
+    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws Exception {
         // remove all orphaned transactions that are branching off of our deleted transactions
         dagUtils.traverseApprovers(
             transaction,
@@ -178,7 +174,7 @@ public class SnapshotGarbageCollector {
             approverTransaction -> approverTransaction.snapshotIndex() == 0,
 
             approverTransaction -> {
-                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), CLASS_TRANSACTION));
+                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
 
                 /*dagUtils.traverseApprovees(
                     approverTransaction,
@@ -193,7 +189,7 @@ public class SnapshotGarbageCollector {
         );
     }
 
-    protected SnapshotGarbageCollector processCleanupJob(GarbageCollectorJob job, int cleanupTarget) throws SnapshotException {
+    protected GarbageCollector processCleanupJob(GarbageCollectorJob job, int cleanupTarget) throws SnapshotException {
         while(!shuttingDown && cleanupTarget < job.getCurrentIndex()) {
             cleanupMilestoneTransactions(job.getCurrentIndex());
 
@@ -205,7 +201,7 @@ public class SnapshotGarbageCollector {
         return this;
     }
 
-    protected SnapshotGarbageCollector processCleanupJobs() throws SnapshotException {
+    protected GarbageCollector processCleanupJobs() throws SnapshotException {
         // repeat until all jobs are processed
         while(!shuttingDown && cleanupJobs.size() >= 1) {
             GarbageCollectorJob firstJob = cleanupJobs.getFirst();
@@ -236,7 +232,7 @@ public class SnapshotGarbageCollector {
      *
      * @throws SnapshotException if an error occurs while persisting the state
      */
-    protected SnapshotGarbageCollector consolidateCleanupJobs() throws SnapshotException {
+    protected GarbageCollector consolidateCleanupJobs() throws SnapshotException {
         // if we have at least 2 jobs -> check if we can consolidate them at the beginning
         if(cleanupJobs.size() >= 2) {
             // retrieve the first two jobs
@@ -292,7 +288,7 @@ public class SnapshotGarbageCollector {
      *
      * @throws SnapshotException if something goes wrong while writing the state file
      */
-    protected SnapshotGarbageCollector persistChanges() throws SnapshotException {
+    protected GarbageCollector persistChanges() throws SnapshotException {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
@@ -314,7 +310,7 @@ public class SnapshotGarbageCollector {
      * problems with future jobs other than requiring them to perform unnecessary steps and therefore slowing them down
      * a bit.
      */
-    protected SnapshotGarbageCollector restoreCleanupJobs() {
+    protected GarbageCollector restoreCleanupJobs() {
         cleanupJobs = new LinkedList<>();
 
         try {

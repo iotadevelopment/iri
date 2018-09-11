@@ -4,7 +4,6 @@ import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.network.Node;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
@@ -22,8 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.security.SecureRandom;
 import java.util.List;
 

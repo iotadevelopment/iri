@@ -37,7 +37,7 @@ public class SnapshotManager {
 
     private Tangle tangle;
 
-    private SnapshotGarbageCollector snapshotGarbageCollector;
+    private GarbageCollector snapshotGarbageCollector;
 
     private TipsViewModel tipsViewModel;
 
@@ -81,7 +81,7 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-        snapshotGarbageCollector = new SnapshotGarbageCollector(tangle, this, tipsViewModel);
+        snapshotGarbageCollector = new GarbageCollector(tangle, this, tipsViewModel);
     }
 
     public void init(MilestoneTracker milestoneTracker) {
