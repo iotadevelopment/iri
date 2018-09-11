@@ -748,4 +748,9 @@ public class TransactionViewModel implements Cacheable {
     public int hashCode() {
         return Objects.hash(getHash());
     }
+
+    @Override
+    public String toString() {
+        return "transaction " + hash.toString();
+    }
 }
