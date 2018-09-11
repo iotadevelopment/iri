@@ -16,6 +16,7 @@ import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
+import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGUtils;
@@ -442,7 +443,11 @@ public class MilestoneTracker {
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotManager.getLatestSnapshot().getIndex()) {
-                                snapshotManager.getLatestSnapshot().rollBackMilestones(newMilestoneViewModel.index(), tangle);
+                                try {
+                                    snapshotManager.getLatestSnapshot().rollBackMilestones(newMilestoneViewModel.index(), tangle);
+                                } catch(SnapshotException e) {
+                                    log.error("could not reset ledger to missing milestone: " + index);
+                                }
 
                                 //hardReset(newMilestoneViewModel, snapshotManager.getLatestSnapshot().getIndex(), "previously unknown milestone (#" + index + ") appeared");
                             }
