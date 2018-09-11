@@ -343,6 +343,6 @@ public class SnapshotGarbageCollector {
     }
 
     protected File getStateFile() {
-        return new File(snapshotManager.getConfiguration().getLocalSnapshotsMainnetBasePath() + ".snapshot.gc");
+        return new File(snapshotManager.getConfiguration().getLocalSnapshotsBasePath() + ".snapshot.gc");
     }
 }

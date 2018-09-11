@@ -84,8 +84,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
     protected int localSnapshotsIntervalSynced = Defaults.LOCAL_SNAPSHOTS_INTERVAL_SYNCED;
     protected int localSnapshotsIntervalUnsynced = Defaults.LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED;
     protected int localSnapshotsDepth = Defaults.LOCAL_SNAPSHOTS_DEPTH;
-    protected String localSnapshotsMainnetBasePath = Defaults.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH;
-    protected String localSnapshotsTestnetBasePath = Defaults.LOCAL_SNAPSHOTS_TESTNET_BASE_PATH;
+    protected String localSnapshotsBasePath = Defaults.LOCAL_SNAPSHOTS_BASE_PATH;
 
     public BaseIotaConfig() {
         //empty constructor
@@ -521,25 +520,14 @@ public abstract class BaseIotaConfig implements IotaConfig {
     }
 
     @Override
-    public String getLocalSnapshotsMainnetBasePath() {
-        return this.localSnapshotsMainnetBasePath;
+    public String getLocalSnapshotsBasePath() {
+        return this.localSnapshotsBasePath;
     }
 
     @JsonProperty
-    @Parameter(names = {"--local-snapshots-mainnet-base-path"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH)
-    protected void setLocalSnapshotsMainnetBasePath(String localSnapshotsMainnetBasePath) {
-        this.localSnapshotsMainnetBasePath = localSnapshotsMainnetBasePath;
-    }
-
-    @Override
-    public String getLocalSnapshotsTestnetBasePath() {
-        return this.localSnapshotsTestnetBasePath;
-    }
-
-    @JsonProperty
-    @Parameter(names = {"--local-snapshots-testnet-base-path"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_MAINNET_BASE_PATH)
-    protected void setLocalSnapshotsTestnetBasePath(String localSnapshotsTestnetBasePath) {
-        this.localSnapshotsTestnetBasePath = localSnapshotsTestnetBasePath;
+    @Parameter(names = {"--local-snapshots-base-path"}, description = SnapshotConfig.Descriptions.LOCAL_SNAPSHOTS_BASE_PATH)
+    protected void setLocalSnapshotsBasePath(String localSnapshotsBasePath) {
+        this.localSnapshotsBasePath = localSnapshotsBasePath;
     }
 
     @Override
@@ -763,8 +751,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
         int LOCAL_SNAPSHOTS_PRUNING_DELAY = 1000;
         int LOCAL_SNAPSHOTS_INTERVAL_SYNCED = 10;
         int LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED = 5000;
-        String LOCAL_SNAPSHOTS_MAINNET_BASE_PATH = "snapshotMainnet";
-        String LOCAL_SNAPSHOTS_TESTNET_BASE_PATH = "snapshotMainnet";
+        String LOCAL_SNAPSHOTS_BASE_PATH = "mainnet";
         int LOCAL_SNAPSHOTS_DEPTH = 500;
         String SNAPSHOT_FILE = "/snapshotMainnet.txt";
         String SNAPSHOT_SIG_FILE = "/snapshotMainnet.sig";

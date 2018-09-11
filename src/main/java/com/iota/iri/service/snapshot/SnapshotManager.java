@@ -538,9 +538,7 @@ public class SnapshotManager {
         if(localSnapshotsEnabled) {
             // load the remaining configuration parameters
             boolean testnet = configuration.isTestnet();
-            String basePath = testnet
-                            ? configuration.getLocalSnapshotsTestnetBasePath()
-                            : configuration.getLocalSnapshotsMainnetBasePath();
+            String basePath = configuration.getLocalSnapshotsBasePath();
 
             // create a file handle for our snapshot file
             File localSnapshotFile = new File(basePath + ".snapshot.state");
@@ -637,9 +635,7 @@ public class SnapshotManager {
     public Snapshot takeLocalSnapshot() throws SnapshotException {
         // load necessary configuration parameters
         boolean testnet = configuration.isTestnet();
-        String basePath = testnet
-                          ? configuration.getLocalSnapshotsTestnetBasePath()
-                          : configuration.getLocalSnapshotsMainnetBasePath();
+        String basePath = configuration.getLocalSnapshotsBasePath();
         int snapshotDepth = configuration.getLocalSnapshotsDepth();
 
         // determine our target milestone
