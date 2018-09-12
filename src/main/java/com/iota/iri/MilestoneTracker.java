@@ -4,7 +4,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -91,11 +90,11 @@ public class MilestoneTracker {
     private MilestoneSolidifier milestoneSolidifier;
 
     public MilestoneTracker(Tangle tangle,
-                     SnapshotManager snapshotManager,
-                     TransactionValidator transactionValidator,
-                     TransactionRequester transactionRequester,
-                     MessageQ messageQ,
-                     IotaConfig config
+                            SnapshotManager snapshotManager,
+                            TransactionValidator transactionValidator,
+                            TransactionRequester transactionRequester,
+                            MessageQ messageQ,
+                            IotaConfig config
     ) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
@@ -364,10 +363,10 @@ public class MilestoneTracker {
         processedTransactions.add(milestoneTransaction.getHash());
 
         dagUtils.traverseApprovees(
-            currentMilestone,
-            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
-            currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
-            processedTransactions
+        currentMilestone,
+        currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
+        currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
+        processedTransactions
         );
 
         for (int resettedMilestoneIndex : resettedMilestones) {
@@ -407,17 +406,17 @@ public class MilestoneTracker {
                     //final TransactionViewModel transactionViewModel2 = StorageTransactions.instance().loadTransaction(transactionViewModel.trunkTransactionPointer);
                     final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle);
                     if (transactionViewModel2.getType() == TransactionViewModel.FILLED_SLOT
-                            && transactionViewModel.getBranchTransactionHash().equals(transactionViewModel2.getTrunkTransactionHash())
-                            && transactionViewModel.getBundleHash().equals(transactionViewModel2.getBundleHash())) {
+                        && transactionViewModel.getBranchTransactionHash().equals(transactionViewModel2.getTrunkTransactionHash())
+                        && transactionViewModel.getBundleHash().equals(transactionViewModel2.getBundleHash())) {
 
                         final byte[] trunkTransactionTrits = transactionViewModel.getTrunkTransactionHash().trits();
                         final byte[] signatureFragmentTrits = Arrays.copyOfRange(transactionViewModel.trits(), TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET, TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET + TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE);
 
                         final byte[] merkleRoot = ISS.getMerkleRoot(mode, ISS.address(mode, ISS.digest(mode,
-                                Arrays.copyOf(ISS.normalizedBundle(trunkTransactionTrits),
-                                        ISS.NUMBER_OF_FRAGMENT_CHUNKS),
-                                signatureFragmentTrits)),
-                                transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
+                        Arrays.copyOf(ISS.normalizedBundle(trunkTransactionTrits),
+                        ISS.NUMBER_OF_FRAGMENT_CHUNKS),
+                        signatureFragmentTrits)),
+                        transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
                         if ((testnet && acceptAnyTestnetCoo) || (new Hash(merkleRoot)).equals(coordinator)) {
                             MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(index, transactionViewModel.getHash());
                             newMilestoneViewModel.store(tangle);
@@ -460,8 +459,8 @@ public class MilestoneTracker {
 
         // while we have a milestone which is solid
         while(
-            !shuttingDown &&
-            nextMilestone != null
+        !shuttingDown &&
+        nextMilestone != null
         ) {
             if(nextMilestone.index() > errorCausingMilestone) {
                 binaryBackoffCounter = 0;
@@ -491,13 +490,13 @@ public class MilestoneTracker {
 
             // dump a log message in intervals and when we terminate
             if(prevSolidMilestoneIndex != snapshotManager.getLatestSnapshot().getIndex() && (
-                System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
+            System.currentTimeMillis() - lastScan >= STATUS_LOG_INTERVAL || nextMilestone == null
             )) {
                 messageQ.publish("lmsi %d %d", prevSolidMilestoneIndex, snapshotManager.getLatestSnapshot().getIndex());
                 messageQ.publish("lmhs %s", snapshotManager.getLatestSnapshot().getHash());
                 log.info("Latest SOLID SUBTANGLE milestone has changed from #"
-                        + prevSolidMilestoneIndex + " to #"
-                        + snapshotManager.getLatestSnapshot().getIndex());
+                         + prevSolidMilestoneIndex + " to #"
+                         + snapshotManager.getLatestSnapshot().getIndex());
 
                 lastScan = System.currentTimeMillis();
                 prevSolidMilestoneIndex = snapshotManager.getLatestSnapshot().getIndex();
