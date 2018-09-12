@@ -26,9 +26,6 @@ public class EntryPointSelectorImplTest {
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
 
-    @Mock
-    private MilestoneTracker milestone;
-
     private static SnapshotManager snapshotManager;
 
     @BeforeClass
@@ -54,7 +51,7 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointAWithoutTangleData() throws Exception {
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestone, new MainnetConfig());
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
@@ -66,7 +63,7 @@ public class EntryPointSelectorImplTest {
         mockTangleBehavior(milestoneHash);
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager, milestone, new MainnetConfig());
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);

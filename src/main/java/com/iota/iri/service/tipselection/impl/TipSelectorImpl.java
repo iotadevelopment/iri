@@ -30,7 +30,6 @@ public class TipSelectorImpl implements TipSelector {
     private final LedgerValidator ledgerValidator;
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
-    private final MilestoneTracker milestone;
     private final TipSelConfig config;
 
     public TipSelectorImpl(Tangle tangle,
@@ -39,7 +38,6 @@ public class TipSelectorImpl implements TipSelector {
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,
                            Walker walkerAlpha,
-                           MilestoneTracker milestone,
                            TipSelConfig config) {
 
         this.entryPointSelector = entryPointSelector;
@@ -51,7 +49,6 @@ public class TipSelectorImpl implements TipSelector {
         this.ledgerValidator = ledgerValidator;
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
-        this.milestone = milestone;
         this.config = config;
     }
 

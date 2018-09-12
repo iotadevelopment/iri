@@ -20,14 +20,14 @@ public class LedgerValidator {
     private final SnapshotManager snapshotManager;
     private final Logger log = LoggerFactory.getLogger(LedgerValidator.class);
     private final Tangle tangle;
-    private final MilestoneTracker milestone;
+    private final MilestoneTracker milestoneTracker;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, SnapshotManager snapshotManager, MilestoneTracker milestone, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotManager snapshotManager, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
-        this.milestone = milestone;
+        this.milestoneTracker = milestoneTracker;
         this.snapshotManager = snapshotManager;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
@@ -145,7 +145,7 @@ public class LedgerValidator {
      * a transaction while the transaction confirmed marker is mutually exclusive to {mark}
      * // old @param hash start of the update tree
      * @param hash tail to traverse from
-     * @param index milestone index
+     * @param index milestoneTracker index
      * @throws Exception
      */
     private void updateSnapshotIndexOfMilestoneTransactions(Hash hash, int index) throws Exception {
@@ -174,7 +174,7 @@ public class LedgerValidator {
         }
 
         for (int resettedMilestoneIndex : resettedMilestones) {
-            milestone.resetCorruptedMilestone(resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
+            milestoneTracker.resetCorruptedMilestone(resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
         }
     }
 
@@ -201,7 +201,7 @@ public class LedgerValidator {
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
-                milestone.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
+                milestoneTracker.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
             }
 
             snapshotManager.getLatestSnapshot().lockRead();

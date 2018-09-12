@@ -16,16 +16,11 @@ import com.iota.iri.storage.Tangle;
 public class EntryPointSelectorImpl implements EntryPointSelector {
 
     private final Tangle tangle;
-    private final MilestoneTracker milestone;
     private final SnapshotManager snapshotManager;
-    private final boolean testnet;
 
-    public EntryPointSelectorImpl(Tangle tangle, SnapshotManager snapshotManager, MilestoneTracker milestone, TipSelConfig config) {
+    public EntryPointSelectorImpl(Tangle tangle, SnapshotManager snapshotManager) {
         this.tangle = tangle;
-        this.milestone = milestone;
         this.snapshotManager = snapshotManager;
-
-        this.testnet = config.isTestnet();
     }
 
     @Override
