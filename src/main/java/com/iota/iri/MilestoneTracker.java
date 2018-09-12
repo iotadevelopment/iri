@@ -67,8 +67,6 @@ public class MilestoneTracker {
      */
     private AtomicInteger blockingSolidMilestoneTrackerTasks = new AtomicInteger(0);
 
-    private AtomicBoolean ledgerValidatorInitialized = new AtomicBoolean(false);
-
     private final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
@@ -139,13 +137,6 @@ public class MilestoneTracker {
 
     private void spawnLatestMilestoneTracker() {
         (new Thread(() -> {
-            log.info("Waiting for Ledger Validator initialization ...");
-            while(!ledgerValidatorInitialized.get()) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) { /* do nothing */ }
-            }
-
             ProgressLogger scanningMilestonesProgress = new ProgressLogger("Scanning Latest Milestones", log);
 
             // bootstrap our latestMilestone with the last milestone in the database (faster startup)
@@ -201,13 +192,6 @@ public class MilestoneTracker {
 
     private void spawnSolidMilestoneTracker() {
         (new Thread(() -> {
-            log.info("Initializing Ledger Validator...");
-            try {
-                ledgerValidator.init();
-                ledgerValidatorInitialized.set(true);
-            } catch (Exception e) {
-                log.error("Error initializing snapshots. Skipping.", e);
-            }
             log.info("Tracker started.");
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();

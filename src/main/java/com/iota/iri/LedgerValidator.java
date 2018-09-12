@@ -178,79 +178,6 @@ public class LedgerValidator {
         }
     }
 
-    /**
-     * Initializes the LedgerValidator. This updates the latest milestone and solid subtangle milestone, and then
-     * builds up the confirmed until it reaches the latest consistent confirmed. If any inconsistencies are detected,
-     * perhaps by database corruption, it will delete the milestone confirmed and all that follow.
-     * It then starts at the earliest consistent milestone index with a confirmed, and analyzes the tangle until it
-     * either reaches the latest solid subtangle milestone, or until it reaches an inconsistent milestone.
-     * @throws Exception
-     */
-    protected void init() throws Exception {
-        //MilestoneViewModel latestConsistentMilestone = buildSnapshot();
-        //if(latestConsistentMilestone != null) {
-        //    log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
-        //}
-    }
-
-    /**
-     * Only called once upon initialization, this builds the {latestSnapshot} state up to the most recent
-     * solid milestone confirmed. It gets the earliest confirmed, and while checking for consistency, patches the next
-     * newest confirmed diff into its map.
-     * @return              the most recent consistent milestone with a confirmed.
-     * @throws Exception
-     */
-    private MilestoneViewModel buildSnapshot() throws Exception {
-        MilestoneViewModel consistentMilestone = null;
-        snapshotManager.getLatestSnapshot().lockWrite();
-        try {
-            MilestoneViewModel candidateMilestone = MilestoneViewModel.findClosestNextMilestone(
-                tangle, snapshotManager.getLatestSnapshot().getIndex()
-            );
-            while (candidateMilestone != null) {
-                if (candidateMilestone.index() % 10000 == 0) {
-                    StringBuilder logMessage = new StringBuilder();
-
-                    logMessage.append("Building snapshot... Consistent: #");
-                    logMessage.append(consistentMilestone != null ? consistentMilestone.index() : -1);
-                    logMessage.append(", Candidate: #");
-                    logMessage.append(candidateMilestone.index());
-
-                    log.info(logMessage.toString());
-                }
-
-                // if we face a milestone that wasn't processed by updateMilestoneTransaction, correctly -> abort and let the
-                // "Solid Milestone Tracker" do it's magic
-                //
-                // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                if(TransactionViewModel.fromHash(tangle, candidateMilestone.getHash()).snapshotIndex() != candidateMilestone.index()) {
-                    break;
-                }
-
-                if (StateDiffViewModel.maybeExists(tangle, candidateMilestone.getHash())) {
-                    StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, candidateMilestone.getHash());
-
-                    if (stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                        SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff());
-
-                        if (snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent()) {
-                            snapshotManager.getLatestSnapshot().update(snapshotStateDiff, candidateMilestone.index(), candidateMilestone.getHash());
-                            consistentMilestone = candidateMilestone;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-
-                // iterate to the next milestone
-                candidateMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, candidateMilestone.index());
-            }
-        } finally {
-            snapshotManager.getLatestSnapshot().unlockWrite();
-        }
-        return consistentMilestone;
-    }
-
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
         if(updateMilestoneTransaction(milestone)) {
             snapshotManager.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
@@ -259,29 +186,6 @@ public class LedgerValidator {
         }
 
         return false;
-    }
-
-    private boolean applyStateDiffToLedger(MilestoneViewModel milestone) throws Exception {
-        SnapshotStateDiff snapshotStateDiff = null;
-        if (StateDiffViewModel.maybeExists(tangle, milestone.getHash())) {
-            StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, milestone.getHash());
-            if (stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                snapshotStateDiff = new SnapshotStateDiff(stateDiffViewModel.getDiff());
-
-                // this should actually never happen since we already check the consistency when creating the StateDiff
-                if (!snapshotManager.getLatestSnapshot().getState().patchedState(snapshotStateDiff).isConsistent()) {
-                    return false;
-                }
-            }
-        }
-
-        if(snapshotStateDiff == null) {
-            snapshotStateDiff = new SnapshotStateDiff(new HashMap<>());
-        }
-
-        snapshotManager.getLatestSnapshot().update(snapshotStateDiff, milestone.index(), milestone.getHash());
-
-        return true;
     }
 
     public boolean updateMilestoneTransaction(MilestoneViewModel milestoneVM) throws Exception {
