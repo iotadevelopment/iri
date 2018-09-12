@@ -4,42 +4,44 @@ import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.Milestone;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.Pair;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+/**
+ * This class represents a "snapshot" of the ledger at a given time.
+ *
+ * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the balances and its
+ * {@link SnapshotMetaData} which holds several information about the snapshot like its timestamp, its corresponding
+ * milestone index and so on.
+ */
 public class Snapshot {
-    // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
-
     /**
      * Lock object allowing to block access to this object from different threads.
      */
     public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
-     * Holds a reference to the state of this snapshot.
+     * Holds a reference to the balances of this snapshot.
      */
-    private final SnapshotState state;
+    protected final SnapshotState state;
 
     /**
      * Holds a reference to the metadata of this snapshot.
      */
-    private final SnapshotMetaData metaData;
+    protected final SnapshotMetaData metaData;
 
     /**
      * Constructor of the Snapshot class.
      *
      * It simply saves the passed parameters in its private properties.
      *
-     * @param state the state of the Snapshot containing all its balances
+     * @param state the balances of the Snapshot containing all its balances
      * @param metaData the metadata of the Snapshot containing its milestone index and other properties
      */
     public Snapshot(SnapshotState state, SnapshotMetaData metaData) {
@@ -50,7 +52,7 @@ public class Snapshot {
     /**
      * Locks the complete Snapshot object for read access.
      *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current balances.
      * This is used to synchronize the access from different Threads, if both members need to be read.
      *
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
@@ -58,15 +60,12 @@ public class Snapshot {
      */
     public void lockRead() {
         readWriteLock.readLock().lock();
-
-        state.lockRead();
-        metaData.lockRead();
     }
 
     /**
      * Locks the complete Snapshot object for write access.
      *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current balances.
      * This is used to synchronize the access from different Threads, if both members need to be modified.
      *
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
@@ -74,9 +73,6 @@ public class Snapshot {
      */
     public void lockWrite() {
         readWriteLock.writeLock().lock();
-
-        state.lockWrite();
-        metaData.lockWrite();
     }
 
     /**
@@ -90,9 +86,6 @@ public class Snapshot {
      */
     public void unlockRead() {
         readWriteLock.readLock().unlock();
-
-        state.unlockRead();
-        metaData.unlockRead();
     }
 
     /**
@@ -106,9 +99,6 @@ public class Snapshot {
      */
     public void unlockWrite() {
         readWriteLock.writeLock().unlock();
-
-        state.unlockWrite();
-        metaData.unlockWrite();
     }
 
     /**
@@ -129,7 +119,7 @@ public class Snapshot {
     }
 
     /**
-     * Getter of the state object.
+     * Getter of the balances object.
      *
      * It simply returns the stored private property.
      *
@@ -215,7 +205,7 @@ public class Snapshot {
     public void update(SnapshotStateDiff diff, int newIndex, Hash newTransactionHash) {
         // check the diff before we apply the update
         if(!diff.isConsistent()) {
-            throw new IllegalStateException("the snapshot state diff is not consistent");
+            throw new IllegalStateException("the snapshot balances diff is not consistent");
         }
 
         // prevent other threads to write to this object while we do the updates
@@ -223,7 +213,7 @@ public class Snapshot {
 
         // apply our changes without locking the underlying members (we already locked globally)
         try {
-            state.applyStateDiff(diff, false);
+            state.applyStateDiff(diff);
             metaData.setIndex(newIndex, false);
             metaData.setHash(newTransactionHash);
             metaData.setTimestamp(System.currentTimeMillis() / 1000L, false);
@@ -236,7 +226,7 @@ public class Snapshot {
     }
 
     /**
-     * This method rolls back the latest milestones until it reaches the state that the snapshot had before applying
+     * This method rolls back the latest milestones until it reaches the balances that the snapshot had before applying
      * the milestone indicated by the given parameter.
      *
      * After checking the validity of the parameters we simply roll back the last milestone until we reach a point that
@@ -262,108 +252,6 @@ public class Snapshot {
         } finally {
             unlockWrite();
         }
-    }
-
-    /**
-     * This method reverts the state of the Snapshot back to a point in time in the past.
-     *
-     * The method cycles through all previous milestones and their corresponding StateDiffs in reverse order, inverts
-     * their values and applies them to the current state. Instead of applying them as we go, we first collect all the
-     * patches in a linked list and apply them afterwards, so if an error occurs while creating the list of patches we
-     * do not end up with an invalid Snapshot state.
-     *
-     * @param targetMilestoneIndex the milestone index that we want to roll back to
-     * @param tangle the database interface that is needed for retrieving the required information
-     */
-    public void rollBackMilestoness(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
-        //region SANITIZE PARAMETERS ///////////////////////////////////////////////////////////////////////////////////
-
-        MilestoneViewModel targetMilestone;
-        try {
-            targetMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, targetMilestoneIndex - 1);
-        } catch (Exception e) {
-            throw new SnapshotException("error while determining the target milestone for the rollback operation", e);
-        }
-        if(targetMilestone == null) {
-            throw new SnapshotException("could not find a milestone with the given index #" + targetMilestoneIndex);
-        }
-
-        if(targetMilestone.index() > getIndex()) {
-            throw new SnapshotException("rollback failed: the target milestone index is bigger than the current index");
-        }
-
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        //region ROLLBACK BALANCE CHANGES //////////////////////////////////////////////////////////////////////////////
-
-        if(targetMilestone.index() < getIndex()) {
-            lockWrite();
-
-            try {
-                // create a variable for the last SnapshotStateDiff since we need to "shift" the indexes (reverting
-                // snapshot 10 brings us back to snapshot 9)
-                SnapshotStateDiff lastStateDiff = null;
-
-                // create the list of patches that need to be applied
-                LinkedList<Pair<SnapshotStateDiff, MilestoneViewModel>> statePatches = new LinkedList<>();
-                for(int currentMilestoneIndex = getIndex(); currentMilestoneIndex > targetMilestone.index(); currentMilestoneIndex--) {
-                    MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
-                    if(currentMilestone != null && !skippedMilestones.remove(currentMilestoneIndex)) {
-                        StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
-
-                        SnapshotStateDiff snapshotStateDiff;
-                        if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                            // create the SnapshotStateDiff object for our changes
-                            snapshotStateDiff = new SnapshotStateDiff(
-                                stateDiffViewModel.getDiff().entrySet().stream().map(
-                                    hashLongEntry -> new HashMap.SimpleEntry<>(
-                                        hashLongEntry.getKey(), -1 * hashLongEntry.getValue()
-                                    )
-                                ).collect(
-                                    Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-                                )
-                            );
-
-                            if (!snapshotStateDiff.isConsistent()) {
-                                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent");
-                            }
-                        } else {
-                            snapshotStateDiff = new SnapshotStateDiff(new HashMap<>());
-                        }
-
-                        if(lastStateDiff != null) {
-                            statePatches.addLast(new Pair<>(lastStateDiff, currentMilestone));
-                        }
-                        lastStateDiff = snapshotStateDiff;
-                    }
-                }
-                if(lastStateDiff != null) {
-                    statePatches.addLast(new Pair<>(lastStateDiff, targetMilestone));
-                }
-
-                // apply the patches
-                Pair<SnapshotStateDiff, MilestoneViewModel> currentPatch;
-                while((currentPatch = statePatches.pollFirst()) != null) {
-                    if(!state.patchedState(currentPatch.low).isConsistent()) {
-                        throw new SnapshotException("failed to apply patch belonging to " + currentPatch.hi);
-                    }
-
-                    state.applyStateDiff(currentPatch.low);
-                    metaData.setIndex(currentPatch.hi.index());
-                    metaData.setHash(currentPatch.hi.getHash());
-                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle, currentPatch.hi.getHash());
-                    if(currentMilestoneTransaction != null && currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
-                        metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
-                    }
-                }
-            } catch (Exception e) {
-                throw new SnapshotException("failed to completely roll back the state of the ledger", e);
-            } finally {
-                unlockWrite();
-            }
-        }
-
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
     }
 
     private HashSet<Integer> skippedMilestones = new HashSet<>();
@@ -450,7 +338,7 @@ public class Snapshot {
                 }
             }
         } catch (Exception e) {
-            throw new SnapshotException("failed to completely replay the the state of the ledger", e);
+            throw new SnapshotException("failed to completely replay the the balances of the ledger", e);
         } finally {
             unlockWrite();
         }
@@ -473,7 +361,7 @@ public class Snapshot {
      * This is a utility method for determining if a given hash is a solid entry point.
      *
      * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
-     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
+     * Snapshot itself, without having to retrieve the balances first. This is mainly to keep the code more readable,
      * without having to manually traverse the necessary references.
      *
      * @param transactionHash hash of the referenced transaction that shall be checked
@@ -491,7 +379,7 @@ public class Snapshot {
      * This is a utility method for determining the balance of an address.
      *
      * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
-     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
+     * Snapshot itself, without having to retrieve the balances first. This is mainly to keep the code more readable,
      * without having to manually traverse the necessary references.
      *
      * @param hash address that we want to check
@@ -556,5 +444,35 @@ public class Snapshot {
      */
     public long getTimestamp(boolean lock) {
         return metaData.getTimestamp(lock);
+    }
+
+    public boolean isConsistent() {
+        lockRead();
+
+        try {
+            return state.isConsistent();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public boolean hasCorrectSupply() {
+        lockRead();
+
+        try {
+            return state.hasCorrectSupply();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
+        lockRead();
+
+        try {
+            return state.patchedState(snapshotStateDiff);
+        } finally {
+            unlockRead();
+        }
     }
 }

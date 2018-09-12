@@ -85,7 +85,7 @@ public interface SnapshotConfig extends Config {
         String LOCAL_SNAPSHOTS_DEPTH = "Number of milestones to keep.";
         String LOCAL_SNAPSHOTS_BASE_PATH = "Path to the snapshot files (without file extensions).";
         String SNAPSHOT_TIME = "Epoch time of the last snapshot.";
-        String SNAPSHOT_FILE = "Path of the file that contains the state of the ledger at the last snapshot.";
+        String SNAPSHOT_FILE = "Path of the file that contains the balances of the ledger at the last snapshot.";
         String SNAPSHOT_SIGNATURE_FILE = "Path to the file that contains a signature for the snapshot file.";
         String MILESTONE_START_INDEX = "The start index of the milestones. This index is encoded in each milestone " +
                 "transaction by the coordinator.";

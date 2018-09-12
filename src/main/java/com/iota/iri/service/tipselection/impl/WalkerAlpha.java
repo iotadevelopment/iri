@@ -101,7 +101,7 @@ public class WalkerAlpha implements Walker {
 
     private Optional<Hash> select(UnIterableMap<HashId, Integer> ratings, Set<Hash> approversSet) {
 
-        //filter based on tangle state when starting the walk
+        //filter based on tangle balances when starting the walk
         List<Hash> approvers = approversSet.stream().filter(ratings::containsKey).collect(Collectors.toList());
 
         //After filtering, if no approvers are available, it's a tip.

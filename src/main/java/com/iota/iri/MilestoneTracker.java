@@ -331,7 +331,7 @@ public class MilestoneTracker {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
 
             if(milestoneToRepair != null) {
-                // reset the ledger to the state before the erroneous milestone appeared
+                // reset the ledger to the balances before the erroneous milestone appeared
                 if(milestoneToRepair.index() <= snapshotManager.getLatestSnapshot().getIndex()) {
                     snapshotManager.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
                 }
@@ -422,7 +422,7 @@ public class MilestoneTracker {
                             newMilestoneViewModel.store(tangle);
 
                             // if we find a NEW milestone that should have been processed before our latest solid
-                            // milestone -> reset the ledger state and check the milestones again
+                            // milestone -> reset the ledger balances and check the milestones again
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotManager.getLatestSnapshot().getIndex()) {
@@ -467,7 +467,7 @@ public class MilestoneTracker {
                 errorCausingMilestone = Integer.MAX_VALUE;
             }
 
-            // advance to the next milestone if we were able to update the ledger state
+            // advance to the next milestone if we were able to update the ledger balances
             if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                 if(nextMilestone.index() > latestMilestoneIndex) {
                     latestMilestoneIndex = nextMilestone.index();

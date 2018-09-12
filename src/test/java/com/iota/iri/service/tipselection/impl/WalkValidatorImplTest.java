@@ -238,7 +238,7 @@ public class WalkValidatorImplTest {
 
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotManager, ledgerValidator,
                 config);
-        Assert.assertFalse("Validation succeded but should have failed due to inconsistent ledger state",
+        Assert.assertFalse("Validation succeded but should have failed due to inconsistent ledger balances",
                 walkValidator.isValid(hash));
     }
 

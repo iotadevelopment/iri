@@ -3,7 +3,6 @@ package com.iota.iri.service.snapshot;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.utils.IotaIOUtils;
-import com.iota.iri.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,30 +10,38 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+/**
+ * This class represents the "state" of the ledger at a given time, which means how many IOTA are available on a certain
+ * address.
+ *
+ * It can either be a full ledger state which is used by the Snapshots or a "differential" State which carries the
+ * balance changes from one State to the next one which is used when updating the ledger state between two milestones.
+ */
 public class SnapshotState {
     /**
      * Logger for this class (used to emit debug messages).
      */
-    private static final Logger log = LoggerFactory.getLogger(SnapshotState.class);
+    protected static final Logger log = LoggerFactory.getLogger(SnapshotState.class);
 
     /**
-     * Underlying Map storing the balances of addresses.
+     * Underlying Map storing the balances of the addresses.
      */
-    protected final Map<Hash, Long> state;
+    protected final Map<Hash, Long> balances;
 
     /**
+     * This method reads the balances from the given file and creates the corresponding SnapshotState.
      *
+     * The format of the file is pairs of "<address>;<balance>" separated by newlines. It simply reads the file line by
+     * line, adding the corresponding values to the map.
+     *
+     * @param snapshotStateFilePath
+     * @return
      */
-    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-
-    public static SnapshotState fromFile(String snapshotStateFilePath) {
+    protected static SnapshotState fromFile(String snapshotStateFilePath) {
         String line;
         Map<Hash, Long> state = new HashMap<>();
         BufferedReader reader = null;
@@ -67,110 +74,74 @@ public class SnapshotState {
         return new SnapshotState(state);
     }
 
-    public SnapshotState(Map<Hash, Long> initialState) {
-        this.state = new HashMap<>(initialState);
+    /**
+     * The constructor of this class makes a copy of the provided map and stores it in its internal property.
+     *
+     * This allows us to work with the provided balances without having to worry about modifications of the passed in
+     * map that happens outside of the SnapshotState logic.
+     *
+     * While most of the other methods are public, the constructor is protected since we do not want to allow the
+     * creation of SnapshotState's outside of the snapshot logic.
+     *
+     * @param initialState map with the addresses and their balances
+     */
+    protected SnapshotState(Map<Hash, Long> initialState) {
+        this.balances = new HashMap<>(initialState);
     }
 
-    public void lockRead() {
-        readWriteLock.readLock().lock();
-    }
-
-    public void lockWrite() {
-        readWriteLock.writeLock().lock();
-    }
-
-    public void unlockRead() {
-        readWriteLock.readLock().unlock();
-    }
-
-    public void unlockWrite() {
-        readWriteLock.writeLock().unlock();
-    }
-
+    /**
+     * This method creates a SnapshotState that contains the resulting balances of only the addresses that were modified
+     * by the given diff.
+     *
+     * It can be used to check if the modifications by a {@link SnapshotStateDiff} will result in a consistent State
+     * where all modified addresses are still positive. Even though this State can be consistent, it will most probably
+     * not return true if we call {@link #hasCorrectSupply()}, since the unmodified addresses are missing.
+     *
+     * @param snapshotStateDiff the balance patches that we want to apply
+     * @return a differential SnapshotState that contains the resulting balances of all modified addresses
+     */
     public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
-        // lock the object while we are reading
-        lockRead();
-
-        try {
-            // construct a SnapshotState that only contains the resulting balances affected by the given diff
-            Map<Hash, Long> patch = snapshotStateDiff.diff.entrySet().stream().map(
-                hashLongEntry -> new HashMap.SimpleEntry<>(
-                    hashLongEntry.getKey(),
-                    state.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue()
-                )
-            ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-            return new SnapshotState(patch);
-        }
-
-        finally {
-            unlockRead();
-        }
-    }
-
-    public void applyStateDiff(SnapshotStateDiff diff) {
-        applyStateDiff(diff, true);
+        return new SnapshotState(snapshotStateDiff.diff.entrySet().stream().map(
+            hashLongEntry -> new HashMap.SimpleEntry<>(
+                hashLongEntry.getKey(),
+                balances.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue()
+            )
+        ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
     /**
      * This method allows us to apply
      *
      * @param diff
-     * @param lock
      */
-    protected void applyStateDiff(SnapshotStateDiff diff, boolean lock) {
-        // optionally lock while we are reading
-        if(lock) {
-            lockWrite();
-        }
-
-        //
-        try {
-            diff.diff.entrySet().stream().forEach(hashLongEntry -> {
-                if(state.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
-                    state.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
-                }
-            });
-        }
-
-        // optionally unlock when we are done
-        finally {
-            if(lock) {
-                unlockWrite();
+    public void applyStateDiff(SnapshotStateDiff diff) {
+        diff.diff.entrySet().stream().forEach(hashLongEntry -> {
+            if(balances.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
+                balances.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
             }
-        }
+        });
     }
 
     public HashMap<Hash, Long> getInconsistentAddresses() {
-        // lock while we are reading
-        lockRead();
-
         // create variable for our result
         HashMap<Hash, Long> result = new HashMap<Hash, Long>();
 
         // cycle through our balances and check if they are positive (dump a message if sth is not consistent)
-        try {
-            final Iterator<Map.Entry<Hash, Long>> stateIterator = state.entrySet().iterator();
-            while(stateIterator.hasNext()) {
-                final Map.Entry<Hash, Long> entry = stateIterator.next();
-                if(entry.getValue() <= 0) {
-                    if(entry.getValue() < 0) {
-                        log.info("skipping negative value for address " + entry.getKey() + ": " + entry.getValue());
+        final Iterator<Map.Entry<Hash, Long>> stateIterator = balances.entrySet().iterator();
+        while(stateIterator.hasNext()) {
+            final Map.Entry<Hash, Long> entry = stateIterator.next();
+            if(entry.getValue() <= 0) {
+                if(entry.getValue() < 0) {
+                    log.info("skipping negative value for address " + entry.getKey() + ": " + entry.getValue());
 
-                        result.put(entry.getKey(), entry.getValue());
-                    }
-
-                    stateIterator.remove();
+                    result.put(entry.getKey(), entry.getValue());
                 }
+
+                stateIterator.remove();
             }
-
-            return result;
         }
 
-        // unlock when we are done
-        finally {
-            unlockRead();
-        }
+        return result;
     }
 
     public boolean isConsistent() {
@@ -178,76 +149,34 @@ public class SnapshotState {
     }
 
     public boolean hasCorrectSupply() {
-        // lock while we are reading
-        lockRead();
+        // calculate the sum of all balances
+        long supply = balances.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
 
-        try {
-            // calculate the sum of all balances
-            long supply = state.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
+        // if the sum differs from the expected supply -> dump an error and return false ...
+        if(supply != TransactionViewModel.SUPPLY) {
+            log.error("the supply differs from the expected supply by: {}", TransactionViewModel.SUPPLY - supply);
 
-            // if the sum differs from the expected supply -> dump an error and return false ...
-            if(supply != TransactionViewModel.SUPPLY) {
-                log.error("the supply differs from the expected supply by: {}", TransactionViewModel.SUPPLY - supply);
-
-                return false;
-            }
-
-            // ... otherwise return true
-            return true;
+            return false;
         }
 
-        // unlock when we are done
-        finally {
-            unlockRead();
-        }
+        // ... otherwise return true
+        return true;
     }
 
     public Long getBalance(Hash address) {
-        // lock while we are reading
-        lockRead();
-
-        // return the result
-        try {
-            return this.state.get(address);
-        }
-
-        // unlock when we are done
-        finally {
-            unlockRead();
-        }
+        return this.balances.get(address);
     }
 
-    public SnapshotState clone() {
-        // lock the object while we read
-        lockRead();
-
-        // create our clone
-        try {
-            return new SnapshotState(this.state);
-        }
-
-        // unlock when we are done
-        finally {
-            unlockRead();
-        }
+    protected SnapshotState clone() {
+        return new SnapshotState(this.balances);
     }
 
-    public void writeFile(String snapshotPath) throws IOException {
-        // lock the object while we read the information
-        lockRead();
-
+    protected void writeFile(String snapshotPath) throws IOException {
         // try to write the file
-        try {
-            Files.write(Paths.get(snapshotPath), () -> state.entrySet().stream().filter(
-                entry -> entry.getValue() != 0
-            ).<CharSequence>map(
-                entry -> entry.getKey() + ";" + entry.getValue()
-            ).sorted().iterator());
-        }
-
-        // unlock the object when we are done
-        finally {
-            unlockRead();
-        }
+        Files.write(Paths.get(snapshotPath), () -> balances.entrySet().stream().filter(
+            entry -> entry.getValue() != 0
+        ).<CharSequence>map(
+            entry -> entry.getKey() + ";" + entry.getValue()
+        ).sorted().iterator());
     }
 }

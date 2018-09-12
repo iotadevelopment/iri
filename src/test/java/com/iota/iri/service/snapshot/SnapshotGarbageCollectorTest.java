@@ -24,7 +24,8 @@ public class SnapshotGarbageCollectorTest {
         MainnetConfig mainnetConfig = new MainnetConfig();
 
         // add some jobs to our queue
-        GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
+        GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
+        snapshotGarbageCollector1.reset();
         snapshotGarbageCollector1.addCleanupJob(mainnetConfig.getMilestoneStartIndex() + 10);
         snapshotGarbageCollector1.addCleanupJob(mainnetConfig.getMilestoneStartIndex() + 20);
 
@@ -53,7 +54,8 @@ public class SnapshotGarbageCollectorTest {
         MainnetConfig mainnetConfig = new MainnetConfig();
 
         // add a job to our queue
-        GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel()).reset();
+        GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
+        snapshotGarbageCollector1.reset();
         snapshotGarbageCollector1.addCleanupJob(12);
 
         // check if the restored cleanupJobs are the same as the saved ones

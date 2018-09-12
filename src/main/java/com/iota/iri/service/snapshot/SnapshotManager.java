@@ -77,7 +77,7 @@ public class SnapshotManager {
             initialSnapshot = loadBuiltInSnapshot();
         }
 
-        // create a working copy of the initial snapshot that keeps track of the latest state
+        // create a working copy of the initial snapshot that keeps track of the latest balances
         latestSnapshot = initialSnapshot.clone();
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
@@ -154,7 +154,7 @@ public class SnapshotManager {
      *
      * It simply returns the stored private property.
      *
-     * @return the Snapshot that represents the most recent "confirmed" state of the ledger
+     * @return the Snapshot that represents the most recent "confirmed" balances of the ledger
      */
     public Snapshot getLatestSnapshot() {
         return latestSnapshot;
@@ -163,7 +163,7 @@ public class SnapshotManager {
     /**
      * This method resets the SnapshotManager and sets the latestSnapshot value back to its starting point.
      *
-     * This can be used to recover from errors if the state of the Snapshot ever becomes corrupted (due to syncing or
+     * This can be used to recover from errors if the balances of the Snapshot ever becomes corrupted (due to syncing or
      * processing errors).
      */
     public void resetLatestSnapshot() {
@@ -207,7 +207,7 @@ public class SnapshotManager {
 
             // this should never happen since we check the snapshots already when applying them but better give
             // a reasonable error message if it ever does
-            if(!snapshot.getState().hasCorrectSupply() || !snapshot.getState().isConsistent()) {
+            if(!snapshot.hasCorrectSupply() || !snapshot.isConsistent()) {
                 throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() +" leads to an invalid supply");
             }
         }
@@ -257,12 +257,12 @@ public class SnapshotManager {
                            ? GENERATE_FROM_INITIAL
                            : GENERATE_FROM_LATEST;
 
-            // store how many milestones has to be processed to generate the ledger state (for reasonable debug messages)
+            // store how many milestones has to be processed to generate the ledger balances (for reasonable debug messages)
             amountOfMilestonesToProcess = generationMode == GENERATE_FROM_INITIAL
                                         ? distanceFromInitialSnapshot
                                         : distanceFromLatestSnapshot;
 
-            // clone the corresponding snapshot state
+            // clone the corresponding snapshot balances
             snapshot = generationMode == GENERATE_FROM_INITIAL
                                 ? initialSnapshot.clone()
                                 : latestSnapshot.clone();
@@ -296,11 +296,11 @@ public class SnapshotManager {
         }
 
         // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
+        dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot balances", stepCounter = 0, amountOfMilestonesToProcess);
 
         // iterate through the milestones to our target
         while(generationMode == GENERATE_FROM_INITIAL ? currentMilestone.index() <= targetMilestone.index() : currentMilestone.index() > targetMilestone.index()) {
-            // calculate the correct ledger state based on our current milestone
+            // calculate the correct ledger balances based on our current milestone
             calculateSnapshotState(snapshot, currentMilestone, generationMode);
 
             // retrieve the next milestone
@@ -320,7 +320,7 @@ public class SnapshotManager {
             currentMilestone = nextMilestone;
 
             // dump a progress message after every step
-            dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", ++stepCounter, amountOfMilestonesToProcess);
+            dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot balances", ++stepCounter, amountOfMilestonesToProcess);
         }
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -541,7 +541,7 @@ public class SnapshotManager {
             String basePath = configuration.getLocalSnapshotsBasePath();
 
             // create a file handle for our snapshot file
-            File localSnapshotFile = new File(basePath + ".snapshot.state");
+            File localSnapshotFile = new File(basePath + ".snapshot.balances");
 
             // create a file handle for our snapshot metadata file
             File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
@@ -553,17 +553,17 @@ public class SnapshotManager {
                 localSnapshotMetadDataFile.exists() &&
                 localSnapshotMetadDataFile.isFile()
             ) {
-                // retrieve the state to our local snapshot
+                // retrieve the balances to our local snapshot
                 SnapshotState snapshotState = SnapshotState.fromFile(localSnapshotFile.getAbsolutePath());
 
-                // check the supply of the snapshot state
+                // check the supply of the snapshot balances
                 if(!snapshotState.hasCorrectSupply()) {
-                    throw new IllegalStateException("the snapshot state file has an invalid supply");
+                    throw new IllegalStateException("the snapshot balances file has an invalid supply");
                 }
 
-                // check the consistency of the snapshot state
+                // check the consistency of the snapshot balances
                 if(!snapshotState.isConsistent()) {
-                    throw new IllegalStateException("the snapshot state file is not consistent");
+                    throw new IllegalStateException("the snapshot balances file is not consistent");
                 }
 
                 // retrieve the meta data to our local snapshot
@@ -599,17 +599,17 @@ public class SnapshotManager {
                 throw new IllegalStateException("the snapshot signature is invalid");
             }
 
-            // restore the snapshot state from its file
+            // restore the snapshot balances from its file
             SnapshotState snapshotState = SnapshotState.fromFile(snapshotPath);
 
-            // check the supply of the snapshot state
+            // check the supply of the snapshot balances
             if(!snapshotState.hasCorrectSupply()) {
-                throw new IllegalStateException("the snapshot state file has an invalid supply");
+                throw new IllegalStateException("the snapshot balances file has an invalid supply");
             }
 
-            // check the consistency of the snaphot state
+            // check the consistency of the snaphot balances
             if(!snapshotState.isConsistent()) {
-                throw new IllegalStateException("the snapshot state file is not consistent");
+                throw new IllegalStateException("the snapshot balances file is not consistent");
             }
 
             // create solid entry points
@@ -664,7 +664,7 @@ public class SnapshotManager {
         snapshotGarbageCollector.addCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
 
         try {
-            targetSnapshot.getState().writeFile(basePath + ".snapshot.state");
+            targetSnapshot.state.writeFile(basePath + ".snapshot.balances");
             targetSnapshot.getMetaData().writeFile(basePath + ".snapshot.meta");
         } catch(IOException e) {
             throw new SnapshotException("could not write local snapshot files", e);

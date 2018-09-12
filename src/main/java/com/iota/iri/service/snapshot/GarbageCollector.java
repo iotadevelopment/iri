@@ -1,16 +1,7 @@
 package com.iota.iri.service.snapshot;
 
-import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.model.Hash;
-import com.iota.iri.model.IntegerIndex;
-import com.iota.iri.model.Milestone;
-import com.iota.iri.model.Transaction;
-import com.iota.iri.storage.Indexable;
-import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +11,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+/**
+ * This class represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in connection
+ * with local snapshots.
+ *
+ * It plans, manages and executes the cleanup jobs asynchronously in separate thread so cleaning up does not affect the
+ * performance of the node itself.
+ */
 public class GarbageCollector {
     /**
      * The interval in milliseconds that the garbage collector will check if new cleanup tasks are available.
@@ -36,10 +34,19 @@ public class GarbageCollector {
      */
     protected boolean shuttingDown = false;
 
+    /**
+     * Holds a reference to the tangle instance which acts as an interface to the used database.
+     */
     protected Tangle tangle;
 
+    /**
+     * Holds a reference to the {@link SnapshotManager} that this garbage collector belongs to.
+     */
     protected SnapshotManager snapshotManager;
 
+    /**
+     * Holds a reference to the {@link TipsViewModel} which is necessary for removing tips that were pruned.
+     */
     protected TipsViewModel tipsViewModel;
 
     /**
@@ -47,10 +54,13 @@ public class GarbageCollector {
      */
     protected LinkedList<GarbageCollectorJob> cleanupJobs;
 
+    /**
+     * DAGUtils instance that is used to traverse the graph.
+     */
     protected DAGUtils dagUtils;
 
     /**
-     * The constructor of this class stores the passed in parameters for future use and restores the previous state of
+     * The constructor of this class stores the passed in parameters for future use and restores the previous balances of
      * the garbage collector if there is a valid one (to continue with cleaning up after IRI restarts).
      */
     public GarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
@@ -68,17 +78,26 @@ public class GarbageCollector {
      * The job that is created through this method will take care of removing all the unnecessary database entries
      * before (and including) the given milestoneIndex.
      *
-     * @param milestoneIndex
+     * It first adds the job to the queue, then persists it and checks if jobs can be consolidated.
+     *
+     * @param milestoneIndex starting point of the cleanup operation
      * @throws SnapshotException if something goes wrong while persisting the job queue
      */
     public void addCleanupJob(int milestoneIndex) throws SnapshotException {
-        cleanupJobs.addLast(new GarbageCollectorJob(milestoneIndex, milestoneIndex));
+        cleanupJobs.addLast(new GarbageCollectorJob(this, milestoneIndex, milestoneIndex));
 
         persistChanges();
         consolidateCleanupJobs();
     }
 
-    public GarbageCollector start() {
+    /**
+     * This method spawns the thread that is taking care of processing the cleanup jobs in the background.
+     *
+     * It repeatedly calls {@link #processCleanupJobs()} while the GarbageCollector was not shutdown.
+     *
+     * @return
+     */
+    public void start() {
         (new Thread(() -> {
             log.info("Snapshot Garbage Collector started ...");
 
@@ -86,133 +105,58 @@ public class GarbageCollector {
                 try {
                     processCleanupJobs();
 
-                    Thread.sleep(GARBAGE_COLLECTOR_RESCAN_INTERVAL);
-                } catch(InterruptedException e) {
-                    log.info("Snapshot Garbage Collector stopped ...");
-
-                    shuttingDown = true;
+                    try {
+                        Thread.sleep(GARBAGE_COLLECTOR_RESCAN_INTERVAL);
+                    } catch(InterruptedException e) { /* do nothing */ }
                 } catch(SnapshotException e) {
-                    log.error("failed to cleanup the garbage", e);
+                    log.error("error while processing the garbage collector jobs", e);
                 }
             }
         }, "Snapshot Garbage Collector")).start();
-
-        return this;
-    }
-
-    public GarbageCollector shutdown() {
-        shuttingDown = true;
-
-        return this;
-    }
-
-    public GarbageCollector reset() {
-        cleanupJobs = new LinkedList<>();
-
-        getStateFile().delete();
-
-        return this;
     }
 
     /**
-     * This method takes care of cleaning up a single milestone and performs the actual database operations.
-     *
-     * This method performs the deletions in an atomic way, which means that either the full processing succeeds or
-     * fails.
-     *
-     * @param milestoneIndex
-     * @return the instance of the {@link GarbageCollector} that it was called on to allow chaining
-     * @throws SnapshotException if something goes wrong while cleaning up the milestone
+     * Shuts down the background job by setting the corresponding shutdown flag.
      */
-    protected GarbageCollector cleanupMilestoneTransactions(int milestoneIndex) throws SnapshotException {
-        try {
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, milestoneIndex);
-            if(milestoneViewModel != null) {
-                List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-
-                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
-
-                dagUtils.traverseApprovees(
-                    // start traversal at the milestone
-                    milestoneViewModel,
-
-                    // continue while the transaction belongs to the current milestone
-                    approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
-
-                    // remove all approved transactions
-                    approvedTransaction -> {
-                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
-
-                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
-                    }
-                );
-
-                MilestoneViewModel.clear(milestoneIndex);
-
-                elementsToDelete.stream().forEach(element -> {
-                    if(Transaction.class.equals(element.hi)) {
-                        tipsViewModel.removeTipHash((Hash) element.low);
-                    }
-                });
-                tipsViewModel.removeTipHash(milestoneViewModel.getHash());
-
-                tangle.deleteBatch(elementsToDelete);
-            }
-        } catch(Exception e) {
-            throw new SnapshotException("failed to cleanup milestone #" + milestoneIndex, e);
-        }
-
-        return this;
+    public void shutdown() {
+        shuttingDown = true;
     }
 
-    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws Exception {
-        // remove all orphaned transactions that are branching off of our deleted transactions
-        dagUtils.traverseApprovers(
-            transaction,
+    /**
+     * This method resets the balances of the GarbageCollector.
+     *
+     * It prunes the job queue and deletes the balances file afterwards. It can for example be used to cleanup the
+     * remaining files after processing the unit tests.
+     */
+    public void reset() {
+        cleanupJobs = new LinkedList<>();
 
-            approverTransaction -> approverTransaction.snapshotIndex() == 0,
-
-            approverTransaction -> {
-                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
-
-                /*dagUtils.traverseApprovees(
-                    approverTransaction,
-                    approvedTransaction -> !approvedTransaction.isSolid(),
-                    approvedTransaction -> {
-                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, processedTransactions);
-                    }
-                );*/
-            },
-
-            processedTransactions
-        );
+        getStateFile().delete();
     }
 
-    protected GarbageCollector processCleanupJob(GarbageCollectorJob job, int cleanupTarget) throws SnapshotException {
-        while(!shuttingDown && cleanupTarget < job.getCurrentIndex()) {
-            cleanupMilestoneTransactions(job.getCurrentIndex());
-
-            job.setCurrentIndex(job.getCurrentIndex() - 1);
-
-            persistChanges();
-        }
-
-        return this;
-    }
-
-    protected GarbageCollector processCleanupJobs() throws SnapshotException {
+    /**
+     * This method contains the logic for scheduling the jobs and executing them.
+     *
+     * While the GarbageCollector is not shutting down and there are jobs that need to be processed, it retrieves the
+     * first job and processes it. Afterwards it checks if there is a second job which also has to be processed. If both
+     * jobs are "done", it consolidates their progress into a single job, that is consecutively used by the following
+     * jobs for determining their "target milestone".
+     *
+     * @return
+     * @throws SnapshotException
+     */
+    protected void processCleanupJobs() throws SnapshotException {
         // repeat until all jobs are processed
         while(!shuttingDown && cleanupJobs.size() >= 1) {
             GarbageCollectorJob firstJob = cleanupJobs.getFirst();
-            processCleanupJob(firstJob, snapshotManager.getConfiguration().getMilestoneStartIndex());
+            firstJob.process(snapshotManager.getConfiguration().getMilestoneStartIndex());
 
             if(cleanupJobs.size() >= 2) {
                 cleanupJobs.removeFirst();
                 GarbageCollectorJob secondJob = cleanupJobs.getFirst();
                 cleanupJobs.addFirst(firstJob);
 
-                processCleanupJob(secondJob, firstJob.getStartingIndex());
+                secondJob.process(firstJob.getStartingIndex());
 
                 // if both jobs are done we can consolidate them to one
                 consolidateCleanupJobs();
@@ -220,19 +164,26 @@ public class GarbageCollector {
                 break;
             }
         }
-
-        return this;
     }
 
     /**
-     * This method consolidates the first two cleanup jobs into a single one if both are done.
+     * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
+     * pending.
      *
-     * It is used to clean up the cleanupJobs queue while we process it, so it doesn't grow indefinitely while we add
-     * new jobs.
+     * It is used to clean up the cleanupJobs queue and the corresponding garbage collector file, so it always has a
+     * size of less than 4 jobs.
      *
-     * @throws SnapshotException if an error occurs while persisting the state
+     * Since the jobs are getting processed from the beginning of the list, we first check if the first two jobs are
+     * "done" and merge them into a single one that reflects the "done" status of both jobs. Consecutively we check if
+     * there are two or more pending jobs at the end that can also be consolidated.
+     *
+     * It is important to note that the jobs always clean from their startingPosition to the startingPosition of the
+     * previous job (or the {@code milestoneStartIndex} of the last global snapshot if there is no previous one) without
+     * any gaps in between which is required to be able to merge them.
+     *
+     * @throws SnapshotException if an error occurs while persisting the balances
      */
-    protected GarbageCollector consolidateCleanupJobs() throws SnapshotException {
+    protected void consolidateCleanupJobs() throws SnapshotException {
         // if we have at least 2 jobs -> check if we can consolidate them at the beginning
         if(cleanupJobs.size() >= 2) {
             // retrieve the first two jobs
@@ -241,7 +192,7 @@ public class GarbageCollector {
 
             // if both first job are done -> consolidate them and persists the changes
             if(job1.getCurrentIndex() == snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
-                cleanupJobs.addFirst(new GarbageCollectorJob(job2.getStartingIndex(), job1.getCurrentIndex()));
+                cleanupJobs.addFirst(new GarbageCollectorJob(this, job2.getStartingIndex(), job1.getCurrentIndex()));
 
                 persistChanges();
             }
@@ -262,7 +213,7 @@ public class GarbageCollector {
 
             // if both jobs are pending -> consolidate them and persists the changes
             if(job1.getCurrentIndex() == job1.getStartingIndex() && job2.getCurrentIndex() == job2.getStartingIndex()) {
-                cleanupJobs.addLast(new GarbageCollectorJob(job1.getStartingIndex(), job1.getCurrentIndex()));
+                cleanupJobs.addLast(new GarbageCollectorJob(this, job1.getStartingIndex(), job1.getCurrentIndex()));
 
                 persistChanges();
             }
@@ -275,42 +226,38 @@ public class GarbageCollector {
                 cleanupSuccessfull = false;
             }
         }
-
-        return this;
     }
 
     /**
      * This method persists the changes of the garbage collector so IRI can continue cleaning up upon restarts.
      *
      * Since cleaning up the old database entries can take a long time, we need to make sure that it is possible to
-     * continue where we stopped. This method therefore writes the state of the queued jobs into a file that is read
+     * continue where we stopped. This method therefore writes the balances of the queued jobs into a file that is read
      * upon re-initialization of the GarbageCollector.
      *
-     * @throws SnapshotException if something goes wrong while writing the state file
+     * @throws SnapshotException if something goes wrong while writing the balances file
      */
-    protected GarbageCollector persistChanges() throws SnapshotException {
+    protected void persistChanges() throws SnapshotException {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
                 () -> cleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getStartingIndex()) + ";" + Integer.toString(entry.getCurrentIndex())).iterator()
             );
         } catch(IOException e) {
-            throw new SnapshotException("could not persists garbage collector state", e);
+            throw new SnapshotException("could not persists garbage collector balances", e);
         }
-
-        return this;
     }
 
     /**
-     * This method tries to restore the previous state of the Garbage Collector by reading the state file that get's
+     * This method tries to restore the previous balances of the Garbage Collector by reading the balances file that get's
      * persisted whenever we modify the queue.
      *
-     * It is used to restore the state of the garbage collector between IRI restarts and speed up the pruning
-     * operations. If it fails to restore the state it just continues with an empty state which doesn't cause any
+     * It is used to restore the balances of the garbage collector between IRI restarts and speed up the pruning
+     * operations. If it fails to restore the balances it just continues with an empty balances which doesn't cause any
      * problems with future jobs other than requiring them to perform unnecessary steps and therefore slowing them down
      * a bit.
      */
-    protected GarbageCollector restoreCleanupJobs() {
+    protected void restoreCleanupJobs() {
         cleanupJobs = new LinkedList<>();
 
         try {
@@ -328,16 +275,23 @@ public class GarbageCollector {
             while((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
                 if(parts.length >= 2) {
-                    cleanupJobs.addLast(new GarbageCollectorJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
+                    cleanupJobs.addLast(new GarbageCollectorJob(this, Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
                 }
             }
 
             reader.close();
         } catch(Exception e) { /* do nothing */ }
-
-        return this;
     }
 
+    /**
+     * This method returns a file handle to the local snapshots garbage collector file.
+     *
+     * It constructs the path of the file by appending the corresponding file extension to the
+     * {@link com.iota.iri.conf.BaseIotaConfig#localSnapshotsBasePath} config variable. If the path is relative, it
+     * places the file relative to the current working directory, which is usually the location of the iri.jar.
+     *
+     * @return File handle to the local snapshots garbage collector file.
+     */
     protected File getStateFile() {
         return new File(snapshotManager.getConfiguration().getLocalSnapshotsBasePath() + ".snapshot.gc");
     }
