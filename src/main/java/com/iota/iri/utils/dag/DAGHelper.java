@@ -92,11 +92,11 @@ public class DAGHelper {
                 if(processedTransactions.add(currentTransactionHash)) {
                     TransactionViewModel currentTransaction = TransactionViewModel.fromHash(tangle, currentTransactionHash);
                     if(
-                    currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && (
-                    // do not "test" the starting transaction since it is not an "approver"
-                    currentTransactionHash == startingTransactionHash ||
-                    condition.test(currentTransaction)
-                    )
+                        currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && (
+                            // do not "test" the starting transaction since it is not an "approver"
+                            currentTransactionHash == startingTransactionHash ||
+                            condition.test(currentTransaction)
+                        )
                     ) {
                         // do not consume the starting transaction since it is not an "approver"
                         if(currentTransactionHash != startingTransactionHash) {
@@ -167,11 +167,11 @@ public class DAGHelper {
                 if(processedTransactions.add(currentTransactionHash)) {
                     TransactionViewModel currentTransaction = TransactionViewModel.fromHash(tangle, currentTransactionHash);
                     if(
-                    currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&(
-                    // do not "test" the starting transaction since it is not an "approvee"
-                    currentTransactionHash == startingTransactionHash ||
-                    condition.test(currentTransaction)
-                    )
+                        currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&(
+                            // do not "test" the starting transaction since it is not an "approvee"
+                            currentTransactionHash == startingTransactionHash ||
+                            condition.test(currentTransaction)
+                        )
                     ) {
                         // do not consume the starting transaction since it is not an "approvee"
                         if(currentTransactionHash != startingTransactionHash) {
