@@ -70,8 +70,8 @@ public class EntryPointSelectorImplTest {
     }
 
     private void mockMilestoneTrackerBehavior(int latestSolidSubtangleMilestoneIndex, Hash latestSolidSubtangleMilestone) {
-        snapshotManager.getLatestSnapshot().getMetaData().setIndex(latestSolidSubtangleMilestoneIndex);
-        snapshotManager.getLatestSnapshot().getMetaData().setHash(latestSolidSubtangleMilestone);
+        snapshotManager.getLatestSnapshot().setIndex(latestSolidSubtangleMilestoneIndex);
+        snapshotManager.getLatestSnapshot().setHash(latestSolidSubtangleMilestone);
     }
 
     private void mockTangleBehavior(Hash milestoneModelHash) throws Exception {

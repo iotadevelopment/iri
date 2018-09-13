@@ -14,7 +14,7 @@ import static org.junit.Assert.assertTrue;
 
 public class SnapshotMetaDataTest {
     @Test
-    public void fileTest() throws IOException {
+    public void fileTest() throws IOException, SnapshotException {
         // create some test hashes
         Hash testHash1 = new Hash("FEDKRGKR9WGSZBRLJLEMWADVPDDYURNSPQ9LKKGPHSVMGWKLLQTUUUAD9TYKCYAJLZDWXPCVBYTVSOAZY");
         Hash testHash2 = Hash.NULL_HASH;

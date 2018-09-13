@@ -362,7 +362,7 @@ public class SnapshotTest {
         balanceChanges.put(AddressesWithBalance.ADDRESS_1.getHash(), -1000L);
         balanceChanges.put(AddressesWithBalance.ADDRESS_2.getHash(), 1000L);
         originalSnapshot.update(new SnapshotStateDiff(balanceChanges), 8, Hash.NULL_HASH);
-        originalSnapshot.getMetaData().setTimestamp(originalSnapshotTimestamp + 10);
+        originalSnapshot.setTimestamp(originalSnapshotTimestamp + 10);
 
         // check if the cloned values are still the unmodified original values /////////////////////////////////////////
 

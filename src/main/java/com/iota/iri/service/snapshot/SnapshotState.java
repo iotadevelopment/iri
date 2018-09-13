@@ -110,9 +110,12 @@ public class SnapshotState {
     }
 
     /**
-     * This method allows us to apply
+     * This method applies the given {@link SnapshotStateDiff} to the current balances.
      *
-     * @param diff
+     * Since this method actually changes the balances of this snapshot the passed in diff should manually be checked
+     * for consistency before.
+     *
+     * @param diff the balance changes that should be applied to this state.
      */
     public void applyStateDiff(SnapshotStateDiff diff) {
         diff.diff.entrySet().stream().forEach(hashLongEntry -> {
@@ -122,11 +125,18 @@ public class SnapshotState {
         });
     }
 
+    /**
+     * This method returns all addresses that have a negative balance.
+     *
+     * While this should never happen with the state belonging to the snapshot itself, it can still happen for the
+     * differential states that are getting created by {@link #patchedState(SnapshotStateDiff)} for the exact reason of
+     * checking their consistency.
+     *
+     * @return a map of the inconsistent addresses (negative balance) and their actual balance (empty if consistent)
+     */
     public HashMap<Hash, Long> getInconsistentAddresses() {
-        // create variable for our result
         HashMap<Hash, Long> result = new HashMap<Hash, Long>();
 
-        // cycle through our balances and check if they are positive (dump a message if sth is not consistent)
         final Iterator<Map.Entry<Hash, Long>> stateIterator = balances.entrySet().iterator();
         while(stateIterator.hasNext()) {
             final Map.Entry<Hash, Long> entry = stateIterator.next();
@@ -144,33 +154,69 @@ public class SnapshotState {
         return result;
     }
 
+    /**
+     * This method checks if the state is consistent.
+     *
+     * Consistent means that there are no addresses with a negative value.
+     *
+     * @return true if the state is consistent and false otherwise
+     */
     public boolean isConsistent() {
         return getInconsistentAddresses().size() == 0;
     }
 
+    /**
+     * This method checks if the state of the ledger has the correct supply.
+     *
+     * It first calculates a sum of the balances of all addresses and then checks if that supply equals the expected
+     * value.
+     *
+     * It doesn't make sense to call this functions on "differential" states that are used to check the
+     * consistency of patches but the snapshot state itself should always stay consistent.
+     *
+     * @return true if the supply is correct and false otherwise
+     */
     public boolean hasCorrectSupply() {
-        // calculate the sum of all balances
         long supply = balances.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
 
-        // if the sum differs from the expected supply -> dump an error and return false ...
         if(supply != TransactionViewModel.SUPPLY) {
             log.error("the supply differs from the expected supply by: {}", TransactionViewModel.SUPPLY - supply);
 
             return false;
         }
 
-        // ... otherwise return true
         return true;
     }
 
+    /**
+     * This method returns the balance for an address.
+     *
+     * @param address address that shall be checked
+     * @return balance of the address or null if the address is unkown
+     */
     public Long getBalance(Hash address) {
         return this.balances.get(address);
     }
 
+    /**
+     * This method creates a deep clone of the current state.
+     *
+     * The created clone can be modified without affecting the original state.
+     *
+     * @return a deep copy of this object
+     */
     protected SnapshotState clone() {
         return new SnapshotState(this.balances);
     }
 
+    /**
+     * This method dumps the current state to a file.
+     *
+     * It is used by local snapshots to persist the in memory states and allow IRI to resume from the local snapshot.
+     *
+     * @param snapshotPath location of the file that shall be written
+     * @throws IOException if anything goes wrong while writing the file
+     */
     protected void writeFile(String snapshotPath) throws IOException {
         // try to write the file
         Files.write(Paths.get(snapshotPath), () -> balances.entrySet().stream().filter(

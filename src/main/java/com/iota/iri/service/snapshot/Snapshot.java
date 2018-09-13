@@ -102,34 +102,6 @@ public class Snapshot {
     }
 
     /**
-     * Getter of the metadata object.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return metadata of this snapshot
-     */
-    public SnapshotMetaData getMetaData() {
-        lockRead();
-
-        try {
-            return metaData;
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * Getter of the balances object.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return metadata of this snapshot
-     */
-    public SnapshotState getState() {
-        return state;
-    }
-
-    /**
      * This method creates a deep clone of the Snapshot object.
      *
      * It can be used to make a copy of the object, that then can be modified without affecting the original object.
@@ -187,7 +159,17 @@ public class Snapshot {
         lockRead();
 
         try {
-            return this.getMetaData().getHash();
+            return this.metaData.getHash();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public void setHash(Hash hash) {
+        lockRead();
+
+        try {
+            metaData.setHash(hash);
         } finally {
             unlockRead();
         }
@@ -214,9 +196,9 @@ public class Snapshot {
         // apply our changes without locking the underlying members (we already locked globally)
         try {
             state.applyStateDiff(diff);
-            metaData.setIndex(newIndex, false);
+            metaData.setIndex(newIndex);
             metaData.setHash(newTransactionHash);
-            metaData.setTimestamp(System.currentTimeMillis() / 1000L, false);
+            metaData.setTimestamp(System.currentTimeMillis() / 1000L);
         }
 
         // unlock the access to this object once we are done updating
@@ -354,7 +336,37 @@ public class Snapshot {
      * @return set of transaction hashes that shall be considered solid when being referenced
      */
     public HashMap<Hash, Integer> getSolidEntryPoints() {
-        return getMetaData().getSolidEntryPoints();
+        lockRead();
+
+        try {
+            return metaData.getSolidEntryPoints();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
+        lockWrite();
+
+        try {
+            metaData.setSeenMilestones(seenMilestones);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    public HashMap<Hash, Integer> getSeenMilestones() {
+        lockRead();
+
+        try {
+            return metaData.getSeenMilestones();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
+        return metaData.confirmedSolidEntryPoints.containsKey(solidEntrypoint);
     }
 
     /**
@@ -368,11 +380,23 @@ public class Snapshot {
      * @return true if it is a solid entry point and false otherwise
      */
     public boolean isSolidEntryPoint(Hash transactionHash) {
-        return getMetaData().hasSolidEntryPoint(transactionHash);
+        lockRead();
+
+        try {
+            return metaData.hasSolidEntryPoint(transactionHash);
+        } finally {
+            unlockRead();
+        }
     }
 
     public int getSolidEntryPointIndex(Hash solidEntrypoint) {
-        return getMetaData().getSolidEntryPointIndex(solidEntrypoint);
+        lockRead();
+
+        try {
+            return metaData.getSolidEntryPointIndex(solidEntrypoint);
+        } finally {
+            unlockRead();
+        }
     }
 
     /**
@@ -386,21 +410,13 @@ public class Snapshot {
      * @return the balance of the given address
      */
     public long getBalance(Hash hash) {
-        return state.getBalance(hash);
-    }
+        lockRead();
 
-    /**
-     * This is a utility method for determining the index of the snapshot, with locking the underlying metadata object
-     * first.
-     *
-     * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
-     * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
-     * having to manually traverse the necessary references.
-     *
-     * @return the milestone index of the snapshot
-     */
-    public int getIndex() {
-        return getIndex(true);
+        try {
+            return state.getBalance(hash);
+        } finally {
+            unlockRead();
+        }
     }
 
     /**
@@ -411,25 +427,30 @@ public class Snapshot {
      * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
      * having to manually traverse the necessary references.
      *
-     * @param lock if set to true the metadata object will be read-locked for other threads
      * @return the milestone index of the snapshot
      */
-    public int getIndex(boolean lock) {
-        return metaData.getIndex(lock);
+    public int getIndex() {
+        return metaData.getIndex();
     }
 
     /**
-     * This is a utility method for determining the timestamp of the snapshot, with locking the underlying metadata
-     * object first.
+     * This is a utility method for determining the index of the snapshot, with optionally locking the underlying
+     * metadata object.
      *
-     * Even though the timestamp is not directly stored in this object, we offer the ability to read it from the
-     * Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more readable,
-     * without having to manually traverse the necessary references.
+     * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
+     * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
+     * having to manually traverse the necessary references.
      *
-     * @return the timestamp when the snapshot was updated or created
+     * @return the milestone index of the snapshot
      */
-    public long getTimestamp() {
-        return getTimestamp(true);
+    public void setIndex(int index) {
+        lockWrite();
+
+        try {
+            metaData.setIndex(index);
+        } finally {
+            unlockWrite();
+        }
     }
 
     /**
@@ -442,8 +463,44 @@ public class Snapshot {
      *
      * @return the timestamp when the snapshot was updated or created
      */
-    public long getTimestamp(boolean lock) {
-        return metaData.getTimestamp(lock);
+    public long getTimestamp() {
+        lockRead();
+
+        try {
+            return metaData.getTimestamp();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * This is a utility method for determining the timestamp of the snapshot, with optionally locking the underlying
+     * metadata object first.
+     *
+     * Even though the timestamp is not directly stored in this object, we offer the ability to read it from the
+     * Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more readable,
+     * without having to manually traverse the necessary references.
+     *
+     * @return the timestamp when the snapshot was updated or created
+     */
+    public void setTimestamp(long timestamp) {
+        lockWrite();
+
+        try {
+            metaData.setTimestamp(timestamp);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
+        lockWrite();
+
+        try {
+            metaData.setSolidEntryPoints(solidEntryPoints);
+        } finally {
+            unlockWrite();
+        }
     }
 
     public boolean isConsistent() {

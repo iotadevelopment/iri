@@ -211,7 +211,7 @@ public class MilestoneTracker {
     private void spawnMilestoneSolidifier() {
         new Thread(() -> {
             // prepare seen milestones for concurrent access
-            ConcurrentHashMap<Hash, Integer> seenMilestones = new ConcurrentHashMap(snapshotManager.getInitialSnapshot().getMetaData().getSeenMilestones());
+            ConcurrentHashMap<Hash, Integer> seenMilestones = new ConcurrentHashMap(snapshotManager.getInitialSnapshot().getSeenMilestones());
 
             while(!shuttingDown) {
                 // retrieve milestones from our local snapshot (if they are still missing)

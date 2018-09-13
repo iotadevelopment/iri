@@ -335,7 +335,7 @@ public class SnapshotManager {
         solidEntryPoints.put(Hash.NULL_HASH, configuration.getMilestoneStartIndex());
 
         // copy the old solid entry points which are still valid
-        snapshot.getMetaData().getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
+        snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
             if(solidEntryPoint.getValue() > targetMilestone.index()) {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             }
@@ -378,7 +378,7 @@ public class SnapshotManager {
                     }
 
                     // only examine transactions that are not part of the solid entry points
-                    if(!initialSnapshot.getMetaData().hasSolidEntryPoint(currentTransaction.getBranchTransactionHash())) {
+                    if(!initialSnapshot.hasSolidEntryPoint(currentTransaction.getBranchTransactionHash())) {
                         // retrieve the branch transaction of our current transaction
                         TransactionViewModel branchTransaction;
                         try {
@@ -397,7 +397,7 @@ public class SnapshotManager {
                     }
 
                     // only examine transactions that are not part of the solid entry points
-                    if(!initialSnapshot.getMetaData().hasSolidEntryPoint(currentTransaction.getTrunkTransactionHash())) {
+                    if(!initialSnapshot.hasSolidEntryPoint(currentTransaction.getTrunkTransactionHash())) {
                         // retrieve the trunk transaction of our current transaction
                         TransactionViewModel trunkTransaction;
                         try {
@@ -465,11 +465,11 @@ public class SnapshotManager {
         }
 
         // set the snapshot index, timestamp and solid entry points to that of our target milestone transaction
-        snapshot.getMetaData().setIndex(targetMilestone.index());
-        snapshot.getMetaData().setTimestamp(targetMilestoneTransaction.getTimestamp());
-        snapshot.getMetaData().setSolidEntryPoints(solidEntryPoints);
-        snapshot.getMetaData().setHash(targetMilestone.getHash());
-        snapshot.getMetaData().setSeenMilestones(seenMilestones);
+        snapshot.setIndex(targetMilestone.index());
+        snapshot.setTimestamp(targetMilestoneTransaction.getTimestamp());
+        snapshot.setSolidEntryPoints(solidEntryPoints);
+        snapshot.setHash(targetMilestone.getHash());
+        snapshot.setSeenMilestones(seenMilestones);
 
         //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -530,50 +530,54 @@ public class SnapshotManager {
         }
     }
 
-    public Snapshot loadLocalSnapshot() throws IOException, IllegalStateException {
-        // load necessary configuration parameters
-        boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
+    public Snapshot loadLocalSnapshot() {
+        try {
+            // load necessary configuration parameters
+            boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
 
-        // if local snapshots are enabled
-        if(localSnapshotsEnabled) {
-            // load the remaining configuration parameters
-            boolean testnet = configuration.isTestnet();
-            String basePath = configuration.getLocalSnapshotsBasePath();
+            // if local snapshots are enabled
+            if(localSnapshotsEnabled) {
+                // load the remaining configuration parameters
+                boolean testnet = configuration.isTestnet();
+                String basePath = configuration.getLocalSnapshotsBasePath();
 
-            // create a file handle for our snapshot file
-            File localSnapshotFile = new File(basePath + ".snapshot.balances");
+                // create a file handle for our snapshot file
+                File localSnapshotFile = new File(basePath + ".snapshot.balances");
 
-            // create a file handle for our snapshot metadata file
-            File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
+                // create a file handle for our snapshot metadata file
+                File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
 
-            // if the local snapshot files exists -> load them
-            if(
+                // if the local snapshot files exists -> load them
+                if(
                 localSnapshotFile.exists() &&
                 localSnapshotFile.isFile() &&
                 localSnapshotMetadDataFile.exists() &&
                 localSnapshotMetadDataFile.isFile()
-            ) {
-                // retrieve the balances to our local snapshot
-                SnapshotState snapshotState = SnapshotState.fromFile(localSnapshotFile.getAbsolutePath());
+                ) {
+                    // retrieve the balances to our local snapshot
+                    SnapshotState snapshotState = SnapshotState.fromFile(localSnapshotFile.getAbsolutePath());
 
-                // check the supply of the snapshot balances
-                if(!snapshotState.hasCorrectSupply()) {
-                    throw new IllegalStateException("the snapshot balances file has an invalid supply");
+                    // check the supply of the snapshot balances
+                    if(!snapshotState.hasCorrectSupply()) {
+                        throw new IllegalStateException("the snapshot balances file has an invalid supply");
+                    }
+
+                    // check the consistency of the snapshot balances
+                    if(!snapshotState.isConsistent()) {
+                        throw new IllegalStateException("the snapshot balances file is not consistent");
+                    }
+
+                    // retrieve the meta data to our local snapshot
+                    SnapshotMetaData snapshotMetaData = SnapshotMetaData.fromFile(localSnapshotMetadDataFile);
+
+                    log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
+
+                    // return our Snapshot
+                    return new Snapshot(snapshotState, snapshotMetaData);
                 }
-
-                // check the consistency of the snapshot balances
-                if(!snapshotState.isConsistent()) {
-                    throw new IllegalStateException("the snapshot balances file is not consistent");
-                }
-
-                // retrieve the meta data to our local snapshot
-                SnapshotMetaData snapshotMetaData = SnapshotMetaData.fromFile(localSnapshotMetadDataFile);
-
-                log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
-
-                // return our Snapshot
-                return new Snapshot(snapshotState, snapshotMetaData);
             }
+        } catch(Exception e) {
+            log.info("No valid Local Snapshot file found");
         }
 
         // otherwise just return null
@@ -665,7 +669,7 @@ public class SnapshotManager {
 
         try {
             targetSnapshot.state.writeFile(basePath + ".snapshot.balances");
-            targetSnapshot.getMetaData().writeFile(basePath + ".snapshot.meta");
+            targetSnapshot.metaData.writeFile(basePath + ".snapshot.meta");
         } catch(IOException e) {
             throw new SnapshotException("could not write local snapshot files", e);
         }

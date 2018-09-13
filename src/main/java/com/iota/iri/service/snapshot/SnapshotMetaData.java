@@ -6,65 +6,78 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
+/**
+ * This class represents the meta data of a snapshot.
+ *
+ * Since a snapshot represents the state of the ledger at a given point and this point is defined by a chosen milestone
+ * in the tangle, we store milestone specific values like a hash, and an index but also derived values that are only
+ * relevant to the local snapshots logic.
+ */
 public class SnapshotMetaData implements Cloneable {
-    // CORE FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////////////////////
-
     /**
-     * Lock object allowing to block access to this object from different threads.
+     * Holds the initial transaction hash that this snapshot was created with.
+     *
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
+     *       this value differs from the {@link #hash}.
      */
-    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-
     protected Hash initialHash;
 
     /**
-     * Holds the transaction hash of the milestone.
+     * Holds the current transaction hash of the snapshot.
      */
     private Hash hash;
 
+    /**
+     * Holds the initial transaction index that this snapshot was created with.
+     *
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
+     *       this value differs from the {@link #index}.
+     */
     protected int initialIndex;
 
     /**
-     * Holds the current index of this snapshot.
-     *
-     * The initial snapshot has its index set to the start index.
+     * Holds the current index of the snapshot.
      */
     private int index;
 
+    /**
+     * Holds the initial timestamp of the milestone transaction that this snapshot was created with.
+     *
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
+     *       this value differs from the {@link #timestamp}.
+     */
     protected long initialTimestamp;
 
     /**
-     * Holds the timestamp when this snapshot was created or updated the last time.
+     * Holds the timestamp of the milestone that this snapshot is associated to.
      */
     private long timestamp;
 
     /**
-     * Set of transaction hashes that were cut off when creating the snapshot.
+     * Hashes that were pruned when creating the snapshot and that still had non-orphaned approvers.
      *
      * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
      * in this Set.
      */
-    private HashMap<Hash, Integer> solidEntryPoints;
-
-    private HashMap<Hash, Integer> seenMilestones;
+    protected HashMap<Hash, Integer> confirmedSolidEntryPoints;
 
     /**
-     * This method retrieves the meta data of a snapshot from a file.
+     * Set of transaction hashes that were pruned when creating the snapshot and that still had non-orphaned approvers.
      *
-     * It is used by local snapshots to determine the relevant information about the saved snapshot.
-     *
-     * @param filePath path to the snapshot metadata file
-     * @return SnapshotMetaData instance holding all the relevant details about the snapshot
-     * @throws FileNotFoundException if the metadata file does not exist
-     * @throws IOException if the metadata file is not readable
-     * @throws IllegalArgumentException if the metadata file exists but is malformed
+     * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
+     * in this Set.
      */
-    public static SnapshotMetaData fromFile(String filePath) throws FileNotFoundException, IOException, IllegalArgumentException {
-        return fromFile(new File(filePath));
-    }
+    private HashMap<Hash, Integer> pendingSolidEntryPoints;
+
+    /**
+     * Holds a list of milestone hashes that were issued after the milestone that was used to create the snapshot.
+     *
+     * It is saved to allow unsynced nodes to request those milestones when they use the corresponding snapshot files to
+     * bootstrap their node.
+     */
+    private HashMap<Hash, Integer> seenMilestones;
 
     /**
      * This method retrieves the meta data of a snapshot from a file.
@@ -77,8 +90,8 @@ public class SnapshotMetaData implements Cloneable {
      * @throws IOException if the metadata file is not readable
      * @throws IllegalArgumentException if the metadata file exists but is malformed
      */
-    public static SnapshotMetaData fromFile(File snapshotMetaDataFile) throws FileNotFoundException, IOException, IllegalArgumentException {
-        // create a read for our file
+    public static SnapshotMetaData fromFile(File snapshotMetaDataFile) throws FileNotFoundException, IOException, SnapshotException {
+        // create a reader for our file
         BufferedReader reader = new BufferedReader(
             new InputStreamReader(
                 new BufferedInputStream(
@@ -99,35 +112,35 @@ public class SnapshotMetaData implements Cloneable {
         if((line = reader.readLine()) != null) {
             hash = new Hash(line);
         } else {
-            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
         // read the index
         if((line = reader.readLine()) != null) {
             index = Integer.parseInt(line);
         } else {
-            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
         // read the timestamp
         if((line = reader.readLine()) != null) {
             timestamp = Long.parseLong(line);
         } else {
-            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
         // read the solid entry points size
         if((line = reader.readLine()) != null) {
             solidEntryPointsSize = Integer.parseInt(line);
         } else {
-            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
         // read the solid entry points size
         if((line = reader.readLine()) != null) {
             seenMilestonesSize = Integer.parseInt(line);
         } else {
-            throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
         }
 
         // read the solid entry points from our file
@@ -139,7 +152,7 @@ public class SnapshotMetaData implements Cloneable {
                     solidEntryPoints.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
                 }
             } else {
-                throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
             }
         }
 
@@ -152,7 +165,7 @@ public class SnapshotMetaData implements Cloneable {
                     seenMilestones.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
                 }
             } else {
-                throw new IllegalArgumentException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
             }
         }
 
@@ -164,235 +177,95 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
-     * Constructor of the SnapshotMetaData.
+     * Constructor of the SnapshotMetaData class.
      *
      * It simply stores the passed in parameters for later use.
      *
      * @param  hash transaction hash representing
      * @param index index of the Snapshot that this metadata belongs to
-     * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
+     * @param confirmedSolidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
-        // store our parameters
+    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> confirmedSolidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
         this.initialHash = hash;
         this.hash = hash;
         this.initialIndex = index;
         this.index = index;
         this.initialTimestamp = timestamp;
         this.timestamp = timestamp;
-        this.solidEntryPoints = solidEntryPoints;
+        this.confirmedSolidEntryPoints = confirmedSolidEntryPoints;
         this.seenMilestones = seenMilestones;
-    }
-
-    /**
-     * Locks the metadata object for read access.
-     *
-     * This is used to synchronize the access from different Threads.
-     */
-    public void lockRead() {
-        readWriteLock.readLock().lock();
-    }
-
-    /**
-     * Locks the metadata object for write access.
-     *
-     * This is used to synchronize the access from different Threads.
-     */
-    public void lockWrite() {
-        readWriteLock.writeLock().lock();
-    }
-
-    /**
-     * Unlocks the object from read blocks.
-     *
-     * This is used to synchronize the access from different Threads.
-     */
-    public void unlockRead() {
-        readWriteLock.readLock().unlock();
-    }
-
-    /**
-     * Unlocks the object from write blocks.
-     *
-     * This is used to synchronize the access from different Threads.
-     */
-    public void unlockWrite() {
-        readWriteLock.writeLock().unlock();
     }
 
     /**
      * This method is the setter of the milestone hash.
      *
-     * It simply stores the passed value in the private property, with locking the object first.
+     * It simply stores the passed value in the private property.
      *
      * @param hash transaction hash of the milestone
      */
     public void setHash(Hash hash) {
-        lockWrite();
-
         this.hash = hash;
-
-        unlockWrite();
     }
 
     /**
      * This method is the getter of the milestone hash.
      *
-     * It simply returns the stored private property, with locking the object first.
+     * It simply returns the stored private property.
      *
      * @return transaction hash of the milestone
      */
     public Hash getHash() {
-        lockRead();
-
-        try {
-            return hash;
-        } finally {
-            unlockRead();
-        }
+        return hash;
     }
 
     /**
      * This method is the setter of the milestone index.
      *
-     * It simply stores the passed value in the private property, with locking the object first.
-     *
-      * @param index milestone index that shall be set
-     */
-    public void setIndex(int index) {
-        setIndex(index, true);
-    }
-
-    /**
-     * This method is the setter of the milestone index.
-     *
-     * It simply stores the passed value in the private property, with optionally locking the object first.
+     * It simply stores the passed value in the private property.
      *
      * @param index index that shall be set
-     * @param lock boolean indicating if the object should be locked for other threads while writing to it
      */
-    public void setIndex(int index, boolean lock) {
-        // prevent other threads to write to this object while we do the updates
-        if(lock) {
-            lockWrite();
-        }
-
-        // apply our changes
+    public void setIndex(int index) {
         this.index = index;
-
-        // unlock the access to this object once we are done updating
-        if(lock) {
-            unlockWrite();
-        }
     }
 
     /**
      * This method is the getter of the index.
      *
-     * It simply returns the stored private property, with locking the object first.
+     * It simply returns the stored private property.
      *
      * @return current index of this metadata
      */
     public int getIndex() {
-        return getIndex(true);
-    }
-
-    /**
-     * This method is the getter of the index.
-     *
-     * It simply returns the stored private property, with optionally locking the object first.
-     *
-     * @return current index of this metadata
-     */
-    public int getIndex(boolean lock) {
-        // lock the object for read access
-        if(lock) {
-            lockRead();
-        }
-
-        // return our value
-        try {
-            return this.index;
-        }
-
-        // unlock the object from read blocks
-        finally {
-            if(lock) {
-                unlockRead();
-            }
-        }
+        return this.index;
     }
 
     /**
      * This method is the setter of the timestamp.
      *
-     * It simply stores the passed value in the private property, with locking the object first.
+     * It simply stores the passed value in the private property.
      *
      * @param timestamp timestamp when the snapshot was created or updated
      */
-    public void setTimestamp(long timestamp) {
-        setTimestamp(timestamp, true);
-    }
-
-    /**
-     * This method is the setter of the timestamp.
-     *
-     * It simply stores the passed value in the private property, with optionally locking the object first.
-     *
-     * @param timestamp timestamp when the snapshot was created or updated
-     * @param lock boolean indicating if the object should be locked for other threads while writing to it
-     */
-    protected void setTimestamp(long timestamp, boolean lock) {
-        // prevent other threads to write to this object while we do the updates
-        if(lock) {
-            lockWrite();
-        }
-
-        // apply our changes
+    protected void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
-
-        // unlock the access to this object once we are done updating
-        if(lock) {
-            unlockWrite();
-        }
     }
 
     /**
      * This method is the getter of the timestamp.
      *
-     * It simply returns the stored private property, with locking the object first.
+     * It simply returns the stored private property.
      *
      * @return timestamp when the snapshot was created or updated
      */
     public long getTimestamp() {
-        return getTimestamp(true);
+        return this.timestamp;
     }
 
-    /**
-     * This method is the getter of the timestamp.
-     *
-     * It simply returns the stored private property, with optionally locking the object first.
-     *
-     * @return timestamp when the snapshot was created or updated
-     */
-    public long getTimestamp(boolean lock) {
-        // lock the object for read access
-        if(lock) {
-            lockRead();
-        }
 
-        // return our value
-        try {
-            return this.timestamp;
-        }
 
-        // unlock the object from read blocks
-        finally {
-            if(lock) {
-                unlockRead();
-            }
-        }
-    }
+
+
 
     /**
      * This method performs a member check on the underlying solid entry points.
@@ -404,11 +277,11 @@ public class SnapshotMetaData implements Cloneable {
      * @return true if the hash is a solid entry point and false otherwise
      */
     public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return solidEntryPoints.containsKey(solidEntrypoint);
+        return confirmedSolidEntryPoints.containsKey(solidEntrypoint);
     }
 
     public int getSolidEntryPointIndex(Hash solidEntrypoint) {
-        return solidEntryPoints.get(solidEntrypoint);
+        return confirmedSolidEntryPoints.get(solidEntrypoint);
     }
 
     /**
@@ -419,18 +292,7 @@ public class SnapshotMetaData implements Cloneable {
      * @return set of transaction hashes that shall be considered solid when being referenced
      */
     public HashMap<Hash, Integer> getSolidEntryPoints() {
-        return solidEntryPoints;
-    }
-
-    /**
-     * This method is the setter of the solid entry points.
-     *
-     * It simply stores the passed value in the private property, with locking the object first.
-     *
-     * @param solidEntryPoints set of solid entry points that shall be stored
-     */
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
-        setSolidEntryPoints(solidEntryPoints, true);
+        return confirmedSolidEntryPoints;
     }
 
     /**
@@ -440,19 +302,8 @@ public class SnapshotMetaData implements Cloneable {
      *
      * @param solidEntryPoints set of solid entry points that shall be stored
      */
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints, boolean lock) {
-        // prevent other threads to write to this object while we do the updates
-        if(lock) {
-            lockWrite();
-        }
-
-        // apply our changes
-        this.solidEntryPoints = solidEntryPoints;
-
-        // unlock the access to this object once we are done updating
-        if(lock) {
-            unlockWrite();
-        }
+    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
+        this.confirmedSolidEntryPoints = solidEntryPoints;
     }
 
     /**
@@ -467,36 +318,14 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
-     * This method is the setter of the solid entry points.
-     *
-     * It simply stores the passed value in the private property, with locking the object first.
-     *
-     * @param seenMilestones set of solid entry points that shall be stored
-     */
-    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
-        setSeenMilestones(seenMilestones, true);
-    }
-
-    /**
      * This method is the setter of the seen milestones.
      *
      * It simply stores the passed value in the private property, with optionally locking the object first.
      *
      * @param seenMilestones set of solid entry points that shall be stored
      */
-    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones, boolean lock) {
-        // prevent other threads to write to this object while we do the updates
-        if(lock) {
-            lockWrite();
-        }
-
-        // apply our changes
+    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
         this.seenMilestones = seenMilestones;
-
-        // unlock the access to this object once we are done updating
-        if(lock) {
-            unlockWrite();
-        }
     }
 
     /**
@@ -531,11 +360,11 @@ public class SnapshotMetaData implements Cloneable {
                     hash.toString(),
                     String.valueOf(index),
                     String.valueOf(timestamp),
-                    String.valueOf(solidEntryPoints.size()),
+                    String.valueOf(confirmedSolidEntryPoints.size()),
                     String.valueOf(seenMilestones.size())
                 ),
                 Stream.concat(
-                    solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
+                    confirmedSolidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
                     seenMilestones.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
                 )
             ).iterator()
@@ -552,6 +381,12 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        return new SnapshotMetaData(new Hash(hash.toString()), index, timestamp, (HashMap) solidEntryPoints.clone(), (HashMap) seenMilestones.clone());
+        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, (HashMap) confirmedSolidEntryPoints.clone(), (HashMap) seenMilestones.clone());
+
+        result.setIndex(index);
+        result.setHash(hash);
+        result.setTimestamp(timestamp);
+
+        return result;
     }
 }
