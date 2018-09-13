@@ -363,10 +363,10 @@ public class MilestoneTracker {
         processedTransactions.add(milestoneTransaction.getHash());
 
         dagUtils.traverseApprovees(
-        currentMilestone,
-        currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
-        currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
-        processedTransactions
+            currentMilestone.getHash(),
+            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
+            currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
+            processedTransactions
         );
 
         for (int resettedMilestoneIndex : resettedMilestones) {

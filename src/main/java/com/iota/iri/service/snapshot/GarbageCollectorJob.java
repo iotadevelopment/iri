@@ -133,7 +133,7 @@ public class GarbageCollectorJob {
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 garbageCollector.dagUtils.traverseApprovees(
-                    milestoneViewModel,
+                    milestoneViewModel.getHash(),
                     approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
                     approvedTransaction -> {
                         elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
@@ -180,7 +180,7 @@ public class GarbageCollectorJob {
     protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws TraversalException {
         // remove all orphaned transactions that are branching off of our deleted transactions
         garbageCollector.dagUtils.traverseApprovers(
-            transaction,
+            transaction.getHash(),
             approverTransaction -> approverTransaction.snapshotIndex() == 0,
             approverTransaction -> {
                 elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
