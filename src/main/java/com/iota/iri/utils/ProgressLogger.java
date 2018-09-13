@@ -47,6 +47,10 @@ public class ProgressLogger {
         return this;
     }
 
+    public int getCurrentStep() {
+        return currentStep;
+    }
+
     public ProgressLogger setStepCount(int stepCount) {
         this.stepCount = stepCount;
 
