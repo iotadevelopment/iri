@@ -18,7 +18,7 @@ import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
-import com.iota.iri.utils.dag.DAGUtils;
+import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -73,7 +73,7 @@ public class MilestoneTracker {
     private final TransactionRequester transactionRequester;
     private final boolean testnet;
     private final MessageQ messageQ;
-    private final DAGUtils dagUtils;
+    private final DAGHelper dagHelper;
     private final int numOfKeysInMilestone;
     private final boolean acceptAnyTestnetCoo;
     private final boolean isRescanning;
@@ -101,7 +101,7 @@ public class MilestoneTracker {
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator);
-        this.dagUtils = DAGUtils.get(tangle);
+        this.dagHelper = DAGHelper.get(tangle);
 
         //configure
         this.testnet = config.isTestnet();
@@ -355,33 +355,41 @@ public class MilestoneTracker {
      * @param currentMilestone the milestone that shall have its confirmed transactions reset
      * @throws Exception if something goes wrong while accessing the database
      */
-    public void resetSnapshotIndexOfMilestoneTransactions(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) throws Exception {
-        Set<Integer> resettedMilestones = new HashSet<>();
+    public void resetSnapshotIndexOfMilestoneTransactions(MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) {
+        try {
+            Set<Integer> resettedMilestones = new HashSet<>();
 
-        TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-        resetSnapshotIndexOfMilestoneTransaction(milestoneTransaction, currentMilestone, resettedMilestones);
-        processedTransactions.add(milestoneTransaction.getHash());
+            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
+            resetSnapshotIndexOfMilestoneTransaction(milestoneTransaction, currentMilestone, resettedMilestones);
+            processedTransactions.add(milestoneTransaction.getHash());
 
-        dagUtils.traverseApprovees(
-            currentMilestone.getHash(),
-            currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
-            currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
-            processedTransactions
-        );
+            dagHelper.traverseApprovees(
+                currentMilestone.getHash(),
+                currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
+                currentTransaction -> resetSnapshotIndexOfMilestoneTransaction(currentTransaction, currentMilestone, resettedMilestones),
+                processedTransactions
+            );
 
-        for (int resettedMilestoneIndex : resettedMilestones) {
-            resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestoneTransactions", processedTransactions);
+            for(int resettedMilestoneIndex : resettedMilestones) {
+                resetCorruptedMilestone(resettedMilestoneIndex, "resetSnapshotIndexOfMilestoneTransactions", processedTransactions);
+            }
+        } catch(Exception e) {
+            log.error("failed to reset the transactions belonging to " + currentMilestone, e);
         }
     }
 
     protected void resetSnapshotIndexOfMilestoneTransaction(TransactionViewModel currentTransaction,
                                                             MilestoneViewModel currentMilestone,
-                                                            Set<Integer> resettedMilestones) throws Exception {
-        if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-            resettedMilestones.add(currentTransaction.snapshotIndex());
-        }
+                                                            Set<Integer> resettedMilestones) {
+        try {
+            if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
+                resettedMilestones.add(currentTransaction.snapshotIndex());
+            }
 
-        currentTransaction.setSnapshot(tangle, snapshotManager, 0);
+            currentTransaction.setSnapshot(tangle, snapshotManager, 0);
+        } catch(Exception e) {
+            log.error("failed to reset the snapshotIndex of " + currentTransaction + " while trying to repair " + currentMilestone, e);
+        }
     }
 
     public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {

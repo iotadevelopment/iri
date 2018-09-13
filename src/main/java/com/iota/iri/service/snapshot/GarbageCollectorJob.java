@@ -10,6 +10,8 @@ import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.TraversalException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,6 +27,11 @@ import java.util.Set;
  * {@code currentIndex}).
  */
 public class GarbageCollectorJob {
+    /**
+     * Logger for this class allowing us to dump debug and status messages.
+     */
+    protected static final Logger log = LoggerFactory.getLogger(GarbageCollectorJob.class);
+
     /**
      * Holds a reference to the {@link GarbageCollector} that this job belongs to.
      */
@@ -132,7 +139,7 @@ public class GarbageCollectorJob {
                 // collect elements to delete
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
-                garbageCollector.dagUtils.traverseApprovees(
+                garbageCollector.dagHelper.traverseApprovees(
                     milestoneViewModel.getHash(),
                     approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
                     approvedTransaction -> {
@@ -177,15 +184,19 @@ public class GarbageCollectorJob {
      *                              transactions more than once)
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
-    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) throws TraversalException {
-        // remove all orphaned transactions that are branching off of our deleted transactions
-        garbageCollector.dagUtils.traverseApprovers(
-            transaction.getHash(),
-            approverTransaction -> approverTransaction.snapshotIndex() == 0,
-            approverTransaction -> {
-                elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
-            },
-            processedTransactions
-        );
+    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) {
+        try {
+            // remove all orphaned transactions that are branching off of our deleted transactions
+            garbageCollector.dagHelper.traverseApprovers(
+                transaction.getHash(),
+                approverTransaction -> approverTransaction.snapshotIndex() == 0,
+                approverTransaction -> {
+                    elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
+                },
+                processedTransactions
+            );
+        } catch(Exception e) {
+            log.error("failed to clean up the orphaned approvers of " + transaction, e);
+        }
     }
 }

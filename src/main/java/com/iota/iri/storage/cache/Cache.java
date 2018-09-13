@@ -26,7 +26,7 @@ public class Cache<T extends Cacheable> {
                     Thread.sleep(10000);
                 } catch (InterruptedException e) { /* do nothing */ }
             }
-        }, "CustomObject cleanup thread");
+        }, "Cache cleanup thread");
         cleanupThread.start();
     }
 

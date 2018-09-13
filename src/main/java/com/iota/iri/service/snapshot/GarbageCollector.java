@@ -2,7 +2,7 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.dag.DAGUtils;
+import com.iota.iri.utils.dag.DAGHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,9 +55,9 @@ public class GarbageCollector {
     protected LinkedList<GarbageCollectorJob> cleanupJobs;
 
     /**
-     * DAGUtils instance that is used to traverse the graph.
+     * DAGHelper instance that is used to traverse the graph.
      */
-    protected DAGUtils dagUtils;
+    protected DAGHelper dagHelper;
 
     /**
      * The constructor of this class stores the passed in parameters for future use and restores the previous balances of
@@ -67,7 +67,7 @@ public class GarbageCollector {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
-        this.dagUtils = DAGUtils.get(tangle);
+        this.dagHelper = DAGHelper.get(tangle);
 
         restoreCleanupJobs();
     }
