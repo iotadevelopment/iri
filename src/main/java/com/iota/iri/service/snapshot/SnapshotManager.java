@@ -326,6 +326,7 @@ public class SnapshotManager {
             MilestoneViewModel nextMilestone = targetMilestone;
             while(nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
                 MilestoneViewModel currentMilestone = nextMilestone;
+                System.out.println(currentMilestone.getHash());
                 dagHelper.traverseApprovees(
                     currentMilestone.getHash(),
                     currentTransaction -> {
