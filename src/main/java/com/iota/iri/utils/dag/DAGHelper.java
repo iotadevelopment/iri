@@ -37,7 +37,9 @@ public class DAGHelper {
         if((instance = instances.get(tangle)) == null) {
             synchronized(DAGHelper.class) {
                 if((instance = instances.get(tangle)) == null) {
-                    instance = instances.put(tangle, new DAGHelper(tangle));
+                    instance = new DAGHelper(tangle);
+
+                    instances.put(tangle, instance);
                 }
             }
         }

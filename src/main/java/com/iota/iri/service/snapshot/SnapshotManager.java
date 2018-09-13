@@ -326,16 +326,10 @@ public class SnapshotManager {
             MilestoneViewModel nextMilestone = targetMilestone;
             while(nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
                 MilestoneViewModel currentMilestone = nextMilestone;
-                System.out.println(dagHelper == null);
                 dagHelper.traverseApprovees(
                     currentMilestone.getHash(),
+                    currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
                     currentTransaction -> {
-                        System.out.println("a");
-
-                        return currentTransaction.snapshotIndex() >= currentMilestone.index();
-                    },
-                    currentTransaction -> {
-                        System.out.println("b");
                         if(isSolidEntryPoint(currentTransaction.getHash(), targetMilestone)) {
                             solidEntryPoints.put(currentTransaction.getHash(), targetMilestone.index());
                         }
