@@ -433,7 +433,7 @@ public class MilestoneTracker {
                             // milestone -> reset the ledger state and check the milestones again
                             //
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                            if(index < snapshotManager.getLatestSnapshot().getIndex()) {
+                            if(index < snapshotManager.getLatestSnapshot().getIndex() && index > snapshotManager.getInitialSnapshot().getIndex()) {
                                 try {
                                     snapshotManager.getLatestSnapshot().rollBackMilestones(newMilestoneViewModel.index(), tangle);
                                 } catch(SnapshotException e) {

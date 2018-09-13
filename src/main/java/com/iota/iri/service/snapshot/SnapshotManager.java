@@ -67,8 +67,6 @@ public class SnapshotManager {
 
     private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
 
-    private ConcurrentHashMap<Hash, Integer> orphanedApprovers;
-
     /**
      * This method is the constructor of the SnapshotManager.
      *
