@@ -538,11 +538,10 @@ public class SnapshotManager {
             // if local snapshots are enabled
             if(localSnapshotsEnabled) {
                 // load the remaining configuration parameters
-                boolean testnet = configuration.isTestnet();
                 String basePath = configuration.getLocalSnapshotsBasePath();
 
                 // create a file handle for our snapshot file
-                File localSnapshotFile = new File(basePath + ".snapshot.balances");
+                File localSnapshotFile = new File(basePath + ".snapshot.state");
 
                 // create a file handle for our snapshot metadata file
                 File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
@@ -668,7 +667,7 @@ public class SnapshotManager {
         snapshotGarbageCollector.addCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
 
         try {
-            targetSnapshot.state.writeFile(basePath + ".snapshot.balances");
+            targetSnapshot.state.writeFile(basePath + ".snapshot.state");
             targetSnapshot.metaData.writeFile(basePath + ".snapshot.meta");
         } catch(IOException e) {
             throw new SnapshotException("could not write local snapshot files", e);

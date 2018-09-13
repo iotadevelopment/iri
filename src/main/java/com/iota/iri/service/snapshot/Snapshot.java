@@ -24,7 +24,7 @@ public class Snapshot {
     /**
      * Lock object allowing to block access to this object from different threads.
      */
-    public final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
      * Holds a reference to the balances of this snapshot.
