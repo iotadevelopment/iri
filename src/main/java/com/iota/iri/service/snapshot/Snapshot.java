@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 /**
  * This class represents a "snapshot" of the ledger at a given time.
  *
- * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the balances and its
+ * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the state and its
  * {@link SnapshotMetaData} which holds several information about the snapshot like its timestamp, its corresponding
  * milestone index and so on.
  */
@@ -27,7 +27,7 @@ public class Snapshot {
     protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
-     * Holds a reference to the balances of this snapshot.
+     * Holds a reference to the state of this snapshot.
      */
     protected final SnapshotState state;
 
@@ -41,7 +41,7 @@ public class Snapshot {
      *
      * It simply saves the passed parameters in its private properties.
      *
-     * @param state the balances of the Snapshot containing all its balances
+     * @param state the state of the Snapshot containing all its balances
      * @param metaData the metadata of the Snapshot containing its milestone index and other properties
      */
     public Snapshot(SnapshotState state, SnapshotMetaData metaData) {
@@ -52,7 +52,7 @@ public class Snapshot {
     /**
      * Locks the complete Snapshot object for read access.
      *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current balances.
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
      * This is used to synchronize the access from different Threads, if both members need to be read.
      *
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
@@ -65,7 +65,7 @@ public class Snapshot {
     /**
      * Locks the complete Snapshot object for write access.
      *
-     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current balances.
+     * It sets the corresponding locks in all child objects and therefore locks the whole object in its current state.
      * This is used to synchronize the access from different Threads, if both members need to be modified.
      *
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
@@ -176,18 +176,18 @@ public class Snapshot {
     }
 
     /**
-     * This method updates both - the balances and the index - in a single call.
+     * This method updates both - the state and the index - in a single call.
      *
      * It first locks both child objects and then performs the corresponding updates. It is used by the MilestoneTracker
-     * to update the balances after a milestone appeared.
+     * to update the state after a milestone appeared.
      *
-     * @param diff change in the balances
+     * @param diff change in the state
      * @param newIndex new milestone index
      */
     public void update(SnapshotStateDiff diff, int newIndex, Hash newTransactionHash) {
         // check the diff before we apply the update
         if(!diff.isConsistent()) {
-            throw new IllegalStateException("the snapshot balances diff is not consistent");
+            throw new IllegalStateException("the snapshot state diff is not consistent");
         }
 
         // prevent other threads to write to this object while we do the updates
@@ -208,7 +208,7 @@ public class Snapshot {
     }
 
     /**
-     * This method rolls back the latest milestones until it reaches the balances that the snapshot had before applying
+     * This method rolls back the latest milestones until it reaches the state that the snapshot had before applying
      * the milestone indicated by the given parameter.
      *
      * After checking the validity of the parameters we simply roll back the last milestone until we reach a point that
@@ -320,7 +320,7 @@ public class Snapshot {
                 }
             }
         } catch (Exception e) {
-            throw new SnapshotException("failed to completely replay the the balances of the ledger", e);
+            throw new SnapshotException("failed to completely replay the the state of the ledger", e);
         } finally {
             unlockWrite();
         }
@@ -373,7 +373,7 @@ public class Snapshot {
      * This is a utility method for determining if a given hash is a solid entry point.
      *
      * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
-     * Snapshot itself, without having to retrieve the balances first. This is mainly to keep the code more readable,
+     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
      * without having to manually traverse the necessary references.
      *
      * @param transactionHash hash of the referenced transaction that shall be checked
@@ -403,7 +403,7 @@ public class Snapshot {
      * This is a utility method for determining the balance of an address.
      *
      * Even tho the balance is not directly stored in this object, we offer the ability to read the balance from the
-     * Snapshot itself, without having to retrieve the balances first. This is mainly to keep the code more readable,
+     * Snapshot itself, without having to retrieve the state first. This is mainly to keep the code more readable,
      * without having to manually traverse the necessary references.
      *
      * @param hash address that we want to check

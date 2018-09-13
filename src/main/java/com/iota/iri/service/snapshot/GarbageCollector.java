@@ -60,7 +60,7 @@ public class GarbageCollector {
     protected DAGHelper dagHelper;
 
     /**
-     * The constructor of this class stores the passed in parameters for future use and restores the previous balances of
+     * The constructor of this class stores the passed in parameters for future use and restores the previous state of
      * the garbage collector if there is a valid one (to continue with cleaning up after IRI restarts).
      */
     public GarbageCollector(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel) {
@@ -123,9 +123,9 @@ public class GarbageCollector {
     }
 
     /**
-     * This method resets the balances of the GarbageCollector.
+     * This method resets the state of the GarbageCollector.
      *
-     * It prunes the job queue and deletes the balances file afterwards. It can for example be used to cleanup the
+     * It prunes the job queue and deletes the state file afterwards. It can for example be used to cleanup the
      * remaining files after processing the unit tests.
      */
     public void reset() {
@@ -181,7 +181,7 @@ public class GarbageCollector {
      * previous job (or the {@code milestoneStartIndex} of the last global snapshot if there is no previous one) without
      * any gaps in between which is required to be able to merge them.
      *
-     * @throws SnapshotException if an error occurs while persisting the balances
+     * @throws SnapshotException if an error occurs while persisting the state
      */
     protected void consolidateCleanupJobs() throws SnapshotException {
         // if we have at least 2 jobs -> check if we can consolidate them at the beginning
@@ -232,10 +232,10 @@ public class GarbageCollector {
      * This method persists the changes of the garbage collector so IRI can continue cleaning up upon restarts.
      *
      * Since cleaning up the old database entries can take a long time, we need to make sure that it is possible to
-     * continue where we stopped. This method therefore writes the balances of the queued jobs into a file that is read
+     * continue where we stopped. This method therefore writes the state of the queued jobs into a file that is read
      * upon re-initialization of the GarbageCollector.
      *
-     * @throws SnapshotException if something goes wrong while writing the balances file
+     * @throws SnapshotException if something goes wrong while writing the state file
      */
     protected void persistChanges() throws SnapshotException {
         try {
@@ -244,16 +244,16 @@ public class GarbageCollector {
                 () -> cleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getStartingIndex()) + ";" + Integer.toString(entry.getCurrentIndex())).iterator()
             );
         } catch(IOException e) {
-            throw new SnapshotException("could not persists garbage collector balances", e);
+            throw new SnapshotException("could not persists garbage collector state", e);
         }
     }
 
     /**
-     * This method tries to restore the previous balances of the Garbage Collector by reading the balances file that get's
+     * This method tries to restore the previous state of the Garbage Collector by reading the state file that get's
      * persisted whenever we modify the queue.
      *
-     * It is used to restore the balances of the garbage collector between IRI restarts and speed up the pruning
-     * operations. If it fails to restore the balances it just continues with an empty balances which doesn't cause any
+     * It is used to restore the state of the garbage collector between IRI restarts and speed up the pruning
+     * operations. If it fails to restore the state it just continues with an empty state which doesn't cause any
      * problems with future jobs other than requiring them to perform unnecessary steps and therefore slowing them down
      * a bit.
      */

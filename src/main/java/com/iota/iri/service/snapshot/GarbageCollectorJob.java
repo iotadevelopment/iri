@@ -52,7 +52,7 @@ public class GarbageCollectorJob {
      *
      * It simply stores the provided parameters in its according protected properties.
      *
-     * Since cleanup jobs can be consolidated (to reduce the size of the garbage collector balances file), we need to be
+     * Since cleanup jobs can be consolidated (to reduce the size of the garbage collector state file), we need to be
      * able provide both parameters even tho the job usually always "starts" with its {@code currentIndex} being equal
      * to the {@code startingIndex}.
      *

@@ -34,7 +34,7 @@ public class LedgerValidator {
     }
 
     /**
-     * Returns a Map of Address and change in balance that can be used to build a new Snapshot balances.
+     * Returns a Map of Address and change in balance that can be used to build a new Snapshot state.
      * Under certain conditions, it will return null:
      *  - While descending through transactions, if a transaction is marked as {PREFILLED_SLOT}, then its hash has been
      *    referenced by some transaction, but the transaction data is not found in the database. It notifies
@@ -42,7 +42,7 @@ public class LedgerValidator {
      *  - When a transaction marked as a tail transaction (if the current index is 0), but it is not the first transaction
      *    in any of the BundleValidator's transaction lists, then the bundle is marked as invalid, deleted, and re-requested.
      *  - When the bundle is not internally consistent (the sum of all transactions in the bundle must be zero)
-     * As transactions are being traversed, it will come upon bundles, and will add the transaction value to {balances}.
+     * As transactions are being traversed, it will come upon bundles, and will add the transaction value to {state}.
      * If {milestone} is true, it will search, through trunk and branch, all transactions, starting from {tip},
      * until it reaches a transaction that is marked as a "confirmed" transaction.
      * If {milestone} is false, it will search up until it reaches a confirmed transaction, or until it finds a hash that has been
@@ -51,7 +51,7 @@ public class LedgerValidator {
      * @param tip                                the hash of a transaction to start the search from
      * @param latestSnapshotIndex                index of the latest snapshot to traverse to
      * @param milestone                          marker to indicate whether to stop only at confirmed transactions
-     * @return {balances}                           the addresses that have a balance changed since the last diff check
+     * @return {state}                           the addresses that have a balance changed since the last diff check
      * @throws Exception
      */
     public Map<Hash,Long> getLatestDiff(final Set<Hash> visitedNonMilestoneSubtangleHashes, Hash tip, int latestSnapshotIndex, boolean milestone) throws Exception {
