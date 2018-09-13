@@ -466,7 +466,7 @@ public class API {
 
     /**
       * Checks the consistency of the transactions. 
-      * Marks balances as false on the following checks<br/>
+      * Marks state as false on the following checks<br/>
       * - Transaction does not exist<br/>
       * - Transaction is not a tail<br/>
       * - Missing a reference transaction<br/>
@@ -511,7 +511,7 @@ public class API {
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
                         state = false;
-                        info = "tails are not consistent (would lead to inconsistent ledger balances or below max depth)";
+                        info = "tails are not consistent (would lead to inconsistent ledger state or below max depth)";
                         break;
                     }
                 }
@@ -776,8 +776,8 @@ public class API {
       * This API call simply returns a list of boolean values in the same order as the transaction list you submitted, thus you get a true/false whether a transaction is confirmed or not.
       * Returns an {@link com.iota.iri.service.dto.ErrorResponse} if a tip is missing or the subtangle is not solid
       * 
-      * @param transactions List of transactions you want to get the inclusion balances for.
-      * @param tips List of tips (including milestones) you want to search for the inclusion balances.
+      * @param transactions List of transactions you want to get the inclusion state for.
+      * @param tips List of tips (including milestones) you want to search for the inclusion state.
       * @return {@link com.iota.iri.service.dto.GetInclusionStatesResponse} 
       **/
     private AbstractResponse getInclusionStatesStatement(final List<String> transactions, final List<String> tips) throws Exception {

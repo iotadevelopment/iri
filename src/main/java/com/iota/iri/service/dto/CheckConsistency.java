@@ -14,16 +14,16 @@ public class CheckConsistency extends AbstractResponse {
     }
 
     /**
-     * The balances of the transaction
+     * The state of the transaction
      *
-     * @return The balances.
+     * @return The state.
      */
     public boolean getState() {
         return state;
     }
     
     /**
-     * Information about the balances
+     * Information about the state
      *
      * @return The info.
      */
