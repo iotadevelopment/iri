@@ -366,7 +366,7 @@ public class Snapshot {
     }
 
     public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return metaData.confirmedSolidEntryPoints.containsKey(solidEntrypoint);
+        return metaData.solidEntryPoints.containsKey(solidEntrypoint);
     }
 
     /**

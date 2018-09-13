@@ -61,15 +61,7 @@ public class SnapshotMetaData implements Cloneable {
      * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
      * in this Set.
      */
-    protected HashMap<Hash, Integer> confirmedSolidEntryPoints;
-
-    /**
-     * Set of transaction hashes that were pruned when creating the snapshot and that still had non-orphaned approvers.
-     *
-     * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
-     * in this Set.
-     */
-    private HashMap<Hash, Integer> pendingSolidEntryPoints;
+    protected HashMap<Hash, Integer> solidEntryPoints;
 
     /**
      * Holds a list of milestone hashes that were issued after the milestone that was used to create the snapshot.
@@ -183,16 +175,16 @@ public class SnapshotMetaData implements Cloneable {
      *
      * @param  hash transaction hash representing
      * @param index index of the Snapshot that this metadata belongs to
-     * @param confirmedSolidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
+     * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
      */
-    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> confirmedSolidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
+    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
         this.initialHash = hash;
         this.hash = hash;
         this.initialIndex = index;
         this.index = index;
         this.initialTimestamp = timestamp;
         this.timestamp = timestamp;
-        this.confirmedSolidEntryPoints = confirmedSolidEntryPoints;
+        this.solidEntryPoints = solidEntryPoints;
         this.seenMilestones = seenMilestones;
     }
 
@@ -277,11 +269,11 @@ public class SnapshotMetaData implements Cloneable {
      * @return true if the hash is a solid entry point and false otherwise
      */
     public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return confirmedSolidEntryPoints.containsKey(solidEntrypoint);
+        return solidEntryPoints.containsKey(solidEntrypoint);
     }
 
     public int getSolidEntryPointIndex(Hash solidEntrypoint) {
-        return confirmedSolidEntryPoints.get(solidEntrypoint);
+        return solidEntryPoints.get(solidEntrypoint);
     }
 
     /**
@@ -292,7 +284,7 @@ public class SnapshotMetaData implements Cloneable {
      * @return set of transaction hashes that shall be considered solid when being referenced
      */
     public HashMap<Hash, Integer> getSolidEntryPoints() {
-        return confirmedSolidEntryPoints;
+        return solidEntryPoints;
     }
 
     /**
@@ -303,7 +295,7 @@ public class SnapshotMetaData implements Cloneable {
      * @param solidEntryPoints set of solid entry points that shall be stored
      */
     public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
-        this.confirmedSolidEntryPoints = solidEntryPoints;
+        this.solidEntryPoints = solidEntryPoints;
     }
 
     /**
@@ -360,11 +352,11 @@ public class SnapshotMetaData implements Cloneable {
                     hash.toString(),
                     String.valueOf(index),
                     String.valueOf(timestamp),
-                    String.valueOf(confirmedSolidEntryPoints.size()),
+                    String.valueOf(solidEntryPoints.size()),
                     String.valueOf(seenMilestones.size())
                 ),
                 Stream.concat(
-                    confirmedSolidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
+                    solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
                     seenMilestones.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
                 )
             ).iterator()
@@ -381,7 +373,7 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, (HashMap) confirmedSolidEntryPoints.clone(), (HashMap) seenMilestones.clone());
+        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, (HashMap) solidEntryPoints.clone(), (HashMap) seenMilestones.clone());
 
         result.setIndex(index);
         result.setHash(hash);
