@@ -407,28 +407,10 @@ public class SnapshotManager {
         return snapshot;
     }
 
-    long lastDumpTime = System.currentTimeMillis();
-
-    String lastLogMessage;
-
-    public void dumpLogMessage(String job, String task, int currentStep, int maxSteps) {
-        String logMessage = job + " [" + task + "]: " + (int) (((double) currentStep / (double) maxSteps) * 100) + "% ...";
-
-        if(!logMessage.equals(lastLogMessage) && (System.currentTimeMillis() - lastDumpTime >= 5000 || currentStep == 1 || currentStep == maxSteps)) {
-            log.info(logMessage);
-
-            lastLogMessage = logMessage;
-            lastDumpTime = System.currentTimeMillis();
-        }
-    }
-
     public Snapshot loadLocalSnapshot() {
         try {
-            // load necessary configuration parameters
-            boolean localSnapshotsEnabled = configuration.getLocalSnapshotsEnabled();
-
             // if local snapshots are enabled
-            if(localSnapshotsEnabled) {
+            if(configuration.getLocalSnapshotsEnabled()) {
                 // load the remaining configuration parameters
                 String basePath = configuration.getLocalSnapshotsBasePath();
 

@@ -31,7 +31,7 @@ public class MilestoneSolidifier {
     /**
      * Defines the maximum amount of transactions that are allows to get processed while trying to solidify a milestone.
      */
-    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT = 10000;
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT = 20000;
 
     /**
      * Defines after how many solidification attempts we increase the transactions limit.
@@ -41,7 +41,7 @@ public class MilestoneSolidifier {
     /**
      * Defines how often we can at maximum increase the {@link #SOLIDIFICATION_TRANSACTIONS_LIMIT}.
      */
-    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT = 6;
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT = 5;
 
     /**
      * Holds a reference to the SnapshotManager which allows us to check if milestones are still relevant.
