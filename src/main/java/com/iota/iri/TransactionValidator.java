@@ -152,7 +152,7 @@ public class TransactionValidator {
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
-                if(analyzedHashes.size() >= 50000) {
+                if(analyzedHashes.size() >= 100000) {
                     return false;
                 }
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
