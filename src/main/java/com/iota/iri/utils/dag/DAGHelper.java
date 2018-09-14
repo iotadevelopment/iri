@@ -91,7 +91,7 @@ public class DAGHelper {
         try {
             Hash currentTransactionHash;
             while((currentTransactionHash = transactionsToExamine.poll()) != null) {
-                if(processedTransactions.add(currentTransactionHash)) {
+                if(currentTransactionHash == startingTransactionHash || processedTransactions.add(currentTransactionHash)) {
                     TransactionViewModel currentTransaction = TransactionViewModel.fromHash(tangle, currentTransactionHash);
                     if(
                         currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && (
@@ -166,7 +166,7 @@ public class DAGHelper {
         try {
             Hash currentTransactionHash;
             while((currentTransactionHash = transactionsToExamine.poll()) != null) {
-                if(processedTransactions.add(currentTransactionHash)) {
+                if(currentTransactionHash == startingTransactionHash || processedTransactions.add(currentTransactionHash)) {
                     TransactionViewModel currentTransaction = TransactionViewModel.fromHash(tangle, currentTransactionHash);
                     if(
                         currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&(
