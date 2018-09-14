@@ -172,7 +172,7 @@ public class MilestoneTracker {
                         }
                     }
 
-                    if (latestMilestoneQueue.size() > 1) {
+                    if (latestMilestoneQueue.size() >= 1) {
                         log.info("Milestone Tracker: Processing milestones ... " + latestMilestoneQueue.size() + " milestones remaining");
                     }
 
