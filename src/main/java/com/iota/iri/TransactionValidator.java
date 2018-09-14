@@ -159,7 +159,7 @@ public class TransactionValidator {
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(hashPointer)) {
                         transactionRequester.requestTransaction(hashPointer, milestone);
-                        if(milestone) {
+                        if(hash.equals(new Hash("MBEWK9HMMIWETPXGYCJSNLUPLXLRUSGJKSGUGHYGDXGLRIDNKLOSRGXLZ9VINLBJFROCHMOMUMURA9999"))) {
                             System.out.println("REQ: " + hashPointer + " /" + hash);
                         }
                         solid = false;
