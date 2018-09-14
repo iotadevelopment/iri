@@ -484,7 +484,6 @@ public class MilestoneTracker {
 
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
             } else {
-                System.out.println(nextMilestone.index() + " ==== " + (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid() ? "u" : "a"));
                 if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
                     resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
 
