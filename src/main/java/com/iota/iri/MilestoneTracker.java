@@ -172,7 +172,9 @@ public class MilestoneTracker {
                         }
                     }
 
-                    log.info("Milestone Tracker: Processing milestones ... " + latestMilestoneQueue.size() + " milestones remaining");
+                    if (latestMilestoneQueue.size() > 1) {
+                        log.info("Milestone Tracker: Processing milestones ... " + latestMilestoneQueue.size() + " milestones remaining");
+                    }
 
                     // allow the "Solid Milestone Tracker" to continue if we finished the first run in rescanning mode
                     if(firstRun && isRescanning) {
