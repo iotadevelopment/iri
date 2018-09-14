@@ -202,7 +202,7 @@ public class MilestoneSolidifier {
             return true;
         }
 
-        statusLogger.updateStatus("Solidifying Milestone #" + earliestMilestoneIndex + " (" + earliestMilestoneHash.toString() + ") [" + unsolidMilestones.size() + " left]");
+        statusLogger.updateStatus("Solidifying Milestone #" + earliestMilestoneIndex + " [" + unsolidMilestones.size() + " left]");
 
         try {
             return transactionValidator.checkSolidity(
