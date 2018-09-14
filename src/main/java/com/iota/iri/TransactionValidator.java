@@ -29,11 +29,7 @@ public class TransactionValidator {
     private final SnapshotManager snapshotManager;
     private final TipsViewModel tipsViewModel;
     private final TransactionRequester transactionRequester;
-    private final MessageQ messageQ;
-    private final SnapshotConfig config;
     private int MIN_WEIGHT_MAGNITUDE = 81;
-    private static long snapshotTimestamp;
-    private static long snapshotTimestampMs;
     private static long MAX_TIMESTAMP_FUTURE = 2 * 60 * 60;
     private static long MAX_TIMESTAMP_FUTURE_MS = MAX_TIMESTAMP_FUTURE * 1000;
 
@@ -46,16 +42,11 @@ public class TransactionValidator {
     private final Set<Hash> newSolidTransactionsOne = new LinkedHashSet<>();
     private final Set<Hash> newSolidTransactionsTwo = new LinkedHashSet<>();
 
-    public TransactionValidator(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel, TransactionRequester transactionRequester,
-                                MessageQ messageQ, SnapshotConfig config) {
+    public TransactionValidator(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel, TransactionRequester transactionRequester) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
         this.tipsViewModel = tipsViewModel;
         this.transactionRequester = transactionRequester;
-        this.messageQ = messageQ;
-        this.config = config;
-        TransactionValidator.snapshotTimestamp = config.getSnapshotTime();
-        TransactionValidator.snapshotTimestampMs = snapshotTimestamp * 1000;
     }
 
     public void init(boolean testnet, int mwm, MilestoneTracker milestone) {
@@ -92,10 +83,10 @@ public class TransactionValidator {
         }
 
         if (transactionViewModel.getAttachmentTimestamp() == 0) {
-            return transactionViewModel.getTimestamp() < snapshotTimestamp && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionViewModel.getHash())
+            return transactionViewModel.getTimestamp() < snapshotManager.getInitialSnapshot().getTimestamp() && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionViewModel.getHash())
                     || transactionViewModel.getTimestamp() > (System.currentTimeMillis() / 1000) + MAX_TIMESTAMP_FUTURE;
         }
-        return transactionViewModel.getAttachmentTimestamp() < snapshotTimestampMs
+        return transactionViewModel.getAttachmentTimestamp() < (snapshotManager.getInitialSnapshot().getTimestamp() * 1000L)
                 || transactionViewModel.getAttachmentTimestamp() > System.currentTimeMillis() + MAX_TIMESTAMP_FUTURE_MS;
     }
 

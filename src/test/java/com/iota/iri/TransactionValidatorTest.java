@@ -49,7 +49,7 @@ public class TransactionValidatorTest {
     MessageQ messageQ = Mockito.mock(MessageQ.class);
     TransactionRequester txRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
     MainnetConfig config = new MainnetConfig();
-    txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester, messageQ, config);
+    txValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, txRequester);
     txValidator.setMwm(false, MAINNET_MWM);
     milestoneTracker = new MilestoneTracker(tangle, snapshotManager, txValidator, Mockito.mock(TransactionRequester.class), messageQ, config);
     txValidator.init(false, MAINNET_MWM, milestoneTracker);
