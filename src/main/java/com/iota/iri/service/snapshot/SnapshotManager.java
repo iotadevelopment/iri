@@ -332,6 +332,8 @@ public class SnapshotManager {
                     }
                 );
 
+                solidEntryPoints.put(currentMilestone.getHash(), targetMilestone.index());
+
                 nextMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
                 progressLogger.progress();
             }
@@ -342,7 +344,6 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the solid entry points for " + targetMilestone, e);
         }
 
-        solidEntryPoints.put(targetMilestone.getHash(), targetMilestone.index());
         solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
         return solidEntryPoints;
