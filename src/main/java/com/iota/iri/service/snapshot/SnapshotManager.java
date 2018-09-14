@@ -346,133 +346,17 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the solid entry points for " + targetMilestone, e);
         }
 
+        solidEntryPoints.put(targetMilestone.getHash(), targetMilestone.index());
         solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
         return solidEntryPoints;
     }
 
-    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
-        // variables used by the snapshot generation process
-        Snapshot snapshot;
-        int generationMode;
-
-        // variables to keep track of the progress of the tasks in this method
-        int amountOfMilestonesToProcess;
-        int stepCounter;
-
-        //region SANITIZE PARAMETERS AND DETERMINE WHICH SNAPSHOT TO WORK FROM /////////////////////////////////////
-
-        // acquire locks for our snapshots
-        initialSnapshot.lockRead();
-        latestSnapshot.lockRead();
-
-        // handle the following block in a try to be able to always unlock the snapshots
-        try {
-            // check if the milestone is not null
-            if(targetMilestone == null) {
-                throw new SnapshotException("the target milestone must not be null");
-            }
-
-            // check if the milestone was solidified already
-            if(targetMilestone.index() > latestSnapshot.getIndex()) {
-                throw new SnapshotException("the target " + targetMilestone + " was not solidified yet");
-            }
-
-            // check if the milestone came after our initial one
-            if(targetMilestone.index() < initialSnapshot.getIndex()) {
-                throw new SnapshotException("the target " + targetMilestone.toString() + " is too old");
-            }
-
-            // determine the distance of our target snapshot from our two snapshots (initial / latest)
-            int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
-            int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
-
-            // determine which generation mode is the fastest one
-            generationMode = distanceFromInitialSnapshot <= distanceFromLatestSnapshot
-                             ? GENERATE_FROM_INITIAL
-                             : GENERATE_FROM_LATEST;
-
-            // store how many milestones has to be processed to generate the ledger state (for reasonable debug messages)
-            amountOfMilestonesToProcess = generationMode == GENERATE_FROM_INITIAL
-                                          ? distanceFromInitialSnapshot
-                                          : distanceFromLatestSnapshot;
-
-            // clone the corresponding snapshot state
-            snapshot = generationMode == GENERATE_FROM_INITIAL
-                       ? initialSnapshot.clone()
-                       : latestSnapshot.clone();
-        } finally {
-            // unlock our snapshots
-            initialSnapshot.unlockRead();
-            latestSnapshot.unlockRead();
-        }
-
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        // if the target snapshot is our starting point we can return immediately
-        if(targetMilestone.index() == snapshot.getIndex()) {
-            return snapshot;
-        }
-
-        //region GENERATE THE SNAPSHOT STATE ///////////////////////////////////////////////////////////////////////////
-
-        // calculate the starting point for our snapshot generation
-        int startingMilestoneIndex = snapshot.getIndex() + (generationMode == GENERATE_FROM_INITIAL ? 1 : 0);
-
-        // retrieve the first milestone for our snapshot generation
-        MilestoneViewModel startingMilestone;
-        try {
-            startingMilestone = MilestoneViewModel.get(tangle, startingMilestoneIndex);
-        } catch(Exception e) {
-            throw new SnapshotException("could not retrieve the milestone #" + startingMilestoneIndex, e);
-        }
-        if(startingMilestone == null) {
-            throw new SnapshotException("could not retrieve the milestone #" + startingMilestoneIndex);
-        }
-
-        // dump a progress message before we start
-        dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", stepCounter = 0, amountOfMilestonesToProcess);
-
-        // iterate through the milestones to our target
-        while(generationMode == GENERATE_FROM_INITIAL ? startingMilestone.index() <= targetMilestone.index() : startingMilestone.index() > targetMilestone.index()) {
-            // calculate the correct ledger state based on our current milestone
-            calculateSnapshotState(snapshot, startingMilestone, generationMode);
-
-            // retrieve the next milestone
-            MilestoneViewModel nextMilestone;
-            try {
-                nextMilestone = generationMode == GENERATE_FROM_INITIAL
-                                ? MilestoneViewModel.findClosestNextMilestone(tangle, startingMilestone.index())
-                                : MilestoneViewModel.findClosestPrevMilestone(tangle, startingMilestone.index());
-            } catch(Exception e) {
-                throw new SnapshotException("could not iterate to the next milestone from " + startingMilestone.toString(), e);
-            }
-            if(nextMilestone == null) {
-                throw new SnapshotException("could not iterate to the next milestone from " + startingMilestone.toString());
-            }
-
-            // iterate to the the next milestone
-            startingMilestone = nextMilestone;
-
-            // dump a progress message after every step
-            dumpLogMessage("Taking local snapshot", "1/3 calculating new snapshot state", ++stepCounter, amountOfMilestonesToProcess);
-        }
-
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        //region ANALYZE OLD TRANSACTIONS THAT CAN BE PRUNED //////////////////////////////////////////////////////////
-
-        HashMap<Hash, Integer> solidEntryPoints = generateSolidEntryPoints(snapshot, targetMilestone);
-        System.out.println("SOLID ENTRY POINTS: " + solidEntryPoints.size());
-
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        //region GENERATE THE LIST OF SEEN MILESTONES //////////////////////////////////////////////////////////////////
-
+    public HashMap<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
         ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
 
         seenMilestonesProgressLogger.start(configuration.getLocalSnapshotsDepth());
-        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
         try {
             MilestoneViewModel seenMilestone = targetMilestone;
             while((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index())) != null) {
@@ -486,31 +370,44 @@ public class SnapshotManager {
         }
         seenMilestonesProgressLogger.finish();
 
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
+        return seenMilestones;
+    }
 
-        //region UPDATE THE SCALAR METADATA VALUES OF THE NEW SNAPSHOT  ////////////////////////////////////////////////
+    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+        if(targetMilestone == null) {
+            throw new SnapshotException("the target milestone must not be null");
+        } else if(targetMilestone.index() > latestSnapshot.getIndex()) {
+            throw new SnapshotException("the snapshot target " + targetMilestone + " was not solidified yet");
+        } else if(targetMilestone.index() < initialSnapshot.getIndex()) {
+            throw new SnapshotException("the snapshot target " + targetMilestone + " is too old");
+        }
 
-        // retrieve the transaction belonging to our targetMilestone
-        TransactionViewModel targetMilestoneTransaction;
+        initialSnapshot.lockRead();
+        latestSnapshot.lockRead();
+
+        Snapshot snapshot;
         try {
-            targetMilestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
-        } catch(Exception e) {
-            throw new SnapshotException("could not retrieve the transaction belonging to " + targetMilestone.toString(), e);
+            int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
+
+            if(distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
+                snapshot = initialSnapshot.clone();
+
+                snapshot.replayMilestones(targetMilestone.index(), tangle);
+            } else {
+                snapshot = latestSnapshot.clone();
+
+                snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
+            }
+        } finally {
+            // unlock our snapshots
+            initialSnapshot.unlockRead();
+            latestSnapshot.unlockRead();
         }
-        if(targetMilestoneTransaction == null) {
-            throw new SnapshotException("could not retrieve the transaction belonging to " + targetMilestone.toString());
-        }
 
-        // set the snapshot index, timestamp and solid entry points to that of our target milestone transaction
-        snapshot.setIndex(targetMilestone.index());
-        snapshot.setTimestamp(targetMilestoneTransaction.getTimestamp());
-        snapshot.setSolidEntryPoints(solidEntryPoints);
-        snapshot.setHash(targetMilestone.getHash());
-        snapshot.setSeenMilestones(seenMilestones);
+        snapshot.setSolidEntryPoints(generateSolidEntryPoints(snapshot, targetMilestone));
+        snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
 
-        //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        // return the result
         return snapshot;
     }
 
