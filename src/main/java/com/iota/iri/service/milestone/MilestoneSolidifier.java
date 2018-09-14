@@ -36,7 +36,7 @@ public class MilestoneSolidifier {
     /**
      * Defines after how many solidification attempts we increase the transactions limit.
      */
-    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL = 5;
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL = 10;
 
     /**
      * Defines how often we can at maximum increase the {@link #SOLIDIFICATION_TRANSACTIONS_LIMIT}.
