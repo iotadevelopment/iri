@@ -1,8 +1,11 @@
 package com.iota.iri.service.milestone;
 
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.utils.log.StatusLogger;
+import org.slf4j.LoggerFactory;
 
 import java.util.AbstractMap;
 import java.util.Collections;
@@ -42,6 +45,8 @@ public class MilestoneSolidifier {
      * Defines how often we can at maximum increase the {@link #SOLIDIFICATION_TRANSACTIONS_LIMIT}.
      */
     protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT = 5;
+
+    protected StatusLogger statusLogger = new StatusLogger(LoggerFactory.getLogger(MilestoneSolidifier.class));
 
     /**
      * Holds a reference to the SnapshotManager which allows us to check if milestones are still relevant.
@@ -197,7 +202,7 @@ public class MilestoneSolidifier {
             return true;
         }
 
-        System.out.println("Solidifying Milestone #" + earliestMilestoneIndex + " (" + earliestMilestoneHash.toString() + ") [" + unsolidMilestones.size() + " left]");
+        statusLogger.updateStatus("Solidifying Milestone #" + earliestMilestoneIndex + " (" + earliestMilestoneHash.toString() + ") [" + unsolidMilestones.size() + " left]");
 
         try {
             return transactionValidator.checkSolidity(
