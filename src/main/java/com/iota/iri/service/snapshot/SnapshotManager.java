@@ -37,10 +37,6 @@ public class SnapshotManager {
      */
     private static final int SOLID_ENTRY_POINT_LIFETIME = 100;
 
-    public static int GENERATE_FROM_INITIAL = 1;
-
-    public static int GENERATE_FROM_LATEST = -1;
-
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
     public static int SNAPSHOT_PUBKEY_DEPTH = 6;

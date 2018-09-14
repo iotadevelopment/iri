@@ -348,7 +348,7 @@ public class MilestoneTracker {
      * This method resets the snapshotIndex of all transactions that "belong" to a milestone.
      *
      * While traversing the graph we use the snapshotIndex value to check if it still belongs to the given milestone and
-     * ignore all transactions that where referenced by a previous one. Since we check if the snapshotIndex is bigger or
+     * ignore all transactions that where referenced by a previous ones. Since we check if the snapshotIndex is bigger or
      * equal to the one of the targetMilestone, we can ignore the case that a previous milestone was not processed, yet
      * since it's milestoneIndex would still be 0.
      *
@@ -484,7 +484,7 @@ public class MilestoneTracker {
 
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
             } else {
-                System.out.println("1 ==== " + (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid() ? "u" : "a"));
+                System.out.println(nextMilestone.index() + " ==== " + (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid() ? "u" : "a"));
                 if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
                     resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
 
