@@ -29,6 +29,21 @@ public class MilestoneSolidifier {
     protected static int SOLIDIFICATION_INTERVAL = 1000;
 
     /**
+     * Defines the maximum amount of transactions that are allows to get processed while trying to solidify a milestone.
+     */
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT = 10000;
+
+    /**
+     * Defines after how many solidification attempts we increase the transactions limit.
+     */
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL = 5;
+
+    /**
+     * Defines how often we can at maximum increase the {@link #SOLIDIFICATION_TRANSACTIONS_LIMIT}.
+     */
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT = 6;
+
+    /**
      * Holds a reference to the SnapshotManager which allows us to check if milestones are still relevant.
      */
     protected SnapshotManager snapshotManager;
@@ -52,6 +67,11 @@ public class MilestoneSolidifier {
      * The earliest unsolid milestone index which is the one that is actively tried to get solidified.
      */
     protected int earliestMilestoneIndex = Integer.MAX_VALUE;
+
+    /**
+     * Holds the amount of solidity checks issued for the earliest milestone.
+     */
+    protected int earliestMilestoneTries = 0;
 
     /**
      * A flag indicating if the solidifier thread is running.
@@ -86,6 +106,7 @@ public class MilestoneSolidifier {
             if(milestoneIndex < earliestMilestoneIndex) {
                 earliestMilestoneHash = milestoneHash;
                 earliestMilestoneIndex = milestoneIndex;
+                earliestMilestoneTries = 0;
             }
 
             unsolidMilestones.put(milestoneHash, milestoneIndex);
@@ -151,6 +172,7 @@ public class MilestoneSolidifier {
 
         earliestMilestoneHash = nextEarliestMilestone.getKey();
         earliestMilestoneIndex = nextEarliestMilestone.getValue();
+        earliestMilestoneTries = 0;
     }
 
     /**
@@ -159,6 +181,14 @@ public class MilestoneSolidifier {
      * It first checks if there is a milestone that has to be solidified and then issues the corresponding solidity
      * check. In addition to issuing the solidity checks, it dumps a log message to keep the node operator informed
      * about the progress of solidification.
+     *
+     * We limit the amount of transactions that may be processed during the solidity check, since we want to solidify
+     * from the oldest milestone to the newest one and not "block" the solidification with a very recent milestone that
+     * needs to traverse huge chunks of the tangle. If we fail to solidify a milestone for a certain amount of tries, we
+     * increase the amount of transactions that may be processed by using an exponential binary backoff strategy. The
+     * main goal of this is to give the solidification enough "resources" to discover the previous milestone if it ever
+     * gets stuck because of a very long path to the previous milestone while at the same time allowing fast solidity
+     * checks in "normal conditions".
      *
      * @return true if there are no unsolid milestones that have to be processed or if the earliest milestone is solid
      */
@@ -170,7 +200,14 @@ public class MilestoneSolidifier {
         System.out.println("Solidifying Milestone #" + earliestMilestoneIndex + " (" + earliestMilestoneHash.toString() + ") [" + unsolidMilestones.size() + " left]");
 
         try {
-            return transactionValidator.checkSolidity(earliestMilestoneHash, true, 100000);
+            return transactionValidator.checkSolidity(
+                earliestMilestoneHash,
+                true,
+                2 ^ Math.min(
+                    earliestMilestoneTries++ / SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL,
+                    SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT
+                ) * SOLIDIFICATION_TRANSACTIONS_LIMIT
+            );
         } catch (Exception e) {
             // dump error
 
