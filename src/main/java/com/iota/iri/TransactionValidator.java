@@ -140,6 +140,10 @@ public class TransactionValidator {
     private final AtomicInteger nextSubSolidGroup = new AtomicInteger(1);
 
     public boolean checkSolidity(Hash hash, boolean milestone) throws Exception {
+        return checkSolidity(hash, milestone, Integer.MAX_VALUE);
+    }
+
+    public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions) throws Exception {
         if(TransactionViewModel.fromHash(tangle, hash).isSolid()) {
             return true;
         }
@@ -152,7 +156,7 @@ public class TransactionValidator {
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
-                if(analyzedHashes.size() >= 100000) {
+                if(analyzedHashes.size() >= maxProcessedTransactions) {
                     return false;
                 }
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);

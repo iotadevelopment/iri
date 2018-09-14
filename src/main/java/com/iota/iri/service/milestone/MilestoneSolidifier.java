@@ -170,7 +170,7 @@ public class MilestoneSolidifier {
         System.out.println("Solidifying Milestone #" + earliestMilestoneIndex + " (" + earliestMilestoneHash.toString() + ") [" + unsolidMilestones.size() + " left]");
 
         try {
-            return transactionValidator.checkSolidity(earliestMilestoneHash, true);
+            return transactionValidator.checkSolidity(earliestMilestoneHash, true, 100000);
         } catch (Exception e) {
             // dump error
 
