@@ -7,9 +7,9 @@ public class StatusLogger {
 
     private Logger logger;
 
-    private String statusMessage = null;
+    private String statusMessage = "";
 
-    private String lastPrintedStatusMessage = null;
+    private String lastPrintedStatusMessage = "";
 
     private Thread outputThread = null;
 
@@ -20,7 +20,7 @@ public class StatusLogger {
     }
 
     public void updateStatus(String message) {
-        if (message != statusMessage) {
+        if (!message.equals(statusMessage)) {
             statusMessage = message;
 
             if (System.currentTimeMillis() - lastLogTime >= LOG_INTERVAL) {
@@ -46,10 +46,10 @@ public class StatusLogger {
     }
 
     private void printStatusMessage() {
-        if(statusMessage != lastPrintedStatusMessage) {
+        if(!statusMessage.equals(lastPrintedStatusMessage)) {
             logger.info(statusMessage);
-            lastLogTime = System.currentTimeMillis();
 
+            lastLogTime = System.currentTimeMillis();
             lastPrintedStatusMessage = statusMessage;
         }
     }
