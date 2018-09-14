@@ -68,7 +68,9 @@ public class LedgerValidator {
         Hash transactionPointer;
         while ((transactionPointer = nonAnalyzedTransactions.poll()) != null) {
             if (visitedNonMilestoneSubtangleHashes.add(transactionPointer)) {
-
+                if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionPointer)) {
+                    System.out.println("SHOULD ABORT" + transactionPointer);
+                }
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
                     numberOfAnalyzedTransactions++;
