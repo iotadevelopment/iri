@@ -26,7 +26,7 @@ public class MilestoneSolidifier {
     /**
      * Defines the interval in which solidity checks are issued (in milliseconds).
      */
-    protected static int SOLIDIFICATION_INTERVAL = 1000;
+    protected static int SOLIDIFICATION_INTERVAL = 100;
 
     /**
      * Defines the maximum amount of transactions that are allows to get processed while trying to solidify a milestone.
@@ -36,7 +36,7 @@ public class MilestoneSolidifier {
     /**
      * Defines after how many solidification attempts we increase the transactions limit.
      */
-    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL = 10;
+    protected static int SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL = 50;
 
     /**
      * Defines how often we can at maximum increase the {@link #SOLIDIFICATION_TRANSACTIONS_LIMIT}.
