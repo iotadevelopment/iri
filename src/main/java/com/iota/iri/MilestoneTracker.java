@@ -382,6 +382,8 @@ public class MilestoneTracker {
                                                             MilestoneViewModel currentMilestone,
                                                             Set<Integer> resettedMilestones) {
         try {
+            System.out.println(currentTransaction.getHash());
+
             if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
                 resettedMilestones.add(currentTransaction.snapshotIndex());
             }

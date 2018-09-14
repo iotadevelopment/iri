@@ -400,7 +400,6 @@ public class SnapshotManager {
                 snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
             }
         } finally {
-            // unlock our snapshots
             initialSnapshot.unlockRead();
             latestSnapshot.unlockRead();
         }

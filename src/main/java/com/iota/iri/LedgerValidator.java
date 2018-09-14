@@ -73,10 +73,7 @@ public class LedgerValidator {
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
                     numberOfAnalyzedTransactions++;
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
-                        transactionViewModel.delete(tangle);
                         transactionRequester.requestTransaction(transactionViewModel.getHash(), milestone);
-                        System.out.println(transactionViewModel.getHash());
-                        System.out.println(1);
                         return null;
 
                     } else {
