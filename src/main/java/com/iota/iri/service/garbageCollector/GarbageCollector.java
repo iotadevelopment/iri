@@ -1,6 +1,8 @@
-package com.iota.iri.service.snapshot;
+package com.iota.iri.service.garbageCollector;
 
 import com.iota.iri.controllers.TipsViewModel;
+import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.dag.DAGHelper;
 import org.slf4j.Logger;
@@ -10,10 +12,11 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * This class represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in connection
- * with local snapshots.
+ * with local snapshots and eventually other parts of the code.
  *
  * It plans, manages and executes the cleanup jobs asynchronously in separate thread so cleaning up does not affect the
  * performance of the node itself.
@@ -52,7 +55,12 @@ public class GarbageCollector {
     /**
      * List of cleanup jobs that shall get processed by the garbage collector.
      */
-    protected LinkedList<GarbageCollectorJob> cleanupJobs;
+    protected LinkedList<GarbageCollectorJob> milestoneCleanupJobs;
+
+    /**
+     * List of cleanup jobs that shall get processed by the garbage collector.
+     */
+    protected LinkedList<GarbageCollectorJob> solidEntryPointCleanupJobs;
 
     /**
      * DAGHelper instance that is used to traverse the graph.
@@ -73,7 +81,7 @@ public class GarbageCollector {
     }
 
     /**
-     * This method allows us to add a new cleanup job.
+     * This method allows us to add a new milestone cleanup job.
      *
      * The job that is created through this method will take care of removing all the unnecessary database entries
      * before (and including) the given milestoneIndex.
@@ -81,13 +89,17 @@ public class GarbageCollector {
      * It first adds the job to the queue, then persists it and checks if jobs can be consolidated.
      *
      * @param milestoneIndex starting point of the cleanup operation
-     * @throws SnapshotException if something goes wrong while persisting the job queue
+     * @throws GarbageCollectorException if something goes wrong while persisting the job queue
      */
-    public void addCleanupJob(int milestoneIndex) throws SnapshotException {
-        cleanupJobs.addLast(new GarbageCollectorJob(this, milestoneIndex, milestoneIndex));
+    public void addMilestoneCleanupJob(int milestoneIndex) throws GarbageCollectorException {
+        milestoneCleanupJobs.addLast(new GarbageCollectorJob(this, milestoneIndex, milestoneIndex));
 
         persistChanges();
         consolidateCleanupJobs();
+    }
+
+    public void addSolidEntryPointCleanupJob(Hash solidEntryPoint) {
+        ;
     }
 
     /**
@@ -108,7 +120,7 @@ public class GarbageCollector {
                     try {
                         Thread.sleep(GARBAGE_COLLECTOR_RESCAN_INTERVAL);
                     } catch(InterruptedException e) { /* do nothing */ }
-                } catch(SnapshotException e) {
+                } catch(GarbageCollectorException e) {
                     log.error("error while processing the garbage collector jobs", e);
                 }
             }
@@ -129,7 +141,7 @@ public class GarbageCollector {
      * remaining files after processing the unit tests.
      */
     public void reset() {
-        cleanupJobs = new LinkedList<>();
+        milestoneCleanupJobs = new LinkedList<>();
 
         getStateFile().delete();
     }
@@ -142,19 +154,18 @@ public class GarbageCollector {
      * jobs are "done", it consolidates their progress into a single job, that is consecutively used by the following
      * jobs for determining their "target milestone".
      *
-     * @return
-     * @throws SnapshotException
+     * @throws GarbageCollectorException
      */
-    protected void processCleanupJobs() throws SnapshotException {
+    protected void processCleanupJobs() throws GarbageCollectorException {
         // repeat until all jobs are processed
-        while(!shuttingDown && cleanupJobs.size() >= 1) {
-            GarbageCollectorJob firstJob = cleanupJobs.getFirst();
+        while(!shuttingDown && milestoneCleanupJobs.size() >= 1) {
+            GarbageCollectorJob firstJob = milestoneCleanupJobs.getFirst();
             firstJob.process(snapshotManager.getConfiguration().getMilestoneStartIndex());
 
-            if(cleanupJobs.size() >= 2) {
-                cleanupJobs.removeFirst();
-                GarbageCollectorJob secondJob = cleanupJobs.getFirst();
-                cleanupJobs.addFirst(firstJob);
+            if(milestoneCleanupJobs.size() >= 2) {
+                milestoneCleanupJobs.removeFirst();
+                GarbageCollectorJob secondJob = milestoneCleanupJobs.getFirst();
+                milestoneCleanupJobs.addFirst(firstJob);
 
                 secondJob.process(firstJob.getStartingIndex());
 
@@ -170,7 +181,7 @@ public class GarbageCollector {
      * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
      * pending.
      *
-     * It is used to clean up the cleanupJobs queue and the corresponding garbage collector file, so it always has a
+     * It is used to clean up the milestoneCleanupJobs queue and the corresponding garbage collector file, so it always has a
      * size of less than 4 jobs.
      *
      * Since the jobs are getting processed from the beginning of the list, we first check if the first two jobs are
@@ -181,47 +192,47 @@ public class GarbageCollector {
      * previous job (or the {@code milestoneStartIndex} of the last global snapshot if there is no previous one) without
      * any gaps in between which is required to be able to merge them.
      *
-     * @throws SnapshotException if an error occurs while persisting the state
+     * @throws GarbageCollectorException if an error occurs while persisting the state
      */
-    protected void consolidateCleanupJobs() throws SnapshotException {
+    protected void consolidateCleanupJobs() throws GarbageCollectorException {
         // if we have at least 2 jobs -> check if we can consolidate them at the beginning
-        if(cleanupJobs.size() >= 2) {
+        if(milestoneCleanupJobs.size() >= 2) {
             // retrieve the first two jobs
-            GarbageCollectorJob job1 = cleanupJobs.removeFirst();
-            GarbageCollectorJob job2 = cleanupJobs.removeFirst();
+            GarbageCollectorJob job1 = milestoneCleanupJobs.removeFirst();
+            GarbageCollectorJob job2 = milestoneCleanupJobs.removeFirst();
 
             // if both first job are done -> consolidate them and persists the changes
             if(job1.getCurrentIndex() == snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
-                cleanupJobs.addFirst(new GarbageCollectorJob(this, job2.getStartingIndex(), job1.getCurrentIndex()));
+                milestoneCleanupJobs.addFirst(new GarbageCollectorJob(this, job2.getStartingIndex(), job1.getCurrentIndex()));
 
                 persistChanges();
             }
 
             // otherwise just add them back to the queue
             else {
-                cleanupJobs.addFirst(job2);
-                cleanupJobs.addFirst(job1);
+                milestoneCleanupJobs.addFirst(job2);
+                milestoneCleanupJobs.addFirst(job1);
             }
         }
 
         // if we have at least 2 jobs -> check if we can consolidate them at the end
         boolean cleanupSuccessfull = true;
-        while(cleanupJobs.size() >= 2 && cleanupSuccessfull) {
+        while(milestoneCleanupJobs.size() >= 2 && cleanupSuccessfull) {
             // retrieve the last two jobs
-            GarbageCollectorJob job1 = cleanupJobs.removeLast();
-            GarbageCollectorJob job2 = cleanupJobs.removeLast();
+            GarbageCollectorJob job1 = milestoneCleanupJobs.removeLast();
+            GarbageCollectorJob job2 = milestoneCleanupJobs.removeLast();
 
             // if both jobs are pending -> consolidate them and persists the changes
             if(job1.getCurrentIndex() == job1.getStartingIndex() && job2.getCurrentIndex() == job2.getStartingIndex()) {
-                cleanupJobs.addLast(new GarbageCollectorJob(this, job1.getStartingIndex(), job1.getCurrentIndex()));
+                milestoneCleanupJobs.addLast(new GarbageCollectorJob(this, job1.getStartingIndex(), job1.getCurrentIndex()));
 
                 persistChanges();
             }
 
             // otherwise just add them back to the queue
             else {
-                cleanupJobs.addLast(job2);
-                cleanupJobs.addLast(job1);
+                milestoneCleanupJobs.addLast(job2);
+                milestoneCleanupJobs.addLast(job1);
 
                 cleanupSuccessfull = false;
             }
@@ -235,16 +246,22 @@ public class GarbageCollector {
      * continue where we stopped. This method therefore writes the state of the queued jobs into a file that is read
      * upon re-initialization of the GarbageCollector.
      *
-     * @throws SnapshotException if something goes wrong while writing the state file
+     * @throws GarbageCollectorException if something goes wrong while writing the state file
      */
-    protected void persistChanges() throws SnapshotException {
+    protected void persistChanges() throws GarbageCollectorException {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
-                () -> cleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getStartingIndex()) + ";" + Integer.toString(entry.getCurrentIndex())).iterator()
+                () -> Stream.concat(
+                    Stream.of(
+                        String.valueOf(milestoneCleanupJobs.size()),
+                        String.valueOf(6)
+                    ),
+                    milestoneCleanupJobs.stream().<CharSequence>map(entry -> Integer.toString(entry.getStartingIndex()) + ";" + Integer.toString(entry.getCurrentIndex()))
+                ).iterator()
             );
         } catch(IOException e) {
-            throw new SnapshotException("could not persists garbage collector state", e);
+            throw new GarbageCollectorException("could not persists garbage collector state", e);
         }
     }
 
@@ -258,7 +275,7 @@ public class GarbageCollector {
      * a bit.
      */
     protected void restoreCleanupJobs() {
-        cleanupJobs = new LinkedList<>();
+        milestoneCleanupJobs = new LinkedList<>();
 
         try {
             // create a reader for our file
@@ -275,7 +292,7 @@ public class GarbageCollector {
             while((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
                 if(parts.length >= 2) {
-                    cleanupJobs.addLast(new GarbageCollectorJob(this, Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
+                    milestoneCleanupJobs.addLast(new GarbageCollectorJob(this, Integer.valueOf(parts[0]), Integer.valueOf(parts[1])));
                 }
             }
 

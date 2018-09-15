@@ -5,6 +5,8 @@ import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.garbageCollector.GarbageCollector;
+import com.iota.iri.service.garbageCollector.GarbageCollectorException;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
@@ -15,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -35,7 +36,7 @@ public class SnapshotManager {
      * to it, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
      * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
      */
-    private static final int SOLID_ENTRY_POINT_LIFETIME = 100;
+    private static final int SOLID_ENTRY_POINT_LIFETIME = 1000;
 
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
@@ -48,8 +49,6 @@ public class SnapshotManager {
     private Tangle tangle;
 
     private GarbageCollector snapshotGarbageCollector;
-
-    private TipsViewModel tipsViewModel;
 
     private SnapshotConfig configuration;
 
@@ -76,7 +75,6 @@ public class SnapshotManager {
     public SnapshotManager(Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) throws IOException {
         // save the necessary dependencies
         this.tangle = tangle;
-        this.tipsViewModel = tipsViewModel;
         this.configuration = configuration;
         this.dagHelper = DAGHelper.get(tangle);
 
@@ -311,8 +309,10 @@ public class SnapshotManager {
 
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
-            if(targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)) {
+            if(targetMilestone.index() - solidEntryPoint.getValue() > SOLID_ENTRY_POINT_LIFETIME && isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)) {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
+            } else {
+                snapshotGarbageCollector.addSolidEntryPointCleanupJob(solidEntryPoint.getKey());
             }
         });
 
@@ -538,7 +538,11 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the snapshot");
         }
 
-        snapshotGarbageCollector.addCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
+        try {
+            snapshotGarbageCollector.addMilestoneCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
+        } catch(GarbageCollectorException e) {
+            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
+        }
 
         try {
             targetSnapshot.state.writeFile(basePath + ".snapshot.state");

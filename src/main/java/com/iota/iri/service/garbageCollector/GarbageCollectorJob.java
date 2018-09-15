@@ -1,4 +1,4 @@
-package com.iota.iri.service.snapshot;
+package com.iota.iri.service.garbageCollector;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
@@ -6,6 +6,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
+import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.utils.Pair;
@@ -107,7 +108,7 @@ public class GarbageCollectorJob {
      * @param cleanupTarget milestone index that is considered the target for this job
      * @throws SnapshotException if anything goes wrong while cleaning up or persisting the changes
      */
-    public void process(int cleanupTarget) throws SnapshotException {
+    public void process(int cleanupTarget) throws GarbageCollectorException {
         while(!garbageCollector.shuttingDown && cleanupTarget < getCurrentIndex()) {
             cleanupMilestoneTransactions(getCurrentIndex());
 
@@ -130,7 +131,7 @@ public class GarbageCollectorJob {
      * @param milestoneIndex the index of the milestone that shall be deleted
      * @throws SnapshotException if something goes wrong while cleaning up the milestone
      */
-    protected void cleanupMilestoneTransactions(int milestoneIndex) throws SnapshotException {
+    protected void cleanupMilestoneTransactions(int milestoneIndex) throws GarbageCollectorException {
         try {
             MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, milestoneIndex);
             if(milestoneViewModel != null) {
@@ -166,7 +167,7 @@ public class GarbageCollectorJob {
                 garbageCollector.tipsViewModel.removeTipHash(milestoneViewModel.getHash());
             }
         } catch(Exception e) {
-            throw new SnapshotException("failed to cleanup milestone #" + milestoneIndex, e);
+            throw new GarbageCollectorException("failed to cleanup milestone #" + milestoneIndex, e);
         }
     }
 
