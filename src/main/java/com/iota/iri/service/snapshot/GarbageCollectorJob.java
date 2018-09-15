@@ -137,15 +137,19 @@ public class GarbageCollectorJob {
                 List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
 
                 // collect elements to delete
+                if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
+                    elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
+                }
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 garbageCollector.dagHelper.traverseApprovees(
                     milestoneViewModel.getHash(),
                     approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
                     approvedTransaction -> {
-                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
+                        if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
+                            elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
-                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
+                            cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
+                        }
                     }
                 );
 
