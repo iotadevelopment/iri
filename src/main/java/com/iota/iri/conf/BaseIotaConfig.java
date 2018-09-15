@@ -757,7 +757,7 @@ public abstract class BaseIotaConfig implements IotaConfig {
         //Snapshot
         boolean LOCAL_SNAPSHOTS_ENABLED = true;
         boolean LOCAL_SNAPSHOTS_PRUNING_ENABLED = true;
-        int LOCAL_SNAPSHOTS_PRUNING_DELAY = 100;
+        int LOCAL_SNAPSHOTS_PRUNING_DELAY = 1000;
         int LOCAL_SNAPSHOTS_INTERVAL_SYNCED = 10;
         int LOCAL_SNAPSHOTS_INTERVAL_UNSYNCED = 5000;
         String LOCAL_SNAPSHOTS_BASE_PATH = "mainnet";
