@@ -277,6 +277,10 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
             // collect elements to delete
             elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
             elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
+            if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
+                garbageCollector.addJob(new OrphanedSubtanglePrunerJob(milestoneViewModel.getHash()));
+                //cleanupOrphanedApprovers(milestoneViewModel.getHash(), elementsToDelete, new HashSet<>());
+            }
             DAGHelper.get(garbageCollector.tangle).traverseApprovees(
                 milestoneViewModel.getHash(),
                 approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
@@ -284,7 +288,12 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
                     elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
                     if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
-                        cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
+                        try {
+                            garbageCollector.addJob(new OrphanedSubtanglePrunerJob(approvedTransaction.getHash()));
+                        } catch(GarbageCollectorException e) {
+                            throw new RuntimeException(e);
+                        }
+                        //cleanupOrphanedApprovers(approvedTransaction.getHash(), elementsToDelete, new HashSet<>());
                     }
                 }
             );
@@ -305,17 +314,17 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      *
      * If the LOCAL_SNAPSHOT_DEPTH is sufficiently high this becomes practically impossible at some point anyway.
      *
-     * @param transaction the transaction that shall have its orphaned approvers removed
+     * @param transactionHash the transaction that shall have its orphaned approvers removed
      * @param elementsToDelete List of elements that is used to gather the elements we want to delete
      * @param processedTransactions List of transactions that were processed already (so we don't process the same
      *                              transactions more than once)
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
-    protected void cleanupOrphanedApprovers(TransactionViewModel transaction, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) {
+    protected void cleanupOrphanedApprovers(Hash transactionHash, List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete, Set<Hash> processedTransactions) {
         try {
             // remove all orphaned transactions that are branching off of our deleted transactions
             DAGHelper.get(garbageCollector.tangle).traverseApprovers(
-                transaction.getHash(),
+            transactionHash,
                 approverTransaction -> approverTransaction.snapshotIndex() == 0,
                 approverTransaction -> {
                     elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
@@ -323,7 +332,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
                 processedTransactions
             );
         } catch(Exception e) {
-            log.error("failed to clean up the orphaned approvers of " + transaction, e);
+            log.error("failed to clean up the orphaned approvers of transaction " + transactionHash, e);
         }
     }
 

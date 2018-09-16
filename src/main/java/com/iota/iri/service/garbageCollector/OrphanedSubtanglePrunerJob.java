@@ -52,6 +52,7 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
                 transactionHash,
                 approverTransaction -> approverTransaction.snapshotIndex() == 0,
                 approverTransaction -> {
+                    System.out.println("DELETING OPRHANED " + approverTransaction);
                     elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
                 }
             );
