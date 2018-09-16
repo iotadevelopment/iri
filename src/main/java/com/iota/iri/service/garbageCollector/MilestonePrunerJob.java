@@ -29,7 +29,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
-    protected static final Logger log = LoggerFactory.getLogger(GarbageCollectorJob.class);
+    protected static final Logger log = LoggerFactory.getLogger(MilestonePrunerJob.class);
 
     /**
      * Holds the milestone index where this job starts cleaning up (read only).
