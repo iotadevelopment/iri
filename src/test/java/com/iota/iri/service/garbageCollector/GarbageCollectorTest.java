@@ -2,7 +2,6 @@ package com.iota.iri.service.garbageCollector;
 
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.service.garbageCollector.GarbageCollector;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import org.junit.AfterClass;
@@ -28,27 +27,27 @@ public class GarbageCollectorTest {
         // add some jobs to our queue
         GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
         snapshotGarbageCollector1.reset();
-        snapshotGarbageCollector1.addMilestoneCleanupJob(mainnetConfig.getMilestoneStartIndex() + 10);
-        snapshotGarbageCollector1.addMilestoneCleanupJob(mainnetConfig.getMilestoneStartIndex() + 20);
+        snapshotGarbageCollector1.addJob(new MilestonePrunerJob(mainnetConfig.getMilestoneStartIndex() + 10));
+        snapshotGarbageCollector1.addJob(new MilestonePrunerJob(mainnetConfig.getMilestoneStartIndex() + 20));
 
         // process the jobs
         snapshotGarbageCollector1.processCleanupJobs();
 
         // after processing all the jobs we should have only 1 entry left indicating the success of the processing
-        Assert.assertTrue("", snapshotGarbageCollector1.milestoneCleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector1.milestoneCleanupJobs.getFirst().getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 20);
-        Assert.assertTrue(snapshotGarbageCollector1.milestoneCleanupJobs.getFirst().getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue("", snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).size() == 1);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).getFirst()).getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 20);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).getFirst()).getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
 
         // add some more jobs after the first processing
-        snapshotGarbageCollector1.addMilestoneCleanupJob(mainnetConfig.getMilestoneStartIndex() + 30);
+        snapshotGarbageCollector1.addJob(new MilestonePrunerJob(mainnetConfig.getMilestoneStartIndex() + 30));
 
         // process the jobs
         snapshotGarbageCollector1.processCleanupJobs();
 
         // after processing all the jobs we should have only 1 entry left indicating the success of the processing
-        Assert.assertTrue("", snapshotGarbageCollector1.milestoneCleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector1.milestoneCleanupJobs.getFirst().getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 30);
-        Assert.assertTrue(snapshotGarbageCollector1.milestoneCleanupJobs.getFirst().getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue("", snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).size() == 1);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).getFirst()).getStartingIndex() == mainnetConfig.getMilestoneStartIndex() + 30);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector1.getJobQueue(MilestonePrunerJob.class).getFirst()).getCurrentIndex() == mainnetConfig.getMilestoneStartIndex());
     }
 
     @Test
@@ -58,22 +57,24 @@ public class GarbageCollectorTest {
         // add a job to our queue
         GarbageCollector snapshotGarbageCollector1 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
         snapshotGarbageCollector1.reset();
-        snapshotGarbageCollector1.addMilestoneCleanupJob(12);
+        snapshotGarbageCollector1.addJob(new MilestonePrunerJob(12));
 
         // check if the restored milestoneCleanupJobs are the same as the saved ones
         GarbageCollector snapshotGarbageCollector2 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
-        Assert.assertTrue(snapshotGarbageCollector2.milestoneCleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector2.milestoneCleanupJobs.getLast().getStartingIndex() == 12);
-        Assert.assertTrue(snapshotGarbageCollector2.milestoneCleanupJobs.getLast().getCurrentIndex() == 12);
+        Assert.assertTrue(snapshotGarbageCollector2.getJobQueue(MilestonePrunerJob.class).size() == 1);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector2.getJobQueue(MilestonePrunerJob.class).getLast()).getStartingIndex() == 12);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector2.getJobQueue(MilestonePrunerJob.class).getLast()).getTargetIndex() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector2.getJobQueue(MilestonePrunerJob.class).getLast()).getCurrentIndex() == 12);
 
         // add another job to our queue
-        snapshotGarbageCollector1.addMilestoneCleanupJob(17);
+        snapshotGarbageCollector1.addJob(new MilestonePrunerJob(17));
 
         // check if the restored milestoneCleanupJobs are the same as the saved ones
         GarbageCollector snapshotGarbageCollector3 = new GarbageCollector(tangle, snapshotManager, new TipsViewModel());
-        Assert.assertTrue(snapshotGarbageCollector3.milestoneCleanupJobs.size() == 1);
-        Assert.assertTrue(snapshotGarbageCollector3.milestoneCleanupJobs.getLast().getStartingIndex() == 17);
-        Assert.assertTrue(snapshotGarbageCollector3.milestoneCleanupJobs.getLast().getCurrentIndex() == 17);
+        Assert.assertTrue(snapshotGarbageCollector3.getJobQueue(MilestonePrunerJob.class).size() == 1);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector3.getJobQueue(MilestonePrunerJob.class).getLast()).getStartingIndex() == 17);
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector3.getJobQueue(MilestonePrunerJob.class).getLast()).getTargetIndex() == mainnetConfig.getMilestoneStartIndex());
+        Assert.assertTrue(((MilestonePrunerJob) snapshotGarbageCollector3.getJobQueue(MilestonePrunerJob.class).getLast()).getCurrentIndex() == 17);
     }
 
     @AfterClass

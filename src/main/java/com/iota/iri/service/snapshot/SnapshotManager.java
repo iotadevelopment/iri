@@ -7,6 +7,8 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.garbageCollector.GarbageCollector;
 import com.iota.iri.service.garbageCollector.GarbageCollectorException;
+import com.iota.iri.service.garbageCollector.MilestonePrunerJob;
+import com.iota.iri.service.garbageCollector.OrphanedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
@@ -312,7 +314,11 @@ public class SnapshotManager {
             if(targetMilestone.index() - solidEntryPoint.getValue() > SOLID_ENTRY_POINT_LIFETIME && isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)) {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             } else {
-                snapshotGarbageCollector.addSolidEntryPointCleanupJob(solidEntryPoint.getKey());
+                try {
+                    snapshotGarbageCollector.addJob(new OrphanedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                } catch(GarbageCollectorException e) {
+                    log.error("could not add cleanup job to garbage collector", e);
+                }
             }
         });
 
@@ -539,7 +545,7 @@ public class SnapshotManager {
         }
 
         try {
-            snapshotGarbageCollector.addMilestoneCleanupJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay());
+            snapshotGarbageCollector.addJob(new MilestonePrunerJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
         } catch(GarbageCollectorException e) {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }
