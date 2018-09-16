@@ -1,5 +1,6 @@
 package com.iota.iri.utils.dag;
 
+import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Tangle;
@@ -94,9 +95,9 @@ public class DAGHelper {
                 if(currentTransactionHash == startingTransactionHash || processedTransactions.add(currentTransactionHash)) {
                     TransactionViewModel currentTransaction = TransactionViewModel.fromHash(tangle, currentTransactionHash);
                     if(
-                        currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT && (
-                            // do not "test" the starting transaction since it is not an "approver"
-                            currentTransactionHash == startingTransactionHash ||
+                        // do not "test" the starting transaction since it is not an "approver"
+                        currentTransactionHash == startingTransactionHash || (
+                            currentTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
                             condition.test(currentTransaction)
                         )
                     ) {
@@ -105,7 +106,7 @@ public class DAGHelper {
                             currentTransactionConsumer.accept(currentTransaction);
                         }
 
-                        currentTransaction.getApprovers(tangle).getHashes().stream().forEach(approverHash -> transactionsToExamine.add(approverHash));
+                        ApproveeViewModel.load(tangle, currentTransactionHash).getHashes().stream().forEach(approverHash -> transactionsToExamine.add(approverHash));
                     }
                 }
             }
