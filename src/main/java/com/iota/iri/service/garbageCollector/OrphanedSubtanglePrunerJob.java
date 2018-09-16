@@ -12,7 +12,13 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
     private Hash transactionHash;
 
     public static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        /* todo */
+        while(jobQueue.getFirst() != null) {
+            jobQueue.getFirst().process();
+
+            jobQueue.removeFirst();
+
+            garbageCollector.persistChanges();
+        }
     }
 
     public static OrphanedSubtanglePrunerJob parse(String input) throws GarbageCollectorException {
@@ -30,7 +36,7 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
 
     @Override
     public void process() throws GarbageCollectorException {
-
+        System.out.println("EXECUTING CLEANUP TASK: " + transactionHash);
     }
 
     @Override
