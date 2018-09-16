@@ -16,6 +16,24 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This method removes all orphaned approvers of a transaction.
+ *
+ * Since orphaned approvers are only reachable from the transaction they approve (bottom -> up), we need to clean
+ * them up as well when removing the transactions belonging to a milestone. Transactions are considered to be
+ * orphaned if they have not been verified by a milestone, yet. While this definition is theoretically not
+ * completely "safe" since a subtangle could stay unconfirmed for a very long time and then still get confirmed (and
+ * therefore not "really" being orphaned), it practically doesn't cause any problems since it will be handled by the
+ * solid entry points and can consequently be solidified again if it ever becomes necessary.
+ *
+ * If the LOCAL_SNAPSHOT_DEPTH is sufficiently high this becomes practically impossible at some point anyway.
+ *
+ * @paramm transactionHash the transaction that shall have its orphaned approvers removed
+ * @paramm elementsToDelete List of elements that is used to gather the elements we want to delete
+ * @paramm processedTransactions List of transactions that were processed already (so we don't process the same
+ *                              transactions more than once)
+ * @throwsm TraversalException if anything goes wrong while traversing the graph
+ */
 public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
     /**
      * Logger for this class allowing us to dump debug and status messages.
