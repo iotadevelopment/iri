@@ -251,22 +251,19 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      */
     protected void cleanupMilestoneTransactions() throws GarbageCollectorException {
         try {
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, getCurrentIndex());
-            if(milestoneViewModel != null) {
-                List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = getElementsToDelete();
+            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = getElementsToDelete();
 
-                // clean database entries
-                garbageCollector.tangle.deleteBatch(elementsToDelete);
+            // clean database entries
+            garbageCollector.tangle.deleteBatch(elementsToDelete);
 
-                // clean runtime caches
-                elementsToDelete.stream().forEach(element -> {
-                    if(Transaction.class.equals(element.hi)) {
-                        garbageCollector.tipsViewModel.removeTipHash((Hash) element.low);
-                    } else if(Milestone.class.equals(element.hi)) {
-                        MilestoneViewModel.clear(((IntegerIndex) element.low).getValue());
-                    }
-                });
-            }
+            // clean runtime caches
+            elementsToDelete.stream().forEach(element -> {
+                if(Transaction.class.equals(element.hi)) {
+                    garbageCollector.tipsViewModel.removeTipHash((Hash) element.low);
+                } else if(Milestone.class.equals(element.hi)) {
+                    MilestoneViewModel.clear(((IntegerIndex) element.low).getValue());
+                }
+            });
         } catch(Exception e) {
             throw new GarbageCollectorException("failed to cleanup milestone #" + getCurrentIndex(), e);
         }
@@ -277,17 +274,15 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
         List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
 
         // collect elements to delete
-        if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
-            elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
-        }
+        elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
         elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
         DAGHelper.get(garbageCollector.tangle).traverseApprovees(
             milestoneViewModel.getHash(),
             approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
             approvedTransaction -> {
-                if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
-                    elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
+                elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
+                if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
                     cleanupOrphanedApprovers(approvedTransaction, elementsToDelete, new HashSet<>());
                 }
             }
