@@ -12,7 +12,7 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
     private Hash transactionHash;
 
     public static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        while(jobQueue.getFirst() != null) {
+        while(jobQueue.size() >= 1) {
             jobQueue.getFirst().process();
 
             jobQueue.removeFirst();
