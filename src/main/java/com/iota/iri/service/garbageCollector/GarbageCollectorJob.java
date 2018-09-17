@@ -1,38 +1,34 @@
 package com.iota.iri.service.garbageCollector;
 
-import com.iota.iri.storage.Indexable;
-import com.iota.iri.storage.Persistable;
-import com.iota.iri.utils.Pair;
-
-import java.util.ArrayDeque;
-import java.util.List;
-
 public abstract class GarbageCollectorJob {
-    public static void consolidateQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        /* can be implemented (optional) */
-    }
-
-    public static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        throw new GarbageCollectorException("\"processQueue\" has to be implemented by the child GarbageCollectorJob class");
-    }
-
-    public static GarbageCollectorJob parse(String input) throws GarbageCollectorException {
-        throw new GarbageCollectorException("\"parse\" has to be implemented by the child GarbageCollectorJob class");
-    }
-
     /**
      * Holds a reference to the {@link GarbageCollector} that this job belongs to.
      */
     protected GarbageCollector garbageCollector;
 
-    public abstract List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws Exception;
-
-    public abstract void process() throws GarbageCollectorException;
-
-    @Override
-    public abstract String toString();
-
+    /**
+     * This method is used to inform the job about the {@link GarbageCollector} it belongs to.
+     *
+     * It automatically gets called when the jobs gets added to the {@link GarbageCollector}.
+     *
+     * @param garbageCollector GarbageCollector that this job belongs to
+     */
     public void registerGarbageCollector(GarbageCollector garbageCollector) {
         this.garbageCollector = garbageCollector;
     }
+
+    /**
+     * This method processes the cleanup job and performs the actual pruning.
+     *
+     * @throws GarbageCollectorException if something goes wrong while processing the job
+     */
+    public abstract void process() throws GarbageCollectorException;
+
+    /**
+     * This method is used to serialize
+     *
+     * @return
+     */
+    @Override
+    public abstract String toString();
 }

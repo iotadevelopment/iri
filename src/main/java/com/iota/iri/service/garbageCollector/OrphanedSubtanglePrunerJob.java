@@ -42,6 +42,11 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
 
     private Hash transactionHash;
 
+    public static void registerInGarbageCollector(GarbageCollector garbageCollector) {
+        garbageCollector.registerParser(OrphanedSubtanglePrunerJob.class, OrphanedSubtanglePrunerJob::parse);
+        garbageCollector.registerQueueProcessor(OrphanedSubtanglePrunerJob.class, OrphanedSubtanglePrunerJob::processQueue);
+    }
+
     public static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
         while(jobQueue.size() >= 1) {
             jobQueue.getFirst().process();

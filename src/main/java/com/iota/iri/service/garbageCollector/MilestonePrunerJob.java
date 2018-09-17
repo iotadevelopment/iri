@@ -51,6 +51,12 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      */
     protected DAGHelper dagHelper;
 
+    public static void registerInGarbageCollector(GarbageCollector garbageCollector) {
+        garbageCollector.registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
+        garbageCollector.registerQueueProcessor(MilestonePrunerJob.class, MilestonePrunerJob::processQueue);
+        garbageCollector.registerQueueConsolidator(MilestonePrunerJob.class, MilestonePrunerJob::consolidateQueue);
+    }
+
     /**
      * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
      * pending.
