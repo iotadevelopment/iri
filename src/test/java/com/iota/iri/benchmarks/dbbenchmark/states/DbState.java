@@ -2,8 +2,11 @@ package com.iota.iri.benchmarks.dbbenchmark.states;
 
 import com.iota.iri.TransactionTestUtils;
 import com.iota.iri.conf.BaseIotaConfig;
+import com.iota.iri.conf.MainnetConfig;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Transaction;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.PersistenceProvider;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -23,6 +26,7 @@ public abstract class DbState {
     private final File logFolder = new File("db-log-bench");
 
     private Tangle tangle;
+    private SnapshotManager snapshotManager;
     private List<TransactionViewModel> transactions;
 
     @Param({"10", "100", "500", "1000", "3000"})
@@ -42,6 +46,7 @@ public abstract class DbState {
         dbProvider.init();
         tangle = new Tangle();
         tangle.addPersistenceProvider(dbProvider);
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
         String trytes = "";
         System.out.println("numTxsToTest = [" + numTxsToTest + "]");
         transactions = new ArrayList<>(numTxsToTest);
@@ -68,6 +73,10 @@ public abstract class DbState {
 
     public Tangle getTangle() {
         return tangle;
+    }
+
+    public SnapshotManager getSnapshotManager() {
+        return snapshotManager;
     }
 
     public List<TransactionViewModel> getTransactions() {

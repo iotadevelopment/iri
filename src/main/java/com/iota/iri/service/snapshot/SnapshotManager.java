@@ -62,7 +62,7 @@ public class SnapshotManager {
 
     private boolean shuttingDown;
 
-    private static int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
+    private static final int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
 
     /**
      * This method is the constructor of the SnapshotManager.
@@ -116,11 +116,11 @@ public class SnapshotManager {
             while(!shuttingDown) {
                 long scanStart = System.currentTimeMillis();
 
-                int LOCAL_SNAPSHOT_INTERVAL = milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex
+                int localSnapshotInterval = milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex
                                               ? configuration.getLocalSnapshotsIntervalSynced()
                                               : configuration.getLocalSnapshotsIntervalUnsynced();
 
-                if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + LOCAL_SNAPSHOT_INTERVAL) {
+                if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + localSnapshotInterval) {
                     try {
                         takeLocalSnapshot();
                     } catch(SnapshotException e) {

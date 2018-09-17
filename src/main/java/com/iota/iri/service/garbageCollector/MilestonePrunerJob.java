@@ -257,7 +257,32 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      */
     protected void cleanupMilestoneTransactions() throws GarbageCollectorException {
         try {
-            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = getElementsToDelete();
+            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
+
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, getCurrentIndex());
+            if (milestoneViewModel != null) {
+                // collect elements to delete
+                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
+                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
+                if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
+                    garbageCollector.addJob(new OrphanedSubtanglePrunerJob(milestoneViewModel.getHash()));
+                }
+                DAGHelper.get(garbageCollector.tangle).traverseApprovees(
+                    milestoneViewModel.getHash(),
+                    approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
+                    approvedTransaction -> {
+                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
+
+                        if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
+                            try {
+                                garbageCollector.addJob(new OrphanedSubtanglePrunerJob(approvedTransaction.getHash()));
+                            } catch(GarbageCollectorException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }
+                );
+            }
 
             // clean database entries
             garbageCollector.tangle.deleteBatch(elementsToDelete);
@@ -273,39 +298,6 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
         } catch(Exception e) {
             throw new GarbageCollectorException("failed to cleanup milestone #" + getCurrentIndex(), e);
         }
-    }
-
-    public List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws Exception {
-        List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-
-        MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, getCurrentIndex());
-        if (milestoneViewModel != null) {
-            // collect elements to delete
-            elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
-            elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-            if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
-                garbageCollector.addJob(new OrphanedSubtanglePrunerJob(milestoneViewModel.getHash()));
-                //cleanupOrphanedApprovers(milestoneViewModel.getHash(), elementsToDelete, new HashSet<>());
-            }
-            DAGHelper.get(garbageCollector.tangle).traverseApprovees(
-                milestoneViewModel.getHash(),
-                approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
-                approvedTransaction -> {
-                    elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
-
-                    if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
-                        try {
-                            garbageCollector.addJob(new OrphanedSubtanglePrunerJob(approvedTransaction.getHash()));
-                        } catch(GarbageCollectorException e) {
-                            throw new RuntimeException(e);
-                        }
-                        //cleanupOrphanedApprovers(approvedTransaction.getHash(), elementsToDelete, new HashSet<>());
-                    }
-                }
-            );
-        }
-
-        return elementsToDelete;
     }
 
     @Override

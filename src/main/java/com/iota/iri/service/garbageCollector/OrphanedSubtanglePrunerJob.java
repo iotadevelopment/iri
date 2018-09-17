@@ -66,30 +66,23 @@ public class OrphanedSubtanglePrunerJob extends GarbageCollectorJob {
     }
 
     @Override
-    public List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws Exception {
-        List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-
-        try {
-            // remove all orphaned transactions that are branching off of our deleted transactions
-            DAGHelper.get(garbageCollector.tangle).traverseApprovers(
-                transactionHash,
-                approverTransaction -> approverTransaction.snapshotIndex() == 0,
-                approverTransaction -> {
-                    System.out.println("DELETING OPRHANED " + approverTransaction);
-                    elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
-                }
-            );
-        } catch(Exception e) {
-            log.error("failed to clean up the orphaned approvers of transaction " + transactionHash, e);
-        }
-
-        return elementsToDelete;
-    }
-
-    @Override
     public void process() throws GarbageCollectorException {
         try {
-            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = getElementsToDelete();
+            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
+
+            try {
+                // remove all orphaned transactions that are branching off of our deleted transactions
+                DAGHelper.get(garbageCollector.tangle).traverseApprovers(
+                    transactionHash,
+                    approverTransaction -> approverTransaction.snapshotIndex() == 0,
+                    approverTransaction -> {
+                        System.out.println("DELETING OPRHANED " + approverTransaction);
+                        elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class));
+                    }
+                );
+            } catch(Exception e) {
+                log.error("failed to clean up the orphaned approvers of transaction " + transactionHash, e);
+            }
 
             // clean database entries
             garbageCollector.tangle.deleteBatch(elementsToDelete);
