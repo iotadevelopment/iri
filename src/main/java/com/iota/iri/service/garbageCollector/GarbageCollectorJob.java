@@ -1,10 +1,15 @@
 package com.iota.iri.service.garbageCollector;
 
-public abstract class GarbageCollectorJob {
+/**
+ * This class is a template for a {@link GarbageCollector} job.
+ *
+ * It acts as a base class and a generic interface for processing the jobs in the {@link GarbageCollector}.
+ */
+abstract class GarbageCollectorJob {
     /**
      * Holds a reference to the {@link GarbageCollector} that this job belongs to.
      */
-    protected GarbageCollector garbageCollector;
+    GarbageCollector garbageCollector;
 
     /**
      * This method is used to inform the job about the {@link GarbageCollector} it belongs to.
@@ -13,7 +18,7 @@ public abstract class GarbageCollectorJob {
      *
      * @param garbageCollector GarbageCollector that this job belongs to
      */
-    public void registerGarbageCollector(GarbageCollector garbageCollector) {
+    void registerGarbageCollector(GarbageCollector garbageCollector) {
         this.garbageCollector = garbageCollector;
     }
 
@@ -22,13 +27,12 @@ public abstract class GarbageCollectorJob {
      *
      * @throws GarbageCollectorException if something goes wrong while processing the job
      */
-    public abstract void process() throws GarbageCollectorException;
+    abstract void process() throws GarbageCollectorException;
 
     /**
-     * This method is used to serialize
+     * This method is used to serialize the job before it gets persisted in the {@link GarbageCollector} state file.
      *
-     * @return
+     * @return string representing a serialized version of this job
      */
-    @Override
-    public abstract String toString();
+    abstract String serialize();
 }

@@ -20,37 +20,9 @@ import java.util.*;
  */
 public class GarbageCollector {
     /**
-     * Boolean flag that indicates if the node is being shutdown.
-     *
-     * Note: It is not just used by the GarbageCollector itself but also by the jobs and therefore protected.
-     */
-    protected boolean shuttingDown = false;
-
-    /**
-     * Holds a reference to the tangle instance which acts as an interface to the used database.
-     *
-     * Note: It is not just used by the GarbageCollector itself but also by the jobs and therefore protected.
-     */
-    protected Tangle tangle;
-
-    /**
-     * Holds a reference to the {@link SnapshotManager} that this garbage collector belongs to.
-     *
-     * Note: It is not just used by the GarbageCollector itself but also by the jobs and therefore protected.
-     */
-    protected SnapshotManager snapshotManager;
-
-    /**
-     * Holds a reference to the {@link TipsViewModel} which is necessary for removing tips that were pruned.
-     *
-     * Note: It is not just used by the GarbageCollector itself but also by the jobs and therefore protected.
-     */
-    protected TipsViewModel tipsViewModel;
-
-    /**
      * The interval in milliseconds that the garbage collector will check if new cleanup tasks are available.
      */
-    private static int GARBAGE_COLLECTOR_RESCAN_INTERVAL = 10000;
+    private static final int GARBAGE_COLLECTOR_RESCAN_INTERVAL = 10000;
 
     /**
      * Logger for this class allowing us to dump debug and status messages.
@@ -58,25 +30,45 @@ public class GarbageCollector {
     private static final Logger log = LoggerFactory.getLogger(GarbageCollector.class);
 
     /**
+     * Boolean flag that indicates if the node is being shutdown.
+     */
+    boolean shuttingDown = false;
+
+    /**
+     * Holds a reference to the tangle instance which acts as an interface to the used database.
+     */
+    final Tangle tangle;
+
+    /**
+     * Holds a reference to the {@link SnapshotManager} that this garbage collector belongs to.
+     */
+    final SnapshotManager snapshotManager;
+
+    /**
+     * Holds a reference to the {@link TipsViewModel} which is necessary for removing tips that were pruned.
+     */
+    final TipsViewModel tipsViewModel;
+
+    /**
      * A map of {@link JobParser}s allowing us to determine how to parse the jobs from the garbage collector state file,
      * based on their type.
      */
-    private HashMap<String, JobParser> jobParsers = new HashMap<>();
+    private final HashMap<String, JobParser> jobParsers = new HashMap<>();
 
     /**
      * A map of {@link QueueProcessor}s allowing us to process queues based on the type of the job.
      */
-    private HashMap<Class<? extends GarbageCollectorJob>, QueueProcessor> queueProcessors = new HashMap<>();
+    private final HashMap<Class<? extends GarbageCollectorJob>, QueueProcessor> queueProcessors = new HashMap<>();
 
     /**
-     * A map of {@link QueueConsolidator}s allowing us to consolidate a queue to consume less "space".
+     * A map of {@link QueueConsolidator}s allowing us to consolidate the queues to consume less "space".
      */
-    private HashMap<Class<? extends GarbageCollectorJob>, QueueConsolidator> queueConsolidators = new HashMap<>();
+    private final HashMap<Class<? extends GarbageCollectorJob>, QueueConsolidator> queueConsolidators = new HashMap<>();
 
     /**
      * List of cleanup jobs that shall get processed by the garbage collector (grouped by their class).
      */
-    private HashMap<Class<? extends GarbageCollectorJob>, ArrayDeque<GarbageCollectorJob>> garbageCollectorJobs = new HashMap<>();
+    private final HashMap<Class<? extends GarbageCollectorJob>, ArrayDeque<GarbageCollectorJob>> garbageCollectorJobs = new HashMap<>();
 
     /**
      * The constructor of this class stores the passed in parameters for future use and restores the previous state of
@@ -91,68 +83,23 @@ public class GarbageCollector {
         this.tipsViewModel = tipsViewModel;
 
         MilestonePrunerJob.registerInGarbageCollector(this);
-        OrphanedSubtanglePrunerJob.registerInGarbageCollector(this);
+        UnconfirmedSubtanglePrunerJob.registerInGarbageCollector(this);
 
-        try {
-            restoreCleanupJobs();
-        } catch(GarbageCollectorException e) {
-            log.error("could not restore garbage collector jobs", e);
-        }
+        restoreCleanupJobs();
     }
 
     /**
-     * This method allows to register a parser for a given job type.
+     * This method adds a job to the GarbageCollector, that will get processed on its next run.
      *
-     * When we serialize the pending jobs to save the current state of the garbage collector, we also dump their class
-     * name, which allows us to generically parse their serialized representation using the registered parser function
-     * back into the corresponding job.
+     * It first registers the garbage collector in the job, so the job has access to all the properties that are
+     * relevant for its execution, and that do not get passed in via its constructor. Then it retrieves the queue based
+     * on its class and adds it there.
      *
-     * This method automatically gets called for the builtin jobs in the constructor of the GarbageCollector.
+     * After adding the job to its corresponding queue we try to consolidate the queue and persist the changes in the
+     * garbage collector state file.
      *
-     * @param jobClass class of the job that the GarbageCollector shall be able to handle
-     * @param jobParser parser function for the serialized version of jobs of the given type
-     */
-    protected void registerParser(Class<?> jobClass, JobParser jobParser) {
-        this.jobParsers.put(jobClass.getCanonicalName(), jobParser);
-    }
-
-    /**
-     * This method allows us to register a {@link QueueProcessor} for the given job type.
-     *
-     * Since different kinds of jobs get processed in a different way, we are able to generically process them based on
-     * their type after having registered a processor for them.
-     *
-     * This method automatically gets called for the builtin jobs in the constructor of the GarbageCollector.
-     *
-     * @param jobClass class of the job that the GarbageCollector shall be able to handle
-     * @param queueProcessor function that takes care of processing the queue for this particular type
-     */
-    protected void registerQueueProcessor(Class<? extends GarbageCollectorJob> jobClass, QueueProcessor queueProcessor) {
-        this.queueProcessors.put(jobClass, queueProcessor);
-    }
-
-    /**
-     * This method allows us to register a {@link QueueConsolidator} for the given job type.
-     *
-     * Some jobs can be consolidated to consume less space in the queue by grouping them together or skipping them
-     * completely. While the consolidation of multiple jobs into fewer ones is optional and only required for certain
-     * types of jobs, this method allows us to generically handle this use case by registering a handler for the job
-     * class that supports this feature.
-     *
-     * This method automatically gets called for the builtin jobs in the constructor of the GarbageCollector.
-     *
-     * @param jobClass class of the job that the GarbageCollector shall be able to handle
-     * @param queueConsolidator
-     */
-    protected void registerQueueConsolidator(Class<? extends GarbageCollectorJob> jobClass, QueueConsolidator queueConsolidator) {
-        this.queueConsolidators.put(jobClass, queueConsolidator);
-    }
-
-    /**
-     * This method adds a job to the GarbageCollector, that will get processed on the next run of the job processing.
-     *
-     * @param job
-     * @throws GarbageCollectorException
+     * @param job the job that shall be executed
+     * @throws GarbageCollectorException if anything goes wrong while adding the job
      */
     public void addJob(GarbageCollectorJob job) throws GarbageCollectorException {
         job.registerGarbageCollector(this);
@@ -172,9 +119,7 @@ public class GarbageCollector {
     /**
      * This method spawns the thread that is taking care of processing the cleanup jobs in the background.
      *
-     * It repeatedly calls {@link #processCleanupJobs()} while the GarbageCollector was not shutdown.
-     *
-     * @return
+     * It repeatedly calls {@link #processCleanupJobs()} until the GarbageCollector is shutting down.
      */
     public void start() {
         (new Thread(() -> {
@@ -204,26 +149,90 @@ public class GarbageCollector {
     /**
      * This method resets the state of the GarbageCollector.
      *
-     * It prunes the job queue and deletes the state file afterwards. It can for example be used to cleanup the
+     * It prunes the job queue and deletes the state file afterwards. One example of its usage is: Cleaning up the
      * remaining files after processing the unit tests.
      */
     public void reset() {
-        garbageCollectorJobs = new HashMap<>();
+        garbageCollectorJobs.clear();
 
         getStateFile().delete();
     }
 
     /**
+     * This method allows to register a parser for a given job type.
+     *
+     * When we serialize the pending jobs to save the current state of the garbage collector, we also dump their class
+     * name, which allows us to generically parse their serialized representation using the registered parser function
+     * back into the corresponding job.
+     *
+     * @param jobClass class of the job that the GarbageCollector shall be able to handle
+     * @param jobParser parser function for the serialized version of jobs of the given type
+     */
+    void registerParser(Class<?> jobClass, JobParser jobParser) {
+        this.jobParsers.put(jobClass.getCanonicalName(), jobParser);
+    }
+
+    /**
+     * This method allows us to register a {@link QueueProcessor} for the given job type.
+     *
+     * Since different kinds of jobs get processed in a different way, we are able to generically process them based on
+     * their type after having registered a processor for them.
+     *
+     * @param jobClass class of the job that the GarbageCollector shall be able to handle
+     * @param queueProcessor function that takes care of processing the queue for this particular type
+     */
+    void registerQueueProcessor(Class<? extends GarbageCollectorJob> jobClass, QueueProcessor queueProcessor) {
+        this.queueProcessors.put(jobClass, queueProcessor);
+    }
+
+    /**
+     * This method allows us to register a {@link QueueConsolidator} for the given job type.
+     *
+     * Some jobs can be consolidated to consume less space in the queue by grouping them together or skipping them
+     * completely. While the consolidation of multiple jobs into fewer ones is optional and only required for certain
+     * types of jobs, this method allows us to generically handle this use case by registering a handler for the job
+     * class that supports this feature.
+     *
+     * @param jobClass class of the job that the GarbageCollector shall be able to handle
+     * @param queueConsolidator lambda that takes care of consolidating the entries in a queue
+     */
+    void registerQueueConsolidator(Class<? extends GarbageCollectorJob> jobClass, QueueConsolidator queueConsolidator) {
+        this.queueConsolidators.put(jobClass, queueConsolidator);
+    }
+
+    /**
+     * This method persists the changes of the garbage collector so IRI can continue cleaning up upon restarts.
+     *
+     * Since cleaning up the old database entries can take a long time, we need to make sure that it is possible to
+     * continue where we stopped. This method therefore writes the state of the queued jobs into a file that is read
+     * upon re-initialization of the GarbageCollector.
+     *
+     * @throws GarbageCollectorException if something goes wrong while writing the state file
+     */
+    void persistChanges() throws GarbageCollectorException {
+        try {
+            Files.write(
+                Paths.get(getStateFile().getAbsolutePath()),
+                () -> garbageCollectorJobs.entrySet().stream().flatMap(
+                    entry -> entry.getValue().stream()
+                ).<CharSequence>map(
+                    entry -> entry.getClass().getCanonicalName() + ";" + entry.serialize()
+                ).iterator()
+            );
+        } catch(IOException e) {
+            throw new GarbageCollectorException("could not persists garbage collector state", e);
+        }
+    }
+
+    /**
      * This method contains the logic for scheduling the jobs and executing them.
      *
-     * While the GarbageCollector is not shutting down and there are jobs that need to be processed, it retrieves the
-     * first job and processes it. Afterwards it checks if there is a second job which also has to be processed. If both
-     * jobs are "done", it consolidates their progress into a single job, that is consecutively used by the following
-     * jobs for determining their "target milestone".
+     * It iterates through all available queues and executes the corresponding {@link QueueProcessor} for each of them
+     * until all queues have been processed.
      *
-     * @throws GarbageCollectorException
+     * @throws GarbageCollectorException if anything goes wrong while processing the cleanup jobs
      */
-    protected void processCleanupJobs() throws GarbageCollectorException {
+    private void processCleanupJobs() throws GarbageCollectorException {
         for(Map.Entry<Class<? extends GarbageCollectorJob>, ArrayDeque<GarbageCollectorJob>> entry : garbageCollectorJobs.entrySet()) {
             if(shuttingDown) {
                 return;
@@ -239,30 +248,15 @@ public class GarbageCollector {
     }
 
     /**
-     * This method persists the changes of the garbage collector so IRI can continue cleaning up upon restarts.
+     * This method retrieves the job queue belonging to a given job type.
      *
-     * Since cleaning up the old database entries can take a long time, we need to make sure that it is possible to
-     * continue where we stopped. This method therefore writes the state of the queued jobs into a file that is read
-     * upon re-initialization of the GarbageCollector.
+     * It first checks if a corresponding queue exists already and creates a new one if no queue was created yet for the
+     * given job type.
      *
-     * @throws GarbageCollectorException if something goes wrong while writing the state file
+     * @param jobClass type of the job that we want to retrieve the queue for
+     * @return the list of jobs for the provided job type
      */
-    protected void persistChanges() throws GarbageCollectorException {
-        try {
-            Files.write(
-                Paths.get(getStateFile().getAbsolutePath()),
-                () -> garbageCollectorJobs.entrySet().stream().flatMap(
-                    entry -> entry.getValue().stream()
-                ).<CharSequence>map(
-                    entry -> entry.getClass().getCanonicalName() + ";" + entry.toString()
-                ).iterator()
-            );
-        } catch(IOException e) {
-            throw new GarbageCollectorException("could not persists garbage collector state", e);
-        }
-    }
-
-    protected ArrayDeque<GarbageCollectorJob> getJobQueue(Class<? extends GarbageCollectorJob> jobClass) {
+    private ArrayDeque<GarbageCollectorJob> getJobQueue(Class<? extends GarbageCollectorJob> jobClass) {
         if (garbageCollectorJobs.get(jobClass) == null) {
             synchronized(this) {
                 if (garbageCollectorJobs.get(jobClass) == null) {
@@ -276,25 +270,23 @@ public class GarbageCollector {
 
     /**
      * This method tries to restore the previous state of the Garbage Collector by reading the state file that get's
-     * persisted whenever we modify the queue.
+     * persisted whenever we modify any of the queues.
      *
      * It is used to restore the state of the garbage collector between IRI restarts and speed up the pruning
      * operations. If it fails to restore the state it just continues with an empty state which doesn't cause any
      * problems with future jobs other than requiring them to perform unnecessary steps and therefore slowing them down
      * a bit.
      */
-    private void restoreCleanupJobs() throws GarbageCollectorException {
+    private void restoreCleanupJobs() {
         try {
-            // create a reader for our file
             BufferedReader reader = new BufferedReader(
-            new InputStreamReader(
-            new BufferedInputStream(
-            new FileInputStream(getStateFile())
-            )
-            )
+                new InputStreamReader(
+                    new BufferedInputStream(
+                        new FileInputStream(getStateFile())
+                    )
+                )
             );
 
-            // read the saved cleanup states back into our queue
             String line;
             while((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
@@ -310,7 +302,6 @@ public class GarbageCollector {
 
             reader.close();
         }
-        catch(FileNotFoundException e) { /* do nothing */ }
         catch(IOException e) { /* do nothing */ }
         catch(Exception e) {
             log.error("could not load local snapshot file", e);

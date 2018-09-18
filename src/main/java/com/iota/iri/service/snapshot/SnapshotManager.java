@@ -8,7 +8,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.service.garbageCollector.GarbageCollector;
 import com.iota.iri.service.garbageCollector.GarbageCollectorException;
 import com.iota.iri.service.garbageCollector.MilestonePrunerJob;
-import com.iota.iri.service.garbageCollector.OrphanedSubtanglePrunerJob;
+import com.iota.iri.service.garbageCollector.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
@@ -315,7 +315,7 @@ public class SnapshotManager {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             } else {
                 try {
-                    snapshotGarbageCollector.addJob(new OrphanedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                    snapshotGarbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
                 } catch(GarbageCollectorException e) {
                     log.error("could not add cleanup job to garbage collector", e);
                 }

@@ -1,19 +1,14 @@
 package com.iota.iri.service.garbageCollector;
 
 import com.iota.iri.controllers.MilestoneViewModel;
-import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
-import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGHelper;
-import com.iota.iri.utils.dag.TraversalException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -27,31 +22,29 @@ import java.util.*;
  */
 public class MilestonePrunerJob extends GarbageCollectorJob {
     /**
-     * Logger for this class allowing us to dump debug and status messages.
-     */
-    protected static final Logger log = LoggerFactory.getLogger(MilestonePrunerJob.class);
-
-    /**
      * Holds the milestone index where this job starts cleaning up (read only).
      */
-    protected int startingIndex;
+    private final int startingIndex;
 
     /**
      * Holds the milestone index where this job stops cleaning up (read only).
      */
-    protected int targetIndex;
+    private int targetIndex;
 
     /**
      * Holds the milestone index of the oldest milestone that was cleaned up already (the current progress).
      */
-    protected int currentIndex;
+    private int currentIndex;
 
     /**
-     * DAGHelper instance that is used to traverse the graph.
+     * This method registers this job type in a {@link GarbageCollector}.
+     *
+     * It registers the {@link JobParser}, the {@link QueueProcessor} and the {@link QueueConsolidator} which will
+     * allow us to process jobs of this particular type.
+     *
+     * @param garbageCollector {@link GarbageCollector} that shall be able to process {@link MilestonePrunerJob}s
      */
-    protected DAGHelper dagHelper;
-
-    public static void registerInGarbageCollector(GarbageCollector garbageCollector) {
+    static void registerInGarbageCollector(GarbageCollector garbageCollector) {
         garbageCollector.registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
         garbageCollector.registerQueueProcessor(MilestonePrunerJob.class, MilestonePrunerJob::processQueue);
         garbageCollector.registerQueueConsolidator(MilestonePrunerJob.class, MilestonePrunerJob::consolidateQueue);
@@ -61,10 +54,10 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
      * pending.
      *
-     * It is used to clean up the milestoneCleanupJobs queue and the corresponding garbage collector file, so it always has a
-     * size of less than 4 jobs.
+     * It is used to clean up the queue and the corresponding garbage collector file, so it always has a size of less
+     * than 4 jobs.
      *
-     * Since the jobs are getting processed from the beginning of the list, we first check if the first two jobs are
+     * Since the jobs are getting processed from the beginning of the queue, we first check if the first two jobs are
      * "done" and merge them into a single one that reflects the "done" status of both jobs. Consecutively we check if
      * there are two or more pending jobs at the end that can also be consolidated.
      *
@@ -74,16 +67,15 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      *
      * @throws GarbageCollectorException if an error occurs while persisting the state
      */
-    public static void consolidateQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        // if we have at least 2 jobs -> check if we can consolidate them at the beginning
+    private static void consolidateQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
+        // if we have at least 2 jobs -> check if we can consolidate them at the beginning (both done)
         if(jobQueue.size() >= 2) {
-            // retrieve the first two jobs
             MilestonePrunerJob job1 = (MilestonePrunerJob) jobQueue.removeFirst();
             MilestonePrunerJob job2 = (MilestonePrunerJob) jobQueue.removeFirst();
 
             // if both first job are done -> consolidate them and persists the changes
-            if(job1.getCurrentIndex() == garbageCollector.snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
-                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job2.getStartingIndex(), job1.getCurrentIndex());
+            if(job1.currentIndex == garbageCollector.snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.currentIndex == job1.startingIndex) {
+                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job2.startingIndex, job1.currentIndex);
                 consolidatedJob.registerGarbageCollector(garbageCollector);
                 jobQueue.addFirst(consolidatedJob);
 
@@ -97,16 +89,15 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
             }
         }
 
-        // if we have at least 2 jobs -> check if we can consolidate them at the end
-        boolean cleanupSuccessfull = true;
-        while(jobQueue.size() >= 2 && cleanupSuccessfull) {
-            // retrieve the last two jobs
+        // if we have at least 2 jobs -> check if we can consolidate them at the end (both pending)
+        boolean cleanupSuccessful = true;
+        while(jobQueue.size() >= 2 && cleanupSuccessful) {
             MilestonePrunerJob job1 = (MilestonePrunerJob) jobQueue.removeLast();
             MilestonePrunerJob job2 = (MilestonePrunerJob) jobQueue.removeLast();
 
             // if both jobs are pending -> consolidate them and persists the changes
-            if(job1.getCurrentIndex() == job1.getStartingIndex() && job2.getCurrentIndex() == job2.getStartingIndex()) {
-                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job1.getStartingIndex(), job1.getCurrentIndex());
+            if(job1.currentIndex == job1.startingIndex && job2.currentIndex == job2.startingIndex) {
+                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job1.startingIndex, job1.currentIndex);
                 consolidatedJob.registerGarbageCollector(garbageCollector);
                 jobQueue.addLast(consolidatedJob);
 
@@ -118,44 +109,83 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
                 jobQueue.addLast(job2);
                 jobQueue.addLast(job1);
 
-                cleanupSuccessfull = false;
+                cleanupSuccessful = false;
             }
         }
 
         int previousStartIndex = garbageCollector.snapshotManager.getConfiguration().getMilestoneStartIndex();
         for(GarbageCollectorJob currentJob : jobQueue) {
-            ((MilestonePrunerJob) currentJob).setTargetIndex(previousStartIndex);
+            ((MilestonePrunerJob) currentJob).targetIndex = previousStartIndex;
 
-            previousStartIndex = ((MilestonePrunerJob) currentJob).getStartingIndex();
+            previousStartIndex = ((MilestonePrunerJob) currentJob).startingIndex;
         }
     }
 
-    public static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        while(!garbageCollector.shuttingDown && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).getTargetIndex() < ((MilestonePrunerJob) jobQueue.getFirst()).getCurrentIndex()) {
-            GarbageCollectorJob firstJob = jobQueue.getFirst();
+    /**
+     * This method processes the entire queue of this job.
+     *
+     * It first retrieves the first job and processes it until it is completely done. If it finds a second job, it
+     * immediately tries to process that one as well. If both jobs are done it triggers a consolidation to merge both
+     * done jobs into a single one.
+     *
+     * We keep the first done job in the queue (even though it might have been consolidated) because we need its
+     * {@link #startingIndex} to determine the next jobs {@link #targetIndex}.
+     *
+     * @param garbageCollector {@link GarbageCollector} that this job belongs to
+     * @param jobQueue queue of {@link MilestonePrunerJob} jobs that shall get processed
+     * @throws GarbageCollectorException if anything goes wrong while processing the jobs
+     */
+    private static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
+        while(!garbageCollector.shuttingDown && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).targetIndex < ((MilestonePrunerJob) jobQueue.getFirst()).currentIndex) {
+            MilestonePrunerJob firstJob = (MilestonePrunerJob) jobQueue.removeFirst();
             firstJob.process();
-            if(jobQueue.size() >= 2) {
-                jobQueue.removeFirst();
-                GarbageCollectorJob secondJob = jobQueue.getFirst();
+
+            if(jobQueue.size() >= 1) {
+                MilestonePrunerJob secondJob = (MilestonePrunerJob) jobQueue.getFirst();
                 jobQueue.addFirst(firstJob);
 
                 secondJob.process();
 
-                // if both jobs are done we can consolidate them to one
                 consolidateQueue(garbageCollector, jobQueue);
             } else {
+                jobQueue.addFirst(firstJob);
+
                 break;
             }
         }
     }
 
-    public static MilestonePrunerJob parse(String input) throws GarbageCollectorException {
+    /**
+     * This method parses the string representation of a {@link MilestonePrunerJob} and creates the corresponding object.
+     *
+     * It splits the String input in two parts (delimited by a ";") and passes them into the constructor of a new
+     * {@link MilestonePrunerJob} by interpreting them as {@link #startingIndex} and {@link #currentIndex} of the job.
+     *
+     * The {@link #targetIndex} is derived by the jobs position in the queue and the fact that milestone deletions
+     * happen sequentially from the newest to the oldest milestone.
+     *
+     * @param input serialized String representation of a {@link MilestonePrunerJob}
+     * @return a new {@link MilestonePrunerJob} with the provided details
+     * @throws GarbageCollectorException if anything goes wrong while parsing the input
+     */
+    private static MilestonePrunerJob parse(String input) throws GarbageCollectorException {
         String[] parts = input.split(";", 2);
         if(parts.length >= 2) {
             return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]));
         }
 
-        throw new GarbageCollectorException("failed to parse garbage collector file");
+        throw new GarbageCollectorException("failed to parse garbage collector file - invalid input: " + input);
+    }
+
+    /**
+     * Does same as {@link #MilestonePrunerJob(int, int)} but defaults to the {@link #currentIndex} being the same as
+     * the {@link #startingIndex}. This is usually the case when we create a new job programmatically that does not get
+     * restored from a state file.
+     *
+     * @param startingIndex milestone index that defines where to start cleaning up
+     */
+    public MilestonePrunerJob(int startingIndex) {
+        this(startingIndex, startingIndex);
     }
 
     /**
@@ -168,76 +198,27 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      * to the {@code startingIndex}.
      *
      * @param startingIndex milestone index that defines where to start cleaning up
+     * @param currentIndex milestone index that defines the next milestone that should be cleaned up by this job
      */
-    public MilestonePrunerJob(int startingIndex) {
-        this(startingIndex, startingIndex);
-    }
-
-    public MilestonePrunerJob(int startingIndex, int currentIndex) {
+    private MilestonePrunerJob(int startingIndex, int currentIndex) {
         this.startingIndex = startingIndex;
-        this.currentIndex = currentIndex;
-    }
-
-    /**
-     * Getter of the {@link #targetIndex} which reflects the starting point of this job.
-     *
-     * It simply returns the stored protected property.
-     *
-     * @return milestone index that defines where to start cleaning up
-     */
-    public int getTargetIndex() {
-        return targetIndex;
-    }
-
-    public void setTargetIndex(int targetIndex) {
-        this.targetIndex = targetIndex;
-    }
-
-    /**
-     * Getter of the {@link #startingIndex} which reflects the starting point of this job.
-     *
-     * It simply returns the stored protected property.
-     *
-     * @return milestone index that defines where to start cleaning up
-     */
-    public int getStartingIndex() {
-        return startingIndex;
-    }
-
-    /**
-     * Getter of the {@link #currentIndex} which reflects the progress of the job.
-     *
-     * It simply returns the stored protected property.
-     *
-     * @return milestone index that defines until where we have cleaned up already
-     */
-    public int getCurrentIndex() {
-        return currentIndex;
-    }
-
-    /**
-     * Setter of the {@link #currentIndex} which reflects the progress of the job.
-     *
-     * It simply sets the corresponding protected property.
-     */
-    public void setCurrentIndex(int currentIndex) {
         this.currentIndex = currentIndex;
     }
 
     /**
      * This method starts the processing of the job which triggers the actual removal of database entries.
      *
-     * It iterates from the {@link #currentIndex} to the provided {@code cleanupTarget} and processes every milestone
+     * It iterates from the {@link #currentIndex} to the provided {@link #targetIndex} and processes every milestone
      * one by one. After each step is finished we persist the progress to be able to continue with the current progress
      * upon IRI restarts.
      *
-     * @throws SnapshotException if anything goes wrong while cleaning up or persisting the changes
+     * @throws GarbageCollectorException if anything goes wrong while cleaning up or persisting the changes
      */
     public void process() throws GarbageCollectorException {
-        while(!garbageCollector.shuttingDown && getTargetIndex() < getCurrentIndex()) {
+        while(!garbageCollector.shuttingDown && targetIndex < currentIndex) {
             cleanupMilestoneTransactions();
 
-            setCurrentIndex(getCurrentIndex() - 1);
+            currentIndex--;
 
             garbageCollector.persistChanges();
         }
@@ -251,36 +232,41 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      * fails. It does that by iterating through all the transactions that belong to the current milestone and first
      * collecting them in a List of items to delete. Once all transactions where found we issue a batchDelete.
      *
+     * While processing the transactions that are directly or indirectly referenced by the chosen milestone, we also
+     * issue additional {@link UnconfirmedSubtanglePrunerJob}s that remove the orphaned parts of the tangle that branch off
+     * the deleted transactions because they would otherwise loose their connection to the rest of the tangle unless
+     * they are branching off a solid entry point (in which case we wait with the deletion until the solid entry point
+     * becomes irrelevant).
+     *
      * After removing the entries from the database it also removes the entries from the relevant runtime caches.
      *
-     * @throws SnapshotException if something goes wrong while cleaning up the milestone
+     * @throws GarbageCollectorException if something goes wrong while cleaning up the milestone
      */
-    protected void cleanupMilestoneTransactions() throws GarbageCollectorException {
+    private void cleanupMilestoneTransactions() throws GarbageCollectorException {
         try {
+            // collect elements to delete
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, getCurrentIndex());
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(garbageCollector.tangle, currentIndex);
             if (milestoneViewModel != null) {
-                // collect elements to delete
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
                 if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
-                    garbageCollector.addJob(new OrphanedSubtanglePrunerJob(milestoneViewModel.getHash()));
+                    garbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
                 }
                 DAGHelper.get(garbageCollector.tangle).traverseApprovees(
-                    milestoneViewModel.getHash(),
-                    approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
-                    approvedTransaction -> {
-                        elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
+                milestoneViewModel.getHash(),
+                approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
+                approvedTransaction -> {
+                    elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
-                        if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
-                            try {
-                                garbageCollector.addJob(new OrphanedSubtanglePrunerJob(approvedTransaction.getHash()));
-                            } catch(GarbageCollectorException e) {
-                                throw new RuntimeException(e);
-                            }
+                    if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
+                        try {
+                            garbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
+                        } catch(GarbageCollectorException e) {
+                            throw new RuntimeException(e);
                         }
                     }
+                }
                 );
             }
 
@@ -288,7 +274,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
             garbageCollector.tangle.deleteBatch(elementsToDelete);
 
             // clean runtime caches
-            elementsToDelete.stream().forEach(element -> {
+            elementsToDelete.forEach(element -> {
                 if(Transaction.class.equals(element.hi)) {
                     garbageCollector.tipsViewModel.removeTipHash((Hash) element.low);
                 } else if(Milestone.class.equals(element.hi)) {
@@ -296,12 +282,20 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
                 }
             });
         } catch(Exception e) {
-            throw new GarbageCollectorException("failed to cleanup milestone #" + getCurrentIndex(), e);
+            throw new GarbageCollectorException("failed to cleanup milestone #" + currentIndex, e);
         }
     }
 
-    @Override
-    public String toString() {
+    /**
+     * This method creates the serialized representation of the job, that is used to persist the state of the
+     * {@link GarbageCollector}.
+     *
+     * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
+     * describe the job.
+     *
+     * @return serialized representation of this job that can be used to persist its state
+     */
+    String serialize() {
         return startingIndex + ";" + currentIndex;
     }
 }

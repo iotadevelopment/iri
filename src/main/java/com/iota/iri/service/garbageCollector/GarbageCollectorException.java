@@ -1,7 +1,7 @@
 package com.iota.iri.service.garbageCollector;
 
 /**
- * This class is used to wrap exceptions that are specific to the snapshot logic.
+ * This class is used to wrap exceptions that are specific to the garbage collector logic.
  *
  * It allows us to distinct between the different kinds of errors that can happen during the execution of the code.
  */
@@ -9,10 +9,10 @@ public class GarbageCollectorException extends Exception {
     /**
      * Constructor of the exception which allows us to provide a specific error message and the cause of the error.
      *
-     * @param message reason why this error occured
+     * @param message reason why this error occurred
      * @param cause wrapped exception that caused this error
      */
-    public GarbageCollectorException(String message, Throwable cause) {
+    GarbageCollectorException(String message, Throwable cause) {
         super(message, cause);
     }
 
@@ -20,9 +20,9 @@ public class GarbageCollectorException extends Exception {
      * Constructor of the exception which allows us to provide a specific error message without having an underlying
      * cause.
      *
-     * @param message reason why this error occured
+     * @param message reason why this error occurred
      */
-    public GarbageCollectorException(String message) {
+    GarbageCollectorException(String message) {
         super(message);
     }
 
@@ -32,7 +32,7 @@ public class GarbageCollectorException extends Exception {
      *
      * @param cause wrapped exception that caused this error
      */
-    public GarbageCollectorException(Throwable cause) {
+    GarbageCollectorException(Throwable cause) {
         super(cause);
     }
 }
