@@ -65,7 +65,7 @@ public class TransactionRequester {
     }
 
     public void requestTransaction(Hash hash, boolean milestone) throws Exception {
-        if (!snapshotManager.getInitialSnapshot().isSolidEntryPoint(hash) && !TransactionViewModel.exists(tangle, hash)) {
+        if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hash) && !TransactionViewModel.exists(tangle, hash)) {
             synchronized (syncObj) {
                 if(milestone) {
                     transactionsToRequest.remove(hash);

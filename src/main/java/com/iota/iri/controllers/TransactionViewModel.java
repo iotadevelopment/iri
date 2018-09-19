@@ -10,10 +10,7 @@ import com.iota.iri.storage.cache.Cacheable;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.Pair;
 
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class TransactionViewModel implements Cacheable {
     public Hash getId() {
@@ -140,7 +137,7 @@ public class TransactionViewModel implements Cacheable {
         getObsoleteTagValue();
         setAttachmentData();
         setMetadata();
-        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(hash)) {
+        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hash)) {
             return false;
         }
         return tangle.update(transaction, hash, item);
@@ -216,7 +213,7 @@ public class TransactionViewModel implements Cacheable {
     }
 
     public boolean store(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
-        if (snapshotManager.getInitialSnapshot().isSolidEntryPoint(hash) || exists(tangle, hash)) {
+        if (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hash) || exists(tangle, hash)) {
             return false;
         }
 
@@ -427,8 +424,8 @@ public class TransactionViewModel implements Cacheable {
             try {
                 // cover the trivial case first -> for faster bottom up propagation
                 if(
-                    (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle))) &&
-                    (snapshotManager.getInitialSnapshot().isSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle)))
+                    (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle))) &&
+                    (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle)))
                 ) {
                     // calculate the correct value ...
                     updateReferencedSnapshotOfLeaf(tangle, snapshotManager, this);
@@ -559,7 +556,7 @@ public class TransactionViewModel implements Cacheable {
     private void updateReferencedSnapshotOfLeaf(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel transaction) throws Exception {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
-        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getBranchTransactionHash())) {
+        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transaction.getBranchTransactionHash())) {
             referencedSnapshotOfBranch = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getBranchTransactionHash());
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
@@ -577,7 +574,7 @@ public class TransactionViewModel implements Cacheable {
 
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
-        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(transaction.getTrunkTransactionHash())) {
+        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transaction.getTrunkTransactionHash())) {
             referencedSnapshotOfTrunk = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getTrunkTransactionHash());
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
@@ -698,7 +695,7 @@ public class TransactionViewModel implements Cacheable {
         TransactionViewModel transactionVM = this, trunk = this.getTrunkTransaction(tangle);
         Stack<Hash> transactionViewModels = new Stack<>();
         transactionViewModels.push(transactionVM.getHash());
-        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(trunk.getHash())) {
+        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(trunk.getHash())) {
             transactionVM = trunk;
             trunk = transactionVM.getTrunkTransaction(tangle);
             transactionViewModels.push(transactionVM.getHash());
@@ -706,8 +703,8 @@ public class TransactionViewModel implements Cacheable {
         while(transactionViewModels.size() != 0) {
             transactionVM = TransactionViewModel.fromHash(tangle, transactionViewModels.pop());
             long currentHeight = transactionVM.getHeight();
-            if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(trunk.getHash()) && trunk.getHeight() == 0
-                    && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionVM.getHash())) {
+            if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(trunk.getHash()) && trunk.getHeight() == 0
+                    && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionVM.getHash())) {
                 if(currentHeight != 1L ){
                     transactionVM.updateHeight(1L);
                     transactionVM.update(tangle, snapshotManager, "height");

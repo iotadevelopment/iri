@@ -142,7 +142,7 @@ public class LedgerValidator {
      * a transaction while the transaction confirmed marker is mutually exclusive to {mark}
      * // old @param hash start of the update tree
      * @param hash tail to traverse from
-     * @param index milestoneTracker index
+     * @param index milestone index
      * @throws Exception
      */
     private void updateSnapshotIndexOfMilestoneTransactions(Hash hash, int index) throws Exception {

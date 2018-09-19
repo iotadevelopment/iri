@@ -14,7 +14,6 @@ import com.iota.iri.utils.collections.interfaces.BoundedSet;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.SetUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,7 +90,7 @@ public class CumulativeWeightCalculator implements RatingCalculator{
             txApprovers = new HashSet<>(appHashes.size());
             for (Hash appHash : appHashes) {
                 //if not genesis (the tx that confirms itself)
-                if (!snapshotManager.getInitialSnapshot().isSolidEntryPoint(appHash)) {
+                if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(appHash)) {
                     txApprovers.add(appHash);
                 }
             }

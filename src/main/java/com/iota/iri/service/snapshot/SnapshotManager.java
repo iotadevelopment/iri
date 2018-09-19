@@ -124,7 +124,7 @@ public class SnapshotManager {
                     try {
                         takeLocalSnapshot();
                     } catch(SnapshotException e) {
-                        log.error("Error while taking local snapshot: " + e.getMessage());
+                        log.error("error while taking local snapshot", e);
                     }
                 }
 
@@ -541,7 +541,7 @@ public class SnapshotManager {
         try {
             targetSnapshot = generateSnapshot(targetMilestone);
         } catch(Exception e) {
-            throw new SnapshotException("could not generate the snapshot");
+            throw new SnapshotException("could not generate the snapshot", e);
         }
 
         try {

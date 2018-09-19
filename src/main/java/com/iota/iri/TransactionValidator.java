@@ -1,6 +1,5 @@
 package com.iota.iri;
 
-import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.Curl;
@@ -10,7 +9,6 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.zmq.MessageQ;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +81,7 @@ public class TransactionValidator {
         }
 
         if (transactionViewModel.getAttachmentTimestamp() == 0) {
-            return transactionViewModel.getTimestamp() < snapshotManager.getInitialSnapshot().getTimestamp() && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(transactionViewModel.getHash())
+            return transactionViewModel.getTimestamp() < snapshotManager.getInitialSnapshot().getTimestamp() && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getHash())
                     || transactionViewModel.getTimestamp() > (System.currentTimeMillis() / 1000) + MAX_TIMESTAMP_FUTURE;
         }
         return transactionViewModel.getAttachmentTimestamp() < (snapshotManager.getInitialSnapshot().getTimestamp() * 1000L)
@@ -182,7 +180,7 @@ public class TransactionValidator {
 
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
-                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().isSolidEntryPoint(hashPointer)) {
+                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hashPointer)) {
                         transactionRequester.requestTransaction(hashPointer, milestone);
                         solid = false;
                         break;
@@ -311,7 +309,7 @@ public class TransactionValidator {
             transactionRequester.requestTransaction(approovee.getHash(), false);
             return false;
         }
-        if(snapshotManager.getInitialSnapshot().isSolidEntryPoint(approovee.getHash())) {
+        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approovee.getHash())) {
             return true;
         }
         return approovee.isSolid();

@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 /**
  * This class represents a "snapshot" of the ledger at a given time.
  *
- * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the state and its
+ * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the balances and its
  * {@link SnapshotMetaData} which holds several information about the snapshot like its timestamp, its corresponding
  * milestone index and so on.
  */
@@ -24,17 +24,17 @@ public class Snapshot {
     /**
      * Lock object allowing to block access to this object from different threads.
      */
-    protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
      * Holds a reference to the state of this snapshot.
      */
-    protected final SnapshotState state;
+    final SnapshotState state;
 
     /**
      * Holds a reference to the metadata of this snapshot.
      */
-    protected final SnapshotMetaData metaData;
+    final SnapshotMetaData metaData;
 
     /**
      * Constructor of the Snapshot class.
@@ -71,7 +71,7 @@ public class Snapshot {
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
      * themselves.
      */
-    public void lockWrite() {
+    private void lockWrite() {
         readWriteLock.writeLock().lock();
     }
 
@@ -97,7 +97,7 @@ public class Snapshot {
      * A more fine-grained control over the locks can be achieved by invoking the lock methods in the child objects
      * themselves.
      */
-    public void unlockWrite() {
+    private void unlockWrite() {
         readWriteLock.writeLock().unlock();
     }
 
@@ -108,6 +108,7 @@ public class Snapshot {
      *
      * @return deep copy of the original object
      */
+    @Override
     public Snapshot clone() {
         // lock the object for reading
         lockRead();
@@ -125,7 +126,7 @@ public class Snapshot {
 
     // UTILITY METHODS /////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public Hash getInitialHash() {
+    private Hash getInitialHash() {
         lockRead();
 
         try {
@@ -135,7 +136,7 @@ public class Snapshot {
         }
     }
 
-    public int getInitialIndex() {
+    private int getInitialIndex() {
         lockRead();
 
         try {
@@ -145,7 +146,7 @@ public class Snapshot {
         }
     }
 
-    public long getInitialTimestamp() {
+    private long getInitialTimestamp() {
         lockRead();
 
         try {
@@ -213,8 +214,8 @@ public class Snapshot {
      *
      * After checking the validity of the parameters we simply roll back the last milestone until we reach a point that
      *
-     * @param targetMilestoneIndex
-     * @param tangle
+     * @param targetMilestoneIndex the index of the milestone that should be rolled back
+     * @param tangle Tangle object which acts as a database interface
      */
     public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         if(targetMilestoneIndex <= getInitialIndex()) {
@@ -228,8 +229,9 @@ public class Snapshot {
         lockWrite();
 
         try {
-            while (targetMilestoneIndex <= getIndex() && rollbackLastMilestone(tangle)) {
-                /* do nothing but rollback */
+            boolean rollbackSuccessful = true;
+            while (targetMilestoneIndex <= getIndex() && rollbackSuccessful) {
+                rollbackSuccessful = rollbackLastMilestone(tangle);
             }
         } finally {
             unlockWrite();
@@ -238,7 +240,7 @@ public class Snapshot {
 
     private HashSet<Integer> skippedMilestones = new HashSet<>();
 
-    public boolean rollbackLastMilestone(Tangle tangle) throws SnapshotException {
+    private boolean rollbackLastMilestone(Tangle tangle) throws SnapshotException {
         lockWrite();
 
         try {
@@ -248,7 +250,7 @@ public class Snapshot {
 
             // revert the last balance changes
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, getHash());
-            if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+            if(!stateDiffViewModel.isEmpty()) {
                 SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
                     stateDiffViewModel.getDiff().entrySet().stream().map(
                         hashLongEntry -> new HashMap.SimpleEntry<>(
@@ -269,9 +271,9 @@ public class Snapshot {
             }
 
             // jump skipped milestones
-            int currentIndex = getIndex();
-            while(skippedMilestones.remove(--currentIndex)) {
-                /* do nothing */
+            int currentIndex = getIndex() - 1;
+            while(skippedMilestones.remove(currentIndex)) {
+                currentIndex--;
             }
 
             // check if we arrived at the start
@@ -305,7 +307,7 @@ public class Snapshot {
                 MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                 if (currentMilestone != null) {
                     StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
-                    if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
+                    if(!stateDiffViewModel.isEmpty()) {
                         state.applyStateDiff(new SnapshotStateDiff(stateDiffViewModel.getDiff()));
                     }
 
@@ -345,7 +347,7 @@ public class Snapshot {
         }
     }
 
-    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
+    void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
         lockWrite();
 
         try {
@@ -365,10 +367,6 @@ public class Snapshot {
         }
     }
 
-    public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return metaData.solidEntryPoints.containsKey(solidEntrypoint);
-    }
-
     /**
      * This is a utility method for determining if a given hash is a solid entry point.
      *
@@ -379,7 +377,7 @@ public class Snapshot {
      * @param transactionHash hash of the referenced transaction that shall be checked
      * @return true if it is a solid entry point and false otherwise
      */
-    public boolean isSolidEntryPoint(Hash transactionHash) {
+    public boolean hasSolidEntryPoint(Hash transactionHash) {
         lockRead();
 
         try {
@@ -440,8 +438,6 @@ public class Snapshot {
      * Even though the index is not directly stored in this object, we offer the ability to read it from the Snapshot
      * itself, without having to retrieve the metadata first. This is mainly to keep the code more readable, without
      * having to manually traverse the necessary references.
-     *
-     * @return the milestone index of the snapshot
      */
     public void setIndex(int index) {
         lockWrite();
@@ -480,8 +476,6 @@ public class Snapshot {
      * Even though the timestamp is not directly stored in this object, we offer the ability to read it from the
      * Snapshot itself, without having to retrieve the metadata first. This is mainly to keep the code more readable,
      * without having to manually traverse the necessary references.
-     *
-     * @return the timestamp when the snapshot was updated or created
      */
     public void setTimestamp(long timestamp) {
         lockWrite();
@@ -493,7 +487,7 @@ public class Snapshot {
         }
     }
 
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
+    void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
         lockWrite();
 
         try {
@@ -513,7 +507,7 @@ public class Snapshot {
         }
     }
 
-    public boolean hasCorrectSupply() {
+    boolean hasCorrectSupply() {
         lockRead();
 
         try {
