@@ -210,12 +210,12 @@ public class MilestoneSolidifier {
 
         try {
             return transactionValidator.checkSolidity(
-            earliestMilestoneHash,
-            true,
-            2 ^ Math.min(
-            earliestMilestoneTries++ / SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL,
-            SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT
-            ) * SOLIDIFICATION_TRANSACTIONS_LIMIT
+                earliestMilestoneHash,
+                true,
+                2 ^ Math.min(
+                    earliestMilestoneTries++ / SOLIDIFICATION_TRANSACTIONS_LIMIT_INCREMENT_INTERVAL,
+                    SOLIDIFICATION_TRANSACTIONS_LIMIT_MAX_INCREMENT
+                ) * SOLIDIFICATION_TRANSACTIONS_LIMIT
             );
         } catch (Exception e) {
             statusLogger.error("Error while solidifying milestone #" + earliestMilestoneIndex, e);
@@ -234,8 +234,8 @@ public class MilestoneSolidifier {
      */
     private boolean processSolidificationTask() {
         if (earliestMilestoneHash != null && (
-        earliestMilestoneIndex <= snapshotManager.getInitialSnapshot().getIndex() ||
-        earliestMilestoneIsSolid()
+            earliestMilestoneIndex <= snapshotManager.getInitialSnapshot().getIndex() ||
+            earliestMilestoneIsSolid()
         )) {
             nextEarliestMilestone();
 
