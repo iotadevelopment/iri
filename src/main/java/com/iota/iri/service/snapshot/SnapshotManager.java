@@ -44,7 +44,7 @@ public class SnapshotManager {
 
     public static int SNAPSHOT_PUBKEY_DEPTH = 6;
 
-    public static int SNAPSHOT_INDEX = 6;
+    public static int SNAPSHOT_INDEX = 9;
 
     public static int SPENT_ADDRESSES_INDEX = 7;
 
