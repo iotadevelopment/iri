@@ -84,7 +84,7 @@ public class TCPNeighbor extends Neighbor {
      */
     @Override
     public void send(DatagramPacket packet) {
-        synchronized (sendQueue) {
+        //synchronized (sendQueue) {
             if (sendQueue.remainingCapacity() == 0) {
                 sendQueue.poll();
                 log.debug("Sendqueue full...dropped 1 tx");
@@ -92,7 +92,7 @@ public class TCPNeighbor extends Neighbor {
             log.debug("Sendqueue size: {}",sendQueue.size());
             byte[] bytes = packet.getData().clone();
             sendQueue.add(ByteBuffer.wrap(bytes));
-        }
+        //}
             
     }
 
