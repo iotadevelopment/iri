@@ -366,6 +366,8 @@ public class Node {
 
         boolean stored = false;
 
+        System.out.println(receivedTransactionViewModel.getHash());
+
         //store new transaction
         try {
             stored = receivedTransactionViewModel.store(tangle, snapshotManager);
