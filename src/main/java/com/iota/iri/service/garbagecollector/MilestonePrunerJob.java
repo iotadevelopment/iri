@@ -137,7 +137,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      * @throws GarbageCollectorException if anything goes wrong while processing the jobs
      */
     private static void processQueue(GarbageCollector garbageCollector, ArrayDeque<GarbageCollectorJob> jobQueue) throws GarbageCollectorException {
-        while(!garbageCollector.shuttingDown && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).targetIndex < ((MilestonePrunerJob) jobQueue.getFirst()).currentIndex) {
+        while(!Thread.interrupted() && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).targetIndex < ((MilestonePrunerJob) jobQueue.getFirst()).currentIndex) {
             MilestonePrunerJob firstJob = (MilestonePrunerJob) jobQueue.removeFirst();
             firstJob.process();
 
@@ -216,7 +216,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
      * @throws GarbageCollectorException if anything goes wrong while cleaning up or persisting the changes
      */
     public void process() throws GarbageCollectorException {
-        while(!garbageCollector.shuttingDown && targetIndex < currentIndex) {
+        while(!Thread.interrupted() && targetIndex < currentIndex) {
             cleanupMilestoneTransactions();
 
             currentIndex--;
@@ -251,7 +251,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
             if (milestoneViewModel != null) {
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                if (!garbageCollector.snapshotManager.getInitialSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
+                if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(milestoneViewModel.getHash())) {
                     garbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
                 }
                 DAGHelper.get(garbageCollector.tangle).traverseApprovees(
@@ -260,7 +260,7 @@ public class MilestonePrunerJob extends GarbageCollectorJob {
                 approvedTransaction -> {
                     elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
-                    if (!garbageCollector.snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
+                    if (!garbageCollector.snapshotManager.getInitialSnapshot().isSolidEntryPoint(approvedTransaction.getHash())) {
                         try {
                             garbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
                         } catch(GarbageCollectorException e) {
