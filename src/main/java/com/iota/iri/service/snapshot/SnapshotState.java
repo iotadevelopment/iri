@@ -198,6 +198,11 @@ public class SnapshotState {
         return this.balances.get(address);
     }
 
+    protected void update(SnapshotState newState) {
+        balances.clear();
+        balances.putAll(newState.balances);
+    }
+
     /**
      * This method creates a deep clone of the current state.
      *

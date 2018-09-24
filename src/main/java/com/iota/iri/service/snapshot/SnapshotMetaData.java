@@ -184,8 +184,8 @@ public class SnapshotMetaData implements Cloneable {
         this.index = index;
         this.initialTimestamp = timestamp;
         this.timestamp = timestamp;
-        this.solidEntryPoints = solidEntryPoints;
-        this.seenMilestones = seenMilestones;
+        this.solidEntryPoints = new HashMap<>(solidEntryPoints);
+        this.seenMilestones = new HashMap<>(seenMilestones);
     }
 
     /**
@@ -197,6 +197,17 @@ public class SnapshotMetaData implements Cloneable {
      */
     public void setHash(Hash hash) {
         this.hash = hash;
+    }
+
+    /**
+     * This method is the getter of the initial milestone hash.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return initial transaction hash of the milestone that the {@link SnapshotMetaData} was created with
+     */
+    public Hash getInitialHash() {
+        return initialHash;
     }
 
     /**
@@ -233,6 +244,17 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     /**
+     * This method is the getter of the initial milestone index.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return initial milestone index that the {@link SnapshotMetaData} was created with
+     */
+    public int getInitialIndex() {
+        return initialIndex;
+    }
+
+    /**
      * This method is the setter of the timestamp.
      *
      * It simply stores the passed value in the private property.
@@ -254,6 +276,16 @@ public class SnapshotMetaData implements Cloneable {
         return this.timestamp;
     }
 
+    /**
+     * This method is the getter of the initial timestamp of the milestone transaction.
+     *
+     * It simply returns the stored private property.
+     *
+     * @return initial timestamp of the milestone transaction that the {@link SnapshotMetaData} was created with
+     */
+    public long getInitialTimestamp() {
+        return initialTimestamp;
+    }
 
 
 
@@ -373,12 +405,20 @@ public class SnapshotMetaData implements Cloneable {
      * @return deep copy of the original object
      */
     public SnapshotMetaData clone() {
-        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, (HashMap) solidEntryPoints.clone(), (HashMap) seenMilestones.clone());
+        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, solidEntryPoints, seenMilestones);
 
         result.setIndex(index);
         result.setHash(hash);
         result.setTimestamp(timestamp);
 
         return result;
+    }
+
+    protected void update(SnapshotMetaData newMetaData) {
+        timestamp = newMetaData.getTimestamp();
+        hash = newMetaData.getHash();
+        index = newMetaData.getIndex();
+        solidEntryPoints = new HashMap<>(newMetaData.solidEntryPoints);
+        seenMilestones = new HashMap<>(newMetaData.seenMilestones);
     }
 }

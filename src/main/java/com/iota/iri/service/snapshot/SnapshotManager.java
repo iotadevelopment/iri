@@ -93,6 +93,7 @@ public class SnapshotManager {
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
         snapshotGarbageCollector = new GarbageCollector(tangle, this, tipsViewModel);
+        snapshotGarbageCollector.restoreCleanupJobs();
     }
 
     public void init(MilestoneTracker milestoneTracker) {
@@ -169,59 +170,6 @@ public class SnapshotManager {
      */
     public Snapshot getLatestSnapshot() {
         return latestSnapshot;
-    }
-
-    /**
-     * This method resets the SnapshotManager and sets the latestSnapshot value back to its starting point.
-     *
-     * This can be used to recover from errors if the state of the Snapshot ever becomes corrupted (due to syncing or
-     * processing errors).
-     */
-    public void resetLatestSnapshot() {
-        latestSnapshot = initialSnapshot.clone();
-    }
-
-    public void calculateSnapshotState(Snapshot snapshot, MilestoneViewModel currentMilestone, int generationMode) throws SnapshotException {
-        // retrieve the balance diff from the db
-        StateDiffViewModel stateDiffViewModel;
-        try {
-            stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
-        } catch(Exception e) {
-            throw new SnapshotException("could not retrieve the StateDiff for " + currentMilestone.toString(), e);
-        }
-
-        // if we have a diff apply it (the values get multiplied by the generationMode to reflect the direction)
-        if(stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-            // create the SnapshotStateDiff object for our changes
-            SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
-            stateDiffViewModel.getDiff().entrySet().stream().map(
-            hashLongEntry -> new HashMap.SimpleEntry<>(
-            hashLongEntry.getKey(), generationMode * hashLongEntry.getValue()
-            )
-            ).collect(
-            Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-            )
-            );
-
-            // this should never happen since we check the StateDiffs already when applying them in the
-            // MilestoneTracker but better give a reasonable error message if it ever does
-            if(!snapshotStateDiff.isConsistent()) {
-                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() + " is inconsistent");
-            }
-
-            // apply the balance changes to the snapshot
-            snapshot.update(
-            snapshotStateDiff,
-            currentMilestone.index(),
-            currentMilestone.getHash()
-            );
-
-            // this should never happen since we check the snapshots already when applying them but better give
-            // a reasonable error message if it ever does
-            if(!snapshot.hasCorrectSupply() || !snapshot.isConsistent()) {
-                throw new SnapshotException("the StateDiff belonging to " + currentMilestone.toString() +" leads to an invalid supply");
-            }
-        }
     }
 
     /**
@@ -501,14 +449,14 @@ public class SnapshotManager {
 
             // return our snapshot
             builtinSnapshot = new Snapshot(
-            snapshotState,
-            new SnapshotMetaData(
-            Hash.NULL_HASH,
-            milestoneStartIndex,
-            configuration.getSnapshotTime(),
-            solidEntryPoints,
-            new HashMap<>()
-            )
+                snapshotState,
+                new SnapshotMetaData(
+                    Hash.NULL_HASH,
+                    milestoneStartIndex,
+                    configuration.getSnapshotTime(),
+                    solidEntryPoints,
+                    new HashMap<>()
+                )
             );
         }
 

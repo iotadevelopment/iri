@@ -441,8 +441,6 @@ public class MilestoneTracker {
                                 } catch(SnapshotException e) {
                                     log.error("could not reset ledger to missing milestone: " + index);
                                 }
-
-                                //hardReset(newMilestoneViewModel, snapshotManager.getLatestSnapshot().getIndex(), "previously unknown milestone (#" + index + ") appeared");
                             }
                             return VALID;
                         } else {
@@ -487,7 +485,11 @@ public class MilestoneTracker {
                 nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotManager.getLatestSnapshot().getIndex());
             } else {
                 if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
-                    resetCorruptedMilestone(nextMilestone.index() - binaryBackoffCounter, "updateLatestSolidSubtangleMilestone");
+                    int currentIndex = nextMilestone.index();
+                    int targetIndex = nextMilestone.index() - binaryBackoffCounter;
+                    for (int i = currentIndex; i >= targetIndex; i--) {
+                        resetCorruptedMilestone(i, "updateLatestSolidSubtangleMilestone");
+                    }
 
                     if(binaryBackoffCounter++ == 0) {
                         errorCausingMilestone = nextMilestone.index();
