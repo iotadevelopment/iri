@@ -58,7 +58,7 @@ public class Snapshot {
     /**
      * Constructor of the Snapshot class.
      *
-     * It simply saves the passed parameters in its private properties.
+     * It simply saves the passed parameters in its protected properties.
      *
      * @param state the state of the Snapshot containing all its balances
      * @param metaData the metadata of the Snapshot containing its milestone index and other properties
@@ -115,7 +115,7 @@ public class Snapshot {
      *
      * Note: the changes done by this method can be reverted by using {@link #rollBackMilestones(int, Tangle)}
      *
-     * @param targetMilestoneIndex the index of the milestone that should be rolled back
+     * @param targetMilestoneIndex the index of the milestone that should be applied
      * @param tangle Tangle object which acts as a database interface
      */
     public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
@@ -163,7 +163,8 @@ public class Snapshot {
      *
      * Note: this method is used to reverse the changes introduced by {@link #replayMilestones(int, Tangle)}
      *
-     * @param targetMilestoneIndex the index of the milestone that should be rolled back
+     * @param targetMilestoneIndex the index of the milestone that should be rolled back (including all following
+     *                             milestones that were applied)
      * @param tangle Tangle object which acts as a database interface
      */
     public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
@@ -202,7 +203,7 @@ public class Snapshot {
     /**
      * This method creates a deep clone of the Snapshot object.
      *
-     * It can be used to make a copy of the object, that then can be modified without affecting the original object.
+     * It can be used to make a copy of the object, that can be modified without affecting the original object.
      *
      * @return deep copy of the original object
      */
@@ -229,16 +230,16 @@ public class Snapshot {
      * @throws SnapshotException if anything goes wrong while accessing the database
      */
     private boolean rollbackLastMilestone(Tangle tangle) throws SnapshotException {
+        if (getIndex() == getInitialIndex()) {
+            return false;
+        }
+
         lockWrite();
 
         try {
-            if(getIndex() == getInitialIndex()) {
-                return false;
-            }
-
             // revert the last balance changes
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, getHash());
-            if(!stateDiffViewModel.isEmpty()) {
+            if (!stateDiffViewModel.isEmpty()) {
                 SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
                     stateDiffViewModel.getDiff().entrySet().stream().map(
                         hashLongEntry -> new HashMap.SimpleEntry<>(
@@ -258,14 +259,14 @@ public class Snapshot {
                 state.applyStateDiff(snapshotStateDiff);
             }
 
-            // jump skipped milestoness
+            // jump skipped milestones
             int currentIndex = getIndex() - 1;
-            while(skippedMilestones.remove(currentIndex)) {
+            while (skippedMilestones.remove(currentIndex)) {
                 currentIndex--;
             }
 
             // check if we arrived at the start
-            if(currentIndex <= getInitialIndex()) {
+            if (currentIndex <= getInitialIndex()) {
                 metaData.setIndex(getInitialIndex());
                 metaData.setHash(getInitialHash());
                 metaData.setTimestamp(getInitialTimestamp());

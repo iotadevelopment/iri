@@ -114,14 +114,16 @@ public class MilestoneSolidifier {
      * @param milestoneIndex index of the milestone that shall be solidified
      */
     public void add(Hash milestoneHash, int milestoneIndex) {
-        if (milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()) {
-            if (milestoneIndex < earliestUnsolidMilestoneIndex) {
-                earliestUnsolidMilestoneHash = milestoneHash;
-                earliestUnsolidMilestoneIndex = milestoneIndex;
-                earliestUnsolidMilestoneSolidificationAttempts = 0;
-            }
+        synchronized (this) {
+            if (milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()) {
+                if (milestoneIndex < earliestUnsolidMilestoneIndex) {
+                    earliestUnsolidMilestoneHash = milestoneHash;
+                    earliestUnsolidMilestoneIndex = milestoneIndex;
+                    earliestUnsolidMilestoneSolidificationAttempts = 0;
+                }
 
-            unsolidMilestones.put(milestoneHash, milestoneIndex);
+                unsolidMilestones.put(milestoneHash, milestoneIndex);
+            }
         }
     }
 
@@ -172,10 +174,12 @@ public class MilestoneSolidifier {
      * @return the Map.Entry holding the earliest milestone or a default Map.Entry(null, Integer.MAX_VALUE)
      */
     private Map.Entry<Hash, Integer> getEarliestUnsolidMilestoneEntry() {
-        try {
-            return Collections.min(unsolidMilestones.entrySet(), comparingInt(Map.Entry::getValue));
-        } catch (NoSuchElementException e) {
-            return new AbstractMap.SimpleEntry<>(null, Integer.MAX_VALUE);
+        synchronized (this) {
+            try {
+                return Collections.min(unsolidMilestones.entrySet(), comparingInt(Map.Entry::getValue));
+            } catch (NoSuchElementException e) {
+                return new AbstractMap.SimpleEntry<>(null, Integer.MAX_VALUE);
+            }
         }
     }
 
@@ -186,13 +190,15 @@ public class MilestoneSolidifier {
      * It is used to cycle through the unsolid milestones as they become solid or irrelevant for our node.
      */
     private void nextEarliestMilestone() {
-        unsolidMilestones.remove(earliestUnsolidMilestoneHash);
+        synchronized (this) {
+            unsolidMilestones.remove(earliestUnsolidMilestoneHash);
 
-        Map.Entry<Hash, Integer> nextEarliestMilestone = getEarliestUnsolidMilestoneEntry();
+            Map.Entry<Hash, Integer> nextEarliestMilestone = getEarliestUnsolidMilestoneEntry();
 
-        earliestUnsolidMilestoneHash = nextEarliestMilestone.getKey();
-        earliestUnsolidMilestoneIndex = nextEarliestMilestone.getValue();
-        earliestUnsolidMilestoneSolidificationAttempts = 0;
+            earliestUnsolidMilestoneHash = nextEarliestMilestone.getKey();
+            earliestUnsolidMilestoneIndex = nextEarliestMilestone.getValue();
+            earliestUnsolidMilestoneSolidificationAttempts = 0;
+        }
     }
 
     /**
