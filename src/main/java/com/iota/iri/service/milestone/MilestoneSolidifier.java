@@ -115,32 +115,30 @@ public class MilestoneSolidifier {
     }
 
     private void addToSolidificationQueue(Hash milestoneHash) {
-        synchronized (this) {
-            // if the the candidate is already selected -> abort
-            if (milestonesToSolidify.contains(milestoneHash)) {
-                return;
+        // if the the candidate is already selected -> abort
+        if (milestonesToSolidify.contains(milestoneHash)) {
+            return;
+        }
+
+        // if there is enough space -> just add and update the oldest pointer
+        if (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE) {
+            milestonesToSolidify.add(milestoneHash);
+
+            if (oldestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) > unsolidMilestonesPool.get(oldestMilestoneMarker)) {
+                oldestMilestoneMarker = milestoneHash;
             }
 
-            // if there is enough space -> just add and update the oldest pointer
-            if (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE) {
-                milestonesToSolidify.add(milestoneHash);
-
-                if (oldestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) > unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-                    oldestMilestoneMarker = milestoneHash;
-                }
-
-                if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(youngestMilestoneMarker)) {
-                    youngestMilestoneMarker = milestoneHash;
-                }
+            if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(youngestMilestoneMarker)) {
+                youngestMilestoneMarker = milestoneHash;
             }
+        }
 
-            // otherwise replace the oldest milestone if this one is younger
-            else if (unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-                milestonesToSolidify.remove(oldestMilestoneMarker);
-                milestonesToSolidify.add(milestoneHash);
+        // otherwise replace the oldest milestone if this one is younger
+        else if (unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(oldestMilestoneMarker)) {
+            milestonesToSolidify.remove(oldestMilestoneMarker);
+            milestonesToSolidify.add(milestoneHash);
 
-                determineOldestMilestoneMarker();
-            }
+            determineOldestMilestoneMarker();
         }
     }
 
@@ -160,10 +158,6 @@ public class MilestoneSolidifier {
             milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()
         ) {
             unsolidMilestonesPool.put(milestoneHash, milestoneIndex);
-
-            if(oldestMilestoneMarker == null || milestoneIndex < unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-                addToSolidificationQueue(milestoneHash);
-            }
         }
     }
 
@@ -210,25 +204,23 @@ public class MilestoneSolidifier {
      * It is getting called by the solidification thread in regular intervals.
      */
     private void processSolidificationQueue() {
-        synchronized (this) {
-            // process milestones and remove finished ones
-            for (Iterator<Hash> iterator = milestonesToSolidify.iterator(); iterator.hasNext(); ) {
-                Hash currentHash = iterator.next();
+        // process milestones and remove finished ones
+        for (Iterator<Hash> iterator = milestonesToSolidify.iterator(); iterator.hasNext(); ) {
+            Hash currentHash = iterator.next();
 
-                if (
-                    unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
-                    isSolid(currentHash)
-                ) {
-                    unsolidMilestonesPool.remove(currentHash);
-                    iterator.remove();
+            if (
+                unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
+                isSolid(currentHash)
+            ) {
+                unsolidMilestonesPool.remove(currentHash);
+                iterator.remove();
 
-                    if (currentHash.equals(oldestMilestoneMarker)) {
-                        oldestMilestoneMarker = null;
-                    }
+                if (currentHash.equals(oldestMilestoneMarker)) {
+                    oldestMilestoneMarker = null;
+                }
 
-                    if (currentHash.equals(youngestMilestoneMarker)) {
-                        youngestMilestoneMarker = null;
-                    }
+                if (currentHash.equals(youngestMilestoneMarker)) {
+                    youngestMilestoneMarker = null;
                 }
             }
         }
