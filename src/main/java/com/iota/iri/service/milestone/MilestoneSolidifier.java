@@ -282,8 +282,8 @@ public class MilestoneSolidifier {
      * @return true if there are no unsolid milestones that have to be processed or if the earliest milestone is solid
      */
     private boolean isSolid(Hash hash) {
-        if (unsolidMilestonesPool.size() > 1 && youngestMilestoneMarker != null) {
-            statusLogger.status("Solidifying milestone #" + unsolidMilestonesPool.get(youngestMilestoneMarker) + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
+        if (unsolidMilestonesPool.size() > 1) {
+            statusLogger.status("Solidifying milestone #" + unsolidMilestonesPool.get(hash) + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
         }
 
         try {
