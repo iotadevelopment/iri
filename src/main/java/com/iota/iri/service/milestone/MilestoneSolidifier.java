@@ -68,6 +68,8 @@ public class MilestoneSolidifier {
 
     private Hash oldestMilestoneMarker = null;
 
+    private Hash youngestMilestoneMarker = null;
+
     /**
      * Holds the amount of solidity checks issued for the earliest milestone.
      */
@@ -103,6 +105,15 @@ public class MilestoneSolidifier {
         }
     }
 
+    private void determineYoungestMilestoneMarker() {
+        youngestMilestoneMarker = null;
+        for (Hash currentHash : milestonesToSolidify) {
+            if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(currentHash) > unsolidMilestonesPool.get(youngestMilestoneMarker)) {
+                youngestMilestoneMarker = currentHash;
+            }
+        }
+    }
+
     private void addToSolidificationQueue(Hash milestoneHash) {
         synchronized (this) {
             // if the the candidate is already selected -> abort
@@ -116,6 +127,10 @@ public class MilestoneSolidifier {
 
                 if (oldestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) > unsolidMilestonesPool.get(oldestMilestoneMarker)) {
                     oldestMilestoneMarker = milestoneHash;
+                }
+
+                if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(youngestMilestoneMarker)) {
+                    youngestMilestoneMarker = milestoneHash;
                 }
             }
 
@@ -210,6 +225,10 @@ public class MilestoneSolidifier {
                     if (currentHash.equals(oldestMilestoneMarker)) {
                         oldestMilestoneMarker = null;
                     }
+
+                    if (currentHash.equals(youngestMilestoneMarker)) {
+                        youngestMilestoneMarker = null;
+                    }
                 }
             }
         }
@@ -222,6 +241,10 @@ public class MilestoneSolidifier {
 
         if(oldestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
             determineOldestMilestoneMarker();
+        }
+
+        if(youngestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
+            determineYoungestMilestoneMarker();
         }
     }
 
@@ -268,7 +291,7 @@ public class MilestoneSolidifier {
      */
     private boolean isSolid(Hash hash) {
         if (unsolidMilestonesPool.size() > 1) {
-            statusLogger.status("Solidifying milestone #" + unsolidMilestonesPool.get(hash) + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
+            statusLogger.status("Solidifying milestone #" + unsolidMilestonesPool.get(youngestMilestoneMarker) + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
         }
 
         try {
