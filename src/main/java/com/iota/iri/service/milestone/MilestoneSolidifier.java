@@ -272,15 +272,11 @@ public class MilestoneSolidifier {
         }
 
         try {
-            System.out.println("SOLIDIFYING " + hash);
-
             return transactionValidator.checkSolidity(hash, true, SOLIDIFICATION_TRANSACTIONS_LIMIT * 4);
         } catch (Exception e) {
             statusLogger.error("Error while solidifying milestone #" + unsolidMilestonesPool.get(hash), e);
 
             return false;
-        } finally {
-            System.out.println("DONE " + hash);
         }
     }
 }
