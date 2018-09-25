@@ -201,8 +201,8 @@ public class MilestoneSolidifier {
                 Hash currentHash = iterator.next();
 
                 if (
-                unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
-                isSolid(currentHash)
+                    unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
+                    isSolid(currentHash)
                 ) {
                     unsolidMilestonesPool.remove(currentHash);
                     iterator.remove();
@@ -274,7 +274,7 @@ public class MilestoneSolidifier {
         try {
             System.out.println("SOLIDIFYING " + hash);
 
-            return transactionValidator.checkSolidity(hash, true, SOLIDIFICATION_TRANSACTIONS_LIMIT);
+            return transactionValidator.checkSolidity(hash, true, SOLIDIFICATION_TRANSACTIONS_LIMIT * 4);
         } catch (Exception e) {
             statusLogger.error("Error while solidifying milestone #" + unsolidMilestonesPool.get(hash), e);
 
