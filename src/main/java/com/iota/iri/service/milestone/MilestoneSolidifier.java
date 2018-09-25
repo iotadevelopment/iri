@@ -195,29 +195,29 @@ public class MilestoneSolidifier {
      * It is getting called by the solidification thread in regular intervals.
      */
     private void processSolidificationQueue() {
-        for (Iterator<Hash> iterator = milestonesToSolidify.iterator(); iterator.hasNext();) {
-            Hash currentHash = iterator.next();
+        synchronized (this) {
+            for (Iterator<Hash> iterator = milestonesToSolidify.iterator(); iterator.hasNext();) {
+                Hash currentHash = iterator.next();
 
-            if (
-                unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
-                isSolid(currentHash)
-            ) {
-                synchronized (this) {
-                    unsolidMilestonesPool.remove(currentHash);
-                    iterator.remove();
+                if (
+                    unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
+                    isSolid(currentHash)
+                ) {
+                        unsolidMilestonesPool.remove(currentHash);
+                        iterator.remove();
 
-                    if (currentHash.equals(oldestMilestoneMarker)) {
-                        oldestMilestoneMarker = null;
-                    }
+                        if (currentHash.equals(oldestMilestoneMarker)) {
+                            oldestMilestoneMarker = null;
+                        }
 
-                    Hash nextSolidificationCandidate = getNextSolidificationCandidate();
-                    if (nextSolidificationCandidate != null) {
-                        addToSolidificationQueue(nextSolidificationCandidate);
-                    } else if(oldestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
-                        determineOldestMilestoneMarker();
+                        Hash nextSolidificationCandidate = getNextSolidificationCandidate();
+                        if (nextSolidificationCandidate != null) {
+                            addToSolidificationQueue(nextSolidificationCandidate);
+                        } else if(oldestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
+                            determineOldestMilestoneMarker();
+                        }
                     }
                 }
-            }
         }
     }
 
