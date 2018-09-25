@@ -216,7 +216,7 @@ public class MilestoneSolidifier {
 
         // fill up our queue again
         Hash nextSolidificationCandidate;
-        while (milestonesToSolidify.size() <= SOLIDIFICATION_QUEUE_SIZE && (nextSolidificationCandidate = getNextSolidificationCandidate()) != null) {
+        while (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE && (nextSolidificationCandidate = getNextSolidificationCandidate()) != null) {
             addToSolidificationQueue(nextSolidificationCandidate);
         }
 
