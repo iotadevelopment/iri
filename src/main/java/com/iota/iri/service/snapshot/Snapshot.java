@@ -187,7 +187,7 @@ public class Snapshot {
                 rollbackSuccessful = rollbackLastMilestone(tangle);
             }
 
-            if(targetMilestoneIndex > getIndex()) {
+            if(targetMilestoneIndex < getIndex()) {
                 throw new SnapshotException("failed to reach the target milestone index when rolling back the milestones");
             }
         } catch(SnapshotException e) {
