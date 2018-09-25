@@ -9,7 +9,7 @@ public class SnapshotException extends Exception {
     /**
      * Constructor of the exception which allows us to provide a specific error message and the cause of the error.
      *
-     * @param message reason why this error occured
+     * @param message reason why this error occurred
      * @param cause wrapped exception that caused this error
      */
     public SnapshotException(String message, Throwable cause) {
@@ -20,7 +20,7 @@ public class SnapshotException extends Exception {
      * Constructor of the exception which allows us to provide a specific error message without having an underlying
      * cause.
      *
-     * @param message reason why this error occured
+     * @param message reason why this error occurred
      */
     public SnapshotException(String message) {
         super(message);

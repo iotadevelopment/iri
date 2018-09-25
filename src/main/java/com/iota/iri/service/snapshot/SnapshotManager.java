@@ -20,11 +20,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
 public class SnapshotManager {
+    /**
+     * Logger for this class allowing us to dump debug and status messages.
+     */
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
 
     private static Snapshot builtinSnapshot = null;

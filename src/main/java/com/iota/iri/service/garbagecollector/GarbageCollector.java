@@ -245,15 +245,18 @@ public class GarbageCollector {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
-                () -> garbageCollectorJobs.entrySet().stream().flatMap(
-                    entry -> entry.getValue().stream()
-                ).<CharSequence>map(
-                    entry -> entry.getClass().getCanonicalName() + ";" + entry.serialize()
-                ).iterator()
+                () -> garbageCollectorJobs.values().stream()
+                      .flatMap(jobQueue -> jobQueue.stream())
+                      .<CharSequence>map(GarbageCollector::serializeJobEntry)
+                      .iterator()
             );
         } catch(IOException e) {
             throw new GarbageCollectorException("could not persists garbage collector state", e);
         }
+    }
+
+    private static String serializeJobEntry(GarbageCollectorJob job) {
+        return job.getClass().getCanonicalName() + ";" + job.serialize();
     }
 
     /**
