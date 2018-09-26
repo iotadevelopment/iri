@@ -59,14 +59,16 @@ public class MilestoneSolidifier {
      */
     private TransactionValidator transactionValidator;
 
+    private ConcurrentHashMap<Hash, Integer> newlyAddedMilestones = new ConcurrentHashMap<>();
+
     /**
      * List of unsolid milestones where we collect the milestones that shall be solidified.
      */
     private ConcurrentHashMap<Hash, Integer> unsolidMilestonesPool = new ConcurrentHashMap<>();
 
-    private HashSet<Hash> milestonesToSolidify = new HashSet<>();
+    private HashMap<Hash, Integer> milestonesToSolidify = new HashMap<>();
 
-    private Hash oldestMilestoneMarker = null;
+    private Map.Entry<Hash, Integer> oldestMilestoneMarker = null;
 
     private Hash youngestMilestoneMarker = null;
 
@@ -98,45 +100,32 @@ public class MilestoneSolidifier {
 
     private void determineOldestMilestoneMarker() {
         oldestMilestoneMarker = null;
-        for (Hash currentHash : milestonesToSolidify) {
-            if (oldestMilestoneMarker == null || unsolidMilestonesPool.get(currentHash) > unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-                oldestMilestoneMarker = currentHash;
+        for (Map.Entry<Hash, Integer> currentEntry : milestonesToSolidify.entrySet()) {
+            if (oldestMilestoneMarker == null || currentEntry.getValue() > oldestMilestoneMarker.getValue()) {
+                oldestMilestoneMarker = currentEntry;
             }
         }
     }
 
-    private void determineYoungestMilestoneMarker() {
-        youngestMilestoneMarker = null;
-        for (Hash currentHash : milestonesToSolidify) {
-            if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(currentHash) > unsolidMilestonesPool.get(youngestMilestoneMarker)) {
-                youngestMilestoneMarker = currentHash;
-            }
-        }
-    }
-
-    private void addToSolidificationQueue(Hash milestoneHash) {
+    private void addToSolidificationQueue(Map.Entry<Hash, Integer> milestoneEntry) {
         // if the the candidate is already selected -> abort
-        if (milestonesToSolidify.contains(milestoneHash)) {
+        if (milestonesToSolidify.containsKey(milestoneEntry.getKey())) {
             return;
         }
 
         // if there is enough space -> just add and update the oldest pointer
         if (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE) {
-            milestonesToSolidify.add(milestoneHash);
+            milestonesToSolidify.put(milestoneEntry.getKey(), milestoneEntry.getValue());
 
-            if (oldestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) > unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-                oldestMilestoneMarker = milestoneHash;
-            }
-
-            if (youngestMilestoneMarker == null || unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(youngestMilestoneMarker)) {
-                youngestMilestoneMarker = milestoneHash;
+            if (oldestMilestoneMarker == null || milestoneEntry.getValue() > oldestMilestoneMarker.getValue()) {
+                oldestMilestoneMarker = milestoneEntry;
             }
         }
 
         // otherwise replace the oldest milestone if this one is younger
-        else if (unsolidMilestonesPool.get(milestoneHash) < unsolidMilestonesPool.get(oldestMilestoneMarker)) {
-            milestonesToSolidify.remove(oldestMilestoneMarker);
-            milestonesToSolidify.add(milestoneHash);
+        else if (milestoneEntry.getValue() < oldestMilestoneMarker.getValue()) {
+            milestonesToSolidify.remove(oldestMilestoneMarker.getKey());
+            milestonesToSolidify.put(milestoneEntry.getKey(), milestoneEntry.getValue());
 
             determineOldestMilestoneMarker();
         }
@@ -155,9 +144,10 @@ public class MilestoneSolidifier {
     public void add(Hash milestoneHash, int milestoneIndex) {
         if (
             !unsolidMilestonesPool.containsKey(milestoneHash) &&
+            !newlyAddedMilestones.containsKey(milestoneHash) &&
             milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()
         ) {
-            unsolidMilestonesPool.put(milestoneHash, milestoneIndex);
+            newlyAddedMilestones.put(milestoneHash, milestoneIndex);
         }
     }
 
@@ -204,39 +194,44 @@ public class MilestoneSolidifier {
      * It is getting called by the solidification thread in regular intervals.
      */
     private void processSolidificationQueue() {
-        // process milestones and remove finished ones
-        for (Iterator<Hash> iterator = milestonesToSolidify.iterator(); iterator.hasNext(); ) {
-            Hash currentHash = iterator.next();
+        // process the newly added milestones first and check if they should get processed instead
+        for (Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<Hash, Integer> currentEntry = iterator.next();
+
+            unsolidMilestonesPool.put(currentEntry.getKey(), currentEntry.getValue());
+
+            if (oldestMilestoneMarker == null || currentEntry.getValue() < oldestMilestoneMarker.getValue()) {
+                addToSolidificationQueue(currentEntry);
+            }
+
+            iterator.remove();
+        }
+
+        // iterate through the
+        for (Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
             if (
-                unsolidMilestonesPool.get(currentHash) <= snapshotManager.getInitialSnapshot().getIndex() ||
-                isSolid(currentHash)
+                currentEntry.getValue() <= snapshotManager.getInitialSnapshot().getIndex() ||
+                isSolid(currentEntry)
             ) {
-                unsolidMilestonesPool.remove(currentHash);
+                unsolidMilestonesPool.remove(currentEntry.getKey());
                 iterator.remove();
 
-                if (currentHash.equals(oldestMilestoneMarker)) {
+                if (currentEntry.getKey().equals(oldestMilestoneMarker.getKey())) {
                     oldestMilestoneMarker = null;
-                }
-
-                if (currentHash.equals(youngestMilestoneMarker)) {
-                    youngestMilestoneMarker = null;
                 }
             }
         }
 
         // fill up our queue again
-        Hash nextSolidificationCandidate;
+        Map.Entry<Hash, Integer> nextSolidificationCandidate;
         while (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE && (nextSolidificationCandidate = getNextSolidificationCandidate()) != null) {
             addToSolidificationQueue(nextSolidificationCandidate);
         }
 
         if(oldestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
             determineOldestMilestoneMarker();
-        }
-
-        if(youngestMilestoneMarker == null && milestonesToSolidify.size() >= 1) {
-            determineYoungestMilestoneMarker();
         }
     }
 
@@ -248,20 +243,20 @@ public class MilestoneSolidifier {
      *
      * @return the Map.Entry holding the earliest milestone or a default Map.Entry(null, Integer.MAX_VALUE)
      */
-    private Hash getNextSolidificationCandidate() {
+    private Map.Entry<Hash, Integer> getNextSolidificationCandidate() {
         Map.Entry<Hash, Integer> nextSolidificationCandidate = null;
-        for (Map.Entry<Hash, Integer> milestone : unsolidMilestonesPool.entrySet()) {
+        for (Map.Entry<Hash, Integer> milestoneEntry : unsolidMilestonesPool.entrySet()) {
             if (
-                !milestonesToSolidify.contains(milestone.getKey()) && (
+                !milestonesToSolidify.containsKey(milestoneEntry.getKey()) && (
                     nextSolidificationCandidate == null ||
-                    milestone.getValue() < nextSolidificationCandidate.getValue()
+                    milestoneEntry.getValue() < nextSolidificationCandidate.getValue()
                 )
             ) {
-                nextSolidificationCandidate = milestone;
+                nextSolidificationCandidate = milestoneEntry;
             }
         }
 
-        return nextSolidificationCandidate == null ? null : nextSolidificationCandidate.getKey();
+        return nextSolidificationCandidate;
     }
 
     /**
@@ -281,15 +276,15 @@ public class MilestoneSolidifier {
      *
      * @return true if there are no unsolid milestones that have to be processed or if the earliest milestone is solid
      */
-    private boolean isSolid(Hash hash) {
+    private boolean isSolid(Map.Entry<Hash, Integer> currentEntry) {
         if (unsolidMilestonesPool.size() > 1) {
-            statusLogger.status("Solidifying milestone #" + unsolidMilestonesPool.get(hash) + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
+            statusLogger.status("Solidifying milestone #" + currentEntry.getValue() + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
         }
 
         try {
-            return transactionValidator.checkSolidity(hash, true, SOLIDIFICATION_TRANSACTIONS_LIMIT * 4);
+            return transactionValidator.checkSolidity(currentEntry.getKey(), true, SOLIDIFICATION_TRANSACTIONS_LIMIT * 4);
         } catch (Exception e) {
-            statusLogger.error("Error while solidifying milestone #" + unsolidMilestonesPool.get(hash), e);
+            statusLogger.error("Error while solidifying milestone #" + currentEntry.getValue(), e);
 
             return false;
         }
