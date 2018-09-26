@@ -96,8 +96,6 @@ public class LedgerValidator {
                             for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
 
                                 if(BundleValidator.isInconsistent(bundleTransactionViewModels)) {
-                                    System.out.println("woot");
-                                    System.out.println(bundleTransactionViewModels);
                                     break;
                                 }
                                 if (bundleTransactionViewModels.get(0).getHash().equals(transactionViewModel.getHash())) {
@@ -120,6 +118,10 @@ public class LedgerValidator {
                             }
                             if (!validBundle) {
                                 System.out.println(2);
+                                for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
+                                    System.out.println(bundleTransactionViewModels.get(0).getHash());
+                                    System.out.println(transactionViewModel.getHash());
+                                }
                                 return null;
                             }
                         }
