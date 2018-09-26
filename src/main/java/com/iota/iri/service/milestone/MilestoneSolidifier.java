@@ -116,9 +116,9 @@ public class MilestoneSolidifier {
      */
     public void add(Hash milestoneHash, int milestoneIndex) {
         if (
-        !unsolidMilestonesPool.containsKey(milestoneHash) &&
-        !newlyAddedMilestones.containsKey(milestoneHash) &&
-        milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()
+            !unsolidMilestonesPool.containsKey(milestoneHash) &&
+            !newlyAddedMilestones.containsKey(milestoneHash) &&
+            milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()
         ) {
             newlyAddedMilestones.put(milestoneHash, milestoneIndex);
         }
