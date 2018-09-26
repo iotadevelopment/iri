@@ -18,12 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * issues checkSolidity calls on the earliest milestones to solidify them.
  *
  * To save resources and make the call a little bit more efficient, we cache the earliest milestones in a separate map,
- * so the relatively expensive task of having to search for the next earliest milestone in the map only has to be
+ * so the relatively expensive task of having to search for the next earliest milestone in the pool only has to be
  * performed after a milestone has become solid or irrelevant for our node.
  */
 public class MilestoneSolidifier {
     /**
-     * Defines the amount of milestones that we "simultaneously" try to solidify.
+     * Defines the amount of milestones that we "simultaneously" try to solidify in one pass.
      */
     private static final int SOLIDIFICATION_QUEUE_SIZE = 10;
 
@@ -145,21 +145,6 @@ public class MilestoneSolidifier {
     }
 
     /**
-     * This method determines the youngest milestone in the solidification queue.
-     *
-     * It iterates over all milestones in the Queue and keeps track of the youngest one found (the one with the highest
-     * milestone index).
-     */
-    private void determineYoungestMilestoneInQueue() {
-        youngestMilestoneInQueue = null;
-        for (Map.Entry<Hash, Integer> currentEntry : milestonesToSolidify.entrySet()) {
-            if (youngestMilestoneInQueue == null || currentEntry.getValue() > youngestMilestoneInQueue.getValue()) {
-                youngestMilestoneInQueue = currentEntry;
-            }
-        }
-    }
-
-    /**
      * This method takes an entry from the {@link #unsolidMilestonesPool} and adds it to the
      * {@link #milestonesToSolidify} queue.
      *
@@ -186,6 +171,7 @@ public class MilestoneSolidifier {
             milestonesToSolidify.remove(youngestMilestoneInQueue.getKey());
             milestonesToSolidify.put(milestoneEntry.getKey(), milestoneEntry.getValue());
 
+            youngestMilestoneInQueue = null;
             determineYoungestMilestoneInQueue();
         }
     }
@@ -193,25 +179,33 @@ public class MilestoneSolidifier {
     /**
      * This method contains the logic for the milestone solidification, that gets executed in a separate {@link Thread}.
      *
-     * It periodically updates and checks the unsolid milestones by invoking {@link #processSolidificationQueue()}.
+     * It simply executes the necessary steps periodically while waiting a short time to give the nodes the ability to
+     * answer to the issued transaction requests.
      */
     private void milestoneSolidificationThread() {
         while(!Thread.interrupted()) {
+            processNewlyAddedMilestones();
             processSolidificationQueue();
+            refillSolidificationQueue();
 
             ThreadUtils.sleep(SOLIDIFICATION_INTERVAL);
         }
     }
 
     /**
-     * This method checks if the current unsolid milestone has become solid or irrelevant and advances to the next one
-     * if that is the case.
+     * This method processes the newly added milestones.
      *
-     * It is getting called by the solidification thread in regular intervals.
+     * We process them lazy to decrease the synchronization requirements and speed up the addition of milestones from
+     * outside {@link Thread}s.
+     *
+     * It simply iterates over the milestones and adds them to the pool. If they are older than the
+     * {@link #youngestMilestoneInQueue}, we add the to the solidification queue.
      */
-    private void processSolidificationQueue() {
-        // process the newly added milestones first and check if they should get processed instead
-        for (Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator(); iterator.hasNext(); ) {
+    private void processNewlyAddedMilestones() {
+        for (
+            Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator();
+            iterator.hasNext();
+        ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
             unsolidMilestonesPool.put(currentEntry.getKey(), currentEntry.getValue());
@@ -222,15 +216,23 @@ public class MilestoneSolidifier {
 
             iterator.remove();
         }
+    }
 
-        // iterate through the
-        for (Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator(); iterator.hasNext(); ) {
+    /**
+     * This method contains the logic for processing the {@link #milestonesToSolidify}.
+     *
+     * It iterates through the queue and checks if the corresponding milestones are still relevant for our node, or if
+     * they could be successfully solidified. If the milestones become solid or irrelevant, we remove them from the
+     * pool and the queue and reset the {@link #youngestMilestoneInQueue} marker (if necessary).
+     */
+    private void processSolidificationQueue() {
+        for (
+            Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator();
+            iterator.hasNext();
+        ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
-            if (
-                currentEntry.getValue() <= snapshotManager.getInitialSnapshot().getIndex() ||
-                isSolid(currentEntry)
-            ) {
+            if (currentEntry.getValue() <= snapshotManager.getInitialSnapshot().getIndex() || isSolid(currentEntry)) {
                 unsolidMilestonesPool.remove(currentEntry.getKey());
                 iterator.remove();
 
@@ -239,25 +241,52 @@ public class MilestoneSolidifier {
                 }
             }
         }
+    }
 
+    /**
+     * This method takes care of adding new milestones from the pool to the solidification queue, and filling it up
+     * again after it was processed / emptied before.
+     *
+     * It first updates the {@link #youngestMilestoneInQueue} marker and then just adds new milestones as long as there
+     * is still space in the {@link #milestonesToSolidify} queue.
+     */
+    private void refillSolidificationQueue() {
         if(youngestMilestoneInQueue == null && milestonesToSolidify.size() >= 1) {
             determineYoungestMilestoneInQueue();
         }
 
-        // fill up our queue again
         Map.Entry<Hash, Integer> nextSolidificationCandidate;
-        while (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE && (nextSolidificationCandidate = getNextSolidificationCandidate()) != null) {
+        while (
+            milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE &&
+            (nextSolidificationCandidate = getNextSolidificationCandidate()) != null
+        ) {
             addToSolidificationQueue(nextSolidificationCandidate);
         }
     }
 
     /**
-     * This method returns the earliest seen Milestone from the internal Map of unsolid milestones.
+     * This method determines the youngest milestone in the solidification queue.
      *
-     * If no unsolid milestone was found it returns an Entry with the Hash being null and the index being
-     * Integer.MAX_VALUE.
+     * It iterates over all milestones in the Queue and keeps track of the youngest one found (the one with the highest
+     * milestone index).
+     */
+    private void determineYoungestMilestoneInQueue() {
+        youngestMilestoneInQueue = null;
+        for (Map.Entry<Hash, Integer> currentEntry : milestonesToSolidify.entrySet()) {
+            if (youngestMilestoneInQueue == null || currentEntry.getValue() > youngestMilestoneInQueue.getValue()) {
+                youngestMilestoneInQueue = currentEntry;
+            }
+        }
+    }
+
+    /**
+     * This method returns the earliest seen Milestone from the unsolid milestones pool, that is not part of the
+     * {@link #milestonesToSolidify} queue yet.
      *
-     * @return the Map.Entry holding the earliest milestone or a default Map.Entry(null, Integer.MAX_VALUE)
+     * It simply iterates over all milestones in the pool and looks for the one with the lowest index, that is not
+     * getting actively solidified, yet.
+     *
+     * @return the Map.Entry holding the earliest milestone or null if the pool does not contain any new candidates.
      */
     private Map.Entry<Hash, Integer> getNextSolidificationCandidate() {
         Map.Entry<Hash, Integer> nextSolidificationCandidate = null;
@@ -278,19 +307,17 @@ public class MilestoneSolidifier {
     /**
      * This method performs the actual solidity check on the selected milestone.
      *
-     * It first checks if there is a milestone that has to be solidified and then issues the corresponding solidity
-     * check. In addition to issuing the solidity checks, it dumps a log message to keep the node operator informed
-     * about the progress of solidification.
+     * It first dumps a log message to keep the node operator informed about the progress of solidification, and then
+     * issues the {@link TransactionValidator#checkSolidity(Hash, boolean, int)} call that starts the solidification
+     * process.
      *
      * We limit the amount of transactions that may be processed during the solidity check, since we want to solidify
      * from the oldest milestone to the newest one and not "block" the solidification with a very recent milestone that
-     * needs to traverse huge chunks of the tangle. If we fail to solidify a milestone for a certain amount of tries, we
-     * increase the amount of transactions that may be processed by using an exponential binary backoff strategy. The
-     * main goal of this is to give the solidification enough "resources" to discover the previous milestone (if it ever
-     * gets stuck because of a very long path to the previous milestone) while at the same time allowing fast solidity
-     * checks in "normal conditions".
+     * needs to traverse huge chunks of the tangle. The main goal of this is to give the solidification just enough
+     * "resources" to discover the previous milestone while at the same time allowing fast solidity checks.
      *
-     * @return true if there are no unsolid milestones that have to be processed or if the earliest milestone is solid
+     * @param currentEntry milestone entry that shall be checked
+     * @return true if the given milestone is solid or false otherwise
      */
     private boolean isSolid(Map.Entry<Hash, Integer> currentEntry) {
         if (unsolidMilestonesPool.size() > 1) {

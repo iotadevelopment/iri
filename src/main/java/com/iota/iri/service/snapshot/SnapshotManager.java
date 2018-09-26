@@ -25,13 +25,17 @@ import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
 public class SnapshotManager {
     /**
+     * Time in seconds that we wait for orphaned transactions to consider them oprhaned.
+     */
+    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
+    /**
      * Logger for this class allowing us to dump debug and status messages.
      */
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
 
     private static Snapshot builtinSnapshot = null;
 
-    private static final int OUTER_SHELL_SIZE = 50;
+    private static final int OUTER_SHELL_SIZE = 500;
 
     /**
      * Maximum age in milestones since creation of solid entry points.
@@ -40,7 +44,7 @@ public class SnapshotManager {
      * to it, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
      * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
      */
-    private static final int SOLID_ENTRY_POINT_LIFETIME = 1000;
+    private static final int SOLID_ENTRY_POINT_LIFETIME = 10000;
 
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
@@ -190,7 +194,7 @@ public class SnapshotManager {
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
     private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction) throws TraversalException {
-        if(transaction.getArrivalTime() > referenceTransaction.getTimestamp()) {
+        if(transaction.getArrivalTime() + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
             return false;
         }
 
@@ -199,7 +203,7 @@ public class SnapshotManager {
             transaction.getHash(),
             currentTransaction -> !nonOrphanedTransactionFound.get(),
             currentTransaction -> {
-                if(currentTransaction.getArrivalTime() > referenceTransaction.getTimestamp()) {
+                if(currentTransaction.getArrivalTime() + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
                     nonOrphanedTransactionFound.set(true);
                 }
             }

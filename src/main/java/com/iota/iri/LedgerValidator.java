@@ -118,12 +118,6 @@ public class LedgerValidator {
                             }
                             if (!validBundle) {
                                 System.out.println(2);
-                                System.out.println(transactionViewModel.getHash());
-                                System.out.println(transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT);
-                                for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
-                                    System.out.println(bundleTransactionViewModels.get(0).getHash());
-                                    System.out.println(transactionViewModel.getHash());
-                                }
                                 return null;
                             }
                         }
