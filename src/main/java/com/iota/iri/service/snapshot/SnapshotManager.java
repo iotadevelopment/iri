@@ -5,10 +5,10 @@ import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.garbagecollector.GarbageCollector;
-import com.iota.iri.service.garbagecollector.GarbageCollectorException;
-import com.iota.iri.service.garbagecollector.MilestonePrunerJob;
-import com.iota.iri.service.garbagecollector.UnconfirmedSubtanglePrunerJob;
+import com.iota.iri.service.transactionpruning.TransactionPruner;
+import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.service.transactionpruning.MilestonePrunerJob;
+import com.iota.iri.service.transactionpruning.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
@@ -56,7 +56,7 @@ public class SnapshotManager {
 
     private Tangle tangle;
 
-    private GarbageCollector snapshotGarbageCollector;
+    private TransactionPruner snapshotTransactionPruner;
 
     private SnapshotConfig configuration;
 
@@ -98,8 +98,8 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-        snapshotGarbageCollector = new GarbageCollector(tangle, this, tipsViewModel);
-        snapshotGarbageCollector.restoreCleanupJobs();
+        snapshotTransactionPruner = new TransactionPruner(tangle, this, tipsViewModel);
+        snapshotTransactionPruner.restoreCleanupJobs();
     }
 
     public void init(MilestoneTracker milestoneTracker) {
@@ -108,7 +108,7 @@ public class SnapshotManager {
             spawnMonitorThread(milestoneTracker);
 
             if(configuration.getLocalSnapshotsPruningEnabled()) {
-                snapshotGarbageCollector.start();
+                snapshotTransactionPruner.start();
             }
         }
     }
@@ -271,9 +271,9 @@ public class SnapshotManager {
                 try {
                     // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
                     if (TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT) {
-                        snapshotGarbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                        snapshotTransactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
                     }
-                } catch (GarbageCollectorException e) {
+                } catch (TransactionPruningException e) {
                     log.error("could not add cleanup job to garbage collector", e);
                 } catch (Exception e) {
 
@@ -504,8 +504,8 @@ public class SnapshotManager {
         }
 
         try {
-            snapshotGarbageCollector.addJob(new MilestonePrunerJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
-        } catch(GarbageCollectorException e) {
+            snapshotTransactionPruner.addJob(new MilestonePrunerJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
+        } catch(TransactionPruningException e) {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }
 

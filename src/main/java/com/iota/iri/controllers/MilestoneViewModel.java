@@ -3,6 +3,7 @@ package com.iota.iri.controllers;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
+import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
@@ -42,7 +43,7 @@ public class MilestoneViewModel {
     /**
      * This method removes a {@link MilestoneViewModel} from the cache.
      *
-     * It is used by the {@link com.iota.iri.service.garbagecollector.GarbageCollector} to remove milestones that were
+     * It is used by the {@link TransactionPruner} to remove milestones that were
      * deleted in the database, so that the runtime environment correctly reflects the database state.
      *
      * @param milestoneIndex the index of the milestone
