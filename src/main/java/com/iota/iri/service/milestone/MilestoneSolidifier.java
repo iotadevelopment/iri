@@ -218,7 +218,7 @@ public class MilestoneSolidifier {
                 unsolidMilestonesPool.remove(currentEntry.getKey());
                 iterator.remove();
 
-                if (currentEntry.getKey().equals(oldestMilestoneMarker.getKey())) {
+                if (oldestMilestoneMarker != null && currentEntry.getKey().equals(oldestMilestoneMarker.getKey())) {
                     oldestMilestoneMarker = null;
                 }
             }
