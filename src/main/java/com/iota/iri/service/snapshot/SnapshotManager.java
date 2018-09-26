@@ -269,9 +269,14 @@ public class SnapshotManager {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             } else {
                 try {
-                    snapshotGarbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
-                } catch(GarbageCollectorException e) {
+                    // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
+                    if (TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT) {
+                        snapshotGarbageCollector.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                    }
+                } catch (GarbageCollectorException e) {
                     log.error("could not add cleanup job to garbage collector", e);
+                } catch (Exception e) {
+
                 }
             }
         });
