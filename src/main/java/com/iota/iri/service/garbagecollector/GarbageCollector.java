@@ -242,14 +242,18 @@ public class GarbageCollector {
      * @throws GarbageCollectorException if something goes wrong while writing the state file
      */
     void persistChanges() throws GarbageCollectorException {
+        System.out.println("persist");
+
         try {
-            Files.write(
-                Paths.get(getStateFile().getAbsolutePath()),
-                () -> garbageCollectorJobs.values().stream()
-                      .flatMap(Collection::stream)
-                      .<CharSequence>map(GarbageCollector::serializeJobEntry)
-                      .iterator()
-            );
+            synchronized (this) {
+                Files.write(
+                    Paths.get(getStateFile().getAbsolutePath()),
+                    () -> garbageCollectorJobs.values().stream()
+                          .flatMap(Collection::stream)
+                          .<CharSequence>map(GarbageCollector::serializeJobEntry)
+                          .iterator()
+                    );
+            }
         } catch(IOException e) {
             throw new GarbageCollectorException("could not persist garbage collector state", e);
         }
