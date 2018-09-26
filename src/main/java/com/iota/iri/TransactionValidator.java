@@ -181,14 +181,18 @@ public class TransactionValidator {
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hashPointer)) {
-                        transactionRequester.requestTransaction(hashPointer, milestone);
                         solid = false;
-                        break;
-                    } else {
-                        if (solid) {
-                            nonAnalyzedTransactions.offer(transaction.getTrunkTransactionHash());
-                            nonAnalyzedTransactions.offer(transaction.getBranchTransactionHash());
+
+                        if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
+                            transactionRequester.requestTransaction(hashPointer, milestone);
+                            break;
+                        } else if (!milestone && !transactionRequester.contains(hashPointer)) {
+                            transactionRequester.requestTransaction(hashPointer, milestone);
+                            break;
                         }
+                    } else {
+                        nonAnalyzedTransactions.offer(transaction.getTrunkTransactionHash());
+                        nonAnalyzedTransactions.offer(transaction.getBranchTransactionHash());
                     }
                 }
             }

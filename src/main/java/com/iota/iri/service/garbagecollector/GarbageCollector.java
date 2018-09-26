@@ -27,6 +27,11 @@ public class GarbageCollector {
     private static final int GARBAGE_COLLECTOR_RESCAN_INTERVAL = 10000;
 
     /**
+     * The interval in milliseconds that the garbage collector will persist the state.
+     */
+    private static final int GARBAGE_COLLECTOR_PERSIST_INTERVAL = 1000;
+
+    /**
      * Logger for this class allowing us to dump debug and status messages.
      */
     private static final Logger log = LoggerFactory.getLogger(GarbageCollector.class);
@@ -38,6 +43,14 @@ public class GarbageCollector {
      * thread for this instance even when we call the {@link #start()} method multiple times.
      */
     private final ThreadIdentifier cleanupThreadIdentifier = new ThreadIdentifier("Snapshot Garbage Collector");
+
+    /**
+     * Holds a reference to the {@link ThreadIdentifier} for the cleanup thread.
+     *
+     * Using a {@link ThreadIdentifier} for spawning the thread allows the {@link ThreadUtils} to spawn exactly one
+     * thread for this instance even when we call the {@link #start()} method multiple times.
+     */
+    private final ThreadIdentifier persisterThreadIdentifier = new ThreadIdentifier("Snapshot Garbage Collector Persister");
 
     /**
      * Holds a reference to the tangle instance which acts as an interface to the used database.
@@ -74,6 +87,8 @@ public class GarbageCollector {
      * List of cleanup jobs that shall get processed by the garbage collector (grouped by their class).
      */
     private final HashMap<Class<? extends GarbageCollectorJob>, ArrayDeque<GarbageCollectorJob>> garbageCollectorJobs = new HashMap<>();
+
+    private boolean persistRequested = true;
 
     /**
      * The constructor of this class stores the passed in parameters for future use and restores the previous state of
@@ -169,6 +184,7 @@ public class GarbageCollector {
      */
     public void start() {
         ThreadUtils.spawnThread(this::cleanupThread, cleanupThreadIdentifier);
+        ThreadUtils.spawnThread(this::persistThread, persisterThreadIdentifier);
     }
 
     /**
@@ -176,6 +192,7 @@ public class GarbageCollector {
      */
     public void shutdown() {
         ThreadUtils.stopThread(cleanupThreadIdentifier);
+        ThreadUtils.stopThread(persisterThreadIdentifier);
     }
 
     /**
@@ -242,20 +259,28 @@ public class GarbageCollector {
      * @throws GarbageCollectorException if something goes wrong while writing the state file
      */
     void persistChanges() throws GarbageCollectorException {
-        System.out.println("persist");
+        persistRequested = true;
+    }
 
-        try {
-            synchronized (this) {
-                Files.write(
-                    Paths.get(getStateFile().getAbsolutePath()),
-                    () -> garbageCollectorJobs.values().stream()
-                          .flatMap(Collection::stream)
-                          .<CharSequence>map(GarbageCollector::serializeJobEntry)
-                          .iterator()
+    private void persistThread() {
+        while(!Thread.interrupted()) {
+            try {
+                if (persistRequested) {
+                    Files.write(
+                       Paths.get(getStateFile().getAbsolutePath()),
+                        () -> garbageCollectorJobs.values().stream()
+                              .flatMap(Collection::stream)
+                              .<CharSequence>map(GarbageCollector::serializeJobEntry)
+                              .iterator()
                     );
+
+                    persistRequested = false;
+                }
+            } catch(IOException e) {
+                log.error("could not persist garbage collector state", e);
             }
-        } catch(IOException e) {
-            throw new GarbageCollectorException("could not persist garbage collector state", e);
+
+            ThreadUtils.sleep(GARBAGE_COLLECTOR_PERSIST_INTERVAL);
         }
     }
 
