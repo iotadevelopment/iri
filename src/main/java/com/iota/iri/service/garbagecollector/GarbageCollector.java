@@ -276,7 +276,7 @@ public class GarbageCollector {
 
                     persistRequested = false;
                 }
-            } catch(IOException e) {
+            } catch(Exception e) {
                 log.error("could not persist garbage collector state", e);
             }
 
