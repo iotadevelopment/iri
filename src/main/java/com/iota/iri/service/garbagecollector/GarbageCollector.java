@@ -245,13 +245,13 @@ public class GarbageCollector {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
-                () -> garbageCollectorJobs.entrySet().stream()
-                      .flatMap(jobQueueEntry -> jobQueueEntry.getValue().stream())
+                () -> garbageCollectorJobs.values().stream()
+                      .flatMap(Collection::stream)
                       .<CharSequence>map(GarbageCollector::serializeJobEntry)
                       .iterator()
             );
         } catch(IOException e) {
-            throw new GarbageCollectorException("could not persists garbage collector state", e);
+            throw new GarbageCollectorException("could not persist garbage collector state", e);
         }
     }
 
