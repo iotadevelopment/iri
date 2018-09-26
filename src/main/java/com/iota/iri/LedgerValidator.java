@@ -97,9 +97,9 @@ public class LedgerValidator {
 
                                 if(BundleValidator.isInconsistent(bundleTransactionViewModels)) {
                                     System.out.println("woot");
+                                    System.out.println(bundleTransactionViewModels);
                                     break;
                                 }
-                                System.out.println("waat");
                                 if (bundleTransactionViewModels.get(0).getHash().equals(transactionViewModel.getHash())) {
 
                                     validBundle = true;
