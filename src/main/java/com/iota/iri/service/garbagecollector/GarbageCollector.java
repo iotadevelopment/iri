@@ -245,8 +245,8 @@ public class GarbageCollector {
         try {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
-                () -> garbageCollectorJobs.values().stream()
-                      .flatMap(jobQueue -> jobQueue.stream())
+                () -> garbageCollectorJobs.entrySet().stream()
+                      .flatMap(jobQueueEntry -> jobQueueEntry.getValue().stream())
                       .<CharSequence>map(GarbageCollector::serializeJobEntry)
                       .iterator()
             );
