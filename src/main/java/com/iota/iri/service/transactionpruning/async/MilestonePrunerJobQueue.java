@@ -41,7 +41,10 @@ public class MilestonePrunerJobQueue extends JobQueue {
         while(
             !Thread.interrupted() &&
             jobQueue.size() >= 2 ||
-            ((MilestonePrunerJob) jobQueue.getFirst()).getTargetIndex() < ((MilestonePrunerJob) jobQueue.getFirst()).getCurrentIndex()
+            (
+                jobQueue.size() >= 1 &&
+                ((MilestonePrunerJob) jobQueue.getFirst()).getTargetIndex() < ((MilestonePrunerJob) jobQueue.getFirst()).getCurrentIndex()
+            )
         ) {
             MilestonePrunerJob firstJob = (MilestonePrunerJob) jobQueue.removeFirst();
             firstJob.process();
