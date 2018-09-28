@@ -1,17 +1,14 @@
 package com.iota.iri.service.transactionpruning.async;
 
-import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.MilestoneViewModel;
-import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
-import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
-import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGHelper;
 
@@ -26,24 +23,11 @@ import java.util.*;
  *
  * It gets processed one milestone at a time persisting the progress after each step.
  */
-public class MilestonePrunerJob implements TransactionPrunerJob {
-    private SnapshotManager snapshotManager;
-
-    private SnapshotConfig snapshotConfig;
-
-    private TipsViewModel tipsViewModel;
-
-    private TransactionPruner transactionPruner;
-
-    /**
-     * Holds a reference to the tangle object which acts as a database interface.
-     */
-    private Tangle tangle;
-
+public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
     /**
      * Holds the milestone index where this job starts cleaning up (read only).
      */
-    private final int startingIndex;
+    private int startingIndex;
 
     /**
      * Holds the milestone index where this job stops cleaning up (read only).
@@ -54,130 +38,6 @@ public class MilestonePrunerJob implements TransactionPrunerJob {
      * Holds the milestone index of the oldest milestone that was cleaned up already (the current progress).
      */
     private int currentIndex;
-
-    public int getStartingIndex() {
-        return startingIndex;
-    }
-
-    public int getCurrentIndex() {
-        return currentIndex;
-    }
-
-    public int getTargetIndex() {
-        return getTargetIndex();
-    }
-
-    public void setTargetIndex(int targetIndex) {
-        this.targetIndex = targetIndex;
-    }
-
-    /**
-     * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
-     * pending.
-     *
-     * It is used to clean up the queue and the corresponding {@link TransactionPruner} file, so it always has a size of
-     * less than 4 jobs.
-     *
-     * Since the jobs are getting processed from the beginning of the queue, we first check if the first two jobs are
-     * "done" and merge them into a single one that reflects the "done" status of both jobs. Consecutively we check if
-     * there are two or more pending jobs at the end that can also be consolidated.
-     *
-     * It is important to note that the jobs always clean from their startingPosition to the startingPosition of the
-     * previous job (or the {@code milestoneStartIndex} of the last global snapshot if there is no previous one) without
-     * any gaps in between which is required to be able to merge them.
-     *
-     * @throws TransactionPruningException if an error occurs while persisting the state
-     */
-    protected static void consolidateQueue(TransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
-        // if we have at least 2 jobs -> check if we can consolidate them at the beginning (both done)
-        if(jobQueue.size() >= 2) {
-            MilestonePrunerJob job1 = (MilestonePrunerJob) jobQueue.removeFirst();
-            MilestonePrunerJob job2 = (MilestonePrunerJob) jobQueue.removeFirst();
-
-            // if both first job are done -> consolidate them and persists the changes
-            if(job1.currentIndex == snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.currentIndex == job1.startingIndex) {
-                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job2.startingIndex, job1.currentIndex);
-                consolidatedJob.registerGarbageCollector(transactionPruner);
-                jobQueue.addFirst(consolidatedJob);
-            }
-
-            // otherwise just add them back to the queue
-            else {
-                jobQueue.addFirst(job2);
-                jobQueue.addFirst(job1);
-            }
-        }
-
-        // if we have at least 2 jobs -> check if we can consolidate them at the end (both pending)
-        boolean cleanupSuccessful = true;
-        while(jobQueue.size() >= 2 && cleanupSuccessful) {
-            MilestonePrunerJob job1 = (MilestonePrunerJob) jobQueue.removeLast();
-            MilestonePrunerJob job2 = (MilestonePrunerJob) jobQueue.removeLast();
-
-            // if both jobs are pending -> consolidate them and persists the changes
-            if(job1.currentIndex == job1.startingIndex && job2.currentIndex == job2.startingIndex) {
-                MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job1.startingIndex, job1.currentIndex);
-                consolidatedJob.registerGarbageCollector(transactionPruner);
-                jobQueue.addLast(consolidatedJob);
-            }
-
-            // otherwise just add them back to the queue
-            else {
-                jobQueue.addLast(job2);
-                jobQueue.addLast(job1);
-
-                cleanupSuccessful = false;
-            }
-        }
-
-        int previousStartIndex = snapshotManager.getConfiguration().getMilestoneStartIndex();
-        for(TransactionPrunerJob currentJob : jobQueue) {
-            ((MilestonePrunerJob) currentJob).targetIndex = previousStartIndex;
-
-            previousStartIndex = ((MilestonePrunerJob) currentJob).startingIndex;
-        }
-    }
-
-    /**
-     * This method fulfills the contract of {@link TransactionPrunerJob#registerGarbageCollector(TransactionPruner)}.
-     */
-    public void registerGarbageCollector(TransactionPruner transactionPruner) {
-        this.transactionPruner = transactionPruner;
-    }
-
-    /**
-     * This method processes the entire queue of this job.
-     *
-     * It first retrieves the first job and processes it until it is completely done. If it finds a second job, it
-     * immediately tries to process that one as well. If both jobs are done it triggers a consolidation to merge both
-     * done jobs into a single one.
-     *
-     * We keep the first done job in the queue (even though it might have been consolidated) because we need its
-     * {@link #startingIndex} to determine the next jobs {@link #targetIndex}.
-     *
-     * @param transactionPruner {@link TransactionPruner} that this job belongs to
-     * @param jobQueue queue of {@link MilestonePrunerJob} jobs that shall get processed
-     * @throws TransactionPruningException if anything goes wrong while processing the jobs
-     */
-    protected static void processQueue(TransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
-        while(!Thread.interrupted() && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).targetIndex < ((MilestonePrunerJob) jobQueue.getFirst()).currentIndex) {
-            MilestonePrunerJob firstJob = (MilestonePrunerJob) jobQueue.removeFirst();
-            firstJob.process();
-
-            if(jobQueue.size() >= 1) {
-                MilestonePrunerJob secondJob = (MilestonePrunerJob) jobQueue.getFirst();
-                jobQueue.addFirst(firstJob);
-
-                secondJob.process();
-
-                consolidateQueue(transactionPruner, snapshotManager, jobQueue);
-            } else {
-                jobQueue.addFirst(firstJob);
-
-                break;
-            }
-        }
-    }
 
     /**
      * This method parses the string representation of a {@link MilestonePrunerJob} and creates the corresponding object.
@@ -229,6 +89,28 @@ public class MilestonePrunerJob implements TransactionPrunerJob {
         this.currentIndex = currentIndex;
     }
 
+    public int getStartingIndex() {
+        return startingIndex;
+    }
+
+    public MilestonePrunerJob setStartingIndex(int startingIndex) {
+        this.startingIndex = startingIndex;
+
+        return this;
+    }
+
+    public int getCurrentIndex() {
+        return currentIndex;
+    }
+
+    public int getTargetIndex() {
+        return targetIndex;
+    }
+
+    public void setTargetIndex(int targetIndex) {
+        this.targetIndex = targetIndex;
+    }
+
     /**
      * This method starts the processing of the job which triggers the actual removal of database entries.
      *
@@ -244,7 +126,7 @@ public class MilestonePrunerJob implements TransactionPrunerJob {
 
             currentIndex--;
 
-            transactionPruner.saveState();
+            getTransactionPruner().saveState();
         }
     }
 
@@ -270,22 +152,22 @@ public class MilestonePrunerJob implements TransactionPrunerJob {
         try {
             // collect elements to delete
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(getTangle(), currentIndex);
             if (milestoneViewModel != null) {
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
-                    transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
+                if (!getSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
+                    getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
                 }
-                DAGHelper.get(tangle).traverseApprovees(
+                DAGHelper.get(getTangle()).traverseApprovees(
                 milestoneViewModel.getHash(),
                 approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
                 approvedTransaction -> {
                     elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
-                    if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
+                    if (!getSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
                         try {
-                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
+                            getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
                         } catch(TransactionPruningException e) {
                             throw new RuntimeException(e);
                         }
@@ -295,12 +177,12 @@ public class MilestonePrunerJob implements TransactionPrunerJob {
             }
 
             // clean database entries
-            tangle.deleteBatch(elementsToDelete);
+            getTangle().deleteBatch(elementsToDelete);
 
             // clean runtime caches
             elementsToDelete.forEach(element -> {
                 if(Transaction.class.equals(element.hi)) {
-                    tipsViewModel.removeTipHash((Hash) element.low);
+                    getTipsViewModel().removeTipHash((Hash) element.low);
                 } else if(Milestone.class.equals(element.hi)) {
                     MilestoneViewModel.clear(((IntegerIndex) element.low).getValue());
                 }

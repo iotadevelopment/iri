@@ -99,8 +99,12 @@ public class SnapshotManager {
         latestSnapshot = initialSnapshot.clone();
 
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-        transactionPruner = new AsyncTransactionPruner(this);
-        transactionPruner.restoreState();
+        transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, getInitialSnapshot(), configuration);
+        try {
+            transactionPruner.restoreState();
+        } catch(TransactionPruningException e) {
+            log.info("could not restore the state of the TransactionPruner", e);
+        }
     }
 
     public void init(MilestoneTracker milestoneTracker) {
@@ -109,7 +113,7 @@ public class SnapshotManager {
             spawnMonitorThread(milestoneTracker);
 
             if(configuration.getLocalSnapshotsPruningEnabled()) {
-                transactionPruner.start();
+                ((AsyncTransactionPruner) transactionPruner).start();
             }
         }
     }
@@ -475,9 +479,8 @@ public class SnapshotManager {
         return builtinSnapshot.clone();
     }
 
-    public Snapshot takeLocalSnapshot() throws SnapshotException {
+    public void takeLocalSnapshot() throws SnapshotException {
         // load necessary configuration parameters
-        boolean testnet = configuration.isTestnet();
         String basePath = configuration.getLocalSnapshotsBasePath();
         int snapshotDepth = configuration.getLocalSnapshotsDepth();
 
@@ -517,8 +520,6 @@ public class SnapshotManager {
             throw new SnapshotException("could not write local snapshot files", e);
         }
 
-        initialSnapshot = targetSnapshot;
-
-        return targetSnapshot;
+        initialSnapshot.update(targetSnapshot);
     }
 }

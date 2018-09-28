@@ -415,9 +415,12 @@ public class SnapshotMetaData implements Cloneable {
     }
 
     protected void update(SnapshotMetaData newMetaData) {
-        timestamp = newMetaData.getTimestamp();
-        hash = newMetaData.getHash();
-        index = newMetaData.getIndex();
+        initialIndex = newMetaData.initialIndex;
+        index = newMetaData.index;
+        hash = newMetaData.hash;
+        initialHash = newMetaData.initialHash;
+        timestamp = newMetaData.timestamp;
+        initialTimestamp = newMetaData.initialTimestamp;
         solidEntryPoints = new HashMap<>(newMetaData.solidEntryPoints);
         seenMilestones = new HashMap<>(newMetaData.seenMilestones);
     }

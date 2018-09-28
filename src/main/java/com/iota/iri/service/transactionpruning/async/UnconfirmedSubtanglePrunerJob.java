@@ -1,18 +1,14 @@
 package com.iota.iri.service.transactionpruning.async;
 
-import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.Transaction;
-import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
-import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGHelper;
 
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 
 /**
@@ -20,44 +16,11 @@ import java.util.List;
  *
  * It is used to clean up orphaned subtangles when they become irrelevant for the ledger.
  */
-public class UnconfirmedSubtanglePrunerJob implements TransactionPrunerJob {
-    TransactionPruner transactionPruner;
-
-    private TipsViewModel tipsViewModel;
-
-    private Tangle tangle;
-
-    /**
-     * This method fulfills the contract of {@link TransactionPrunerJob#registerGarbageCollector(TransactionPruner)}.
-     */
-    public void registerGarbageCollector(TransactionPruner transactionPruner) {
-        this.transactionPruner = transactionPruner;
-    }
-
+public class UnconfirmedSubtanglePrunerJob extends AsyncTransactionPrunerJob {
     /**
      * Holds the hash of the transaction that shall have its unconfirmed approvers cleaned.
      */
     private Hash transactionHash;
-
-    /**
-     * This method processes the entire queue of this job type.
-     *
-     * While it finds jobs, it retrieves the first job, processes it and then removes it from the queue, before
-     * persisting the changes to keep track of the progress.
-     *
-     * @param transactionPruner {@link TransactionPruner} that this job belongs to
-     * @param jobQueue queue of {@link MilestonePrunerJob} jobs that shall get processed
-     * @throws TransactionPruningException if anything goes wrong while processing the jobs
-     */
-    protected static void processQueue(AsyncTransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
-        while(jobQueue.size() >= 1) {
-            jobQueue.getFirst().process();
-
-            jobQueue.removeFirst();
-
-            transactionPruner.saveState();
-        }
-    }
 
     /**
      * This method parses the serialized representation of a {@link UnconfirmedSubtanglePrunerJob} and creates the
@@ -99,17 +62,19 @@ public class UnconfirmedSubtanglePrunerJob implements TransactionPrunerJob {
         try {
             // collect elements to delete
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            DAGHelper.get(tangle).traverseApprovers(
+            DAGHelper.get(getTangle()).traverseApprovers(
                 transactionHash,
                 approverTransaction -> approverTransaction.snapshotIndex() == 0,
                 approverTransaction -> elementsToDelete.add(new Pair<>(approverTransaction.getHash(), Transaction.class))
             );
 
             // clean database entries
-            tangle.deleteBatch(elementsToDelete);
+            getTangle().deleteBatch(elementsToDelete);
 
             // clean runtime caches
-            elementsToDelete.forEach(element -> tipsViewModel.removeTipHash((Hash) element.low));
+            elementsToDelete.forEach(element -> getTipsViewModel().removeTipHash((Hash) element.low));
+
+            getTransactionPruner().saveState();
         } catch (Exception e) {
             throw new TransactionPruningException("failed to cleanup orphaned approvers of transaction " + transactionHash, e);
         }

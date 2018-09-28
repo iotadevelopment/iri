@@ -178,8 +178,7 @@ public class Snapshot {
 
         lockWrite();
 
-        SnapshotMetaData metaDataBeforeChanges = metaData.clone();
-        SnapshotState stateBeforeChanges = state.clone();
+        Snapshot snapshotBeforeChanges = this.clone();
 
         try {
             boolean rollbackSuccessful = true;
@@ -191,10 +190,20 @@ public class Snapshot {
                 throw new SnapshotException("failed to reach the target milestone index when rolling back the milestones");
             }
         } catch(SnapshotException e) {
-            state.update(stateBeforeChanges);
-            metaData.update(metaDataBeforeChanges);
+            update(snapshotBeforeChanges);
 
             throw e;
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    public void update(Snapshot snapshot) {
+        lockWrite();
+
+        try {
+            state.update(snapshot.state);
+            metaData.update(snapshot.metaData);
         } finally {
             unlockWrite();
         }

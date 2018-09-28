@@ -1,10 +1,13 @@
 package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
+import com.iota.iri.controllers.TipsViewModel;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
 import org.slf4j.Logger;
@@ -14,7 +17,6 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -42,6 +44,14 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      */
     private static final Logger log = LoggerFactory.getLogger(AsyncTransactionPruner.class);
 
+    private final Tangle tangle;
+
+    private final TipsViewModel tipsViewModel;
+
+    private final Snapshot snapshot;
+
+    private final SnapshotConfig config;
+
     /**
      * Holds a reference to the {@link ThreadIdentifier} for the cleanup thread.
      *
@@ -59,48 +69,36 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     private final ThreadIdentifier persisterThreadIdentifier = new ThreadIdentifier("Transaction Pruner Persister");
 
     /**
-     * Holds a reference to the {@link SnapshotManager} that this
-     * {@link com.iota.iri.service.transactionpruning.TransactionPruner} belongs to.
-     */
-    private final SnapshotManager snapshotManager;
-
-    /**
      * A map of {@link JobParser}s allowing us to determine how to parse the jobs from the
      * {@link com.iota.iri.service.transactionpruning.TransactionPruner} state file, based on their type.
      */
     private final Map<String, JobParser> jobParsers = new HashMap<>();
 
     /**
-     * A map of {@link QueueProcessor}s allowing us to process queues based on the type of the job.
-     */
-    //private final Map<Class<? extends TransactionPrunerJob>, QueueProcessor> queueProcessors = new HashMap<>();
-
-    /**
-     * A map of {@link QueueConsolidator}s allowing us to consolidate the queues to consume less "space".
-     */
-    //private final Map<Class<? extends TransactionPrunerJob>, QueueConsolidator> queueConsolidators = new HashMap<>();
-
-    private final Map<Class<? extends TransactionPrunerJob>, JobQueue> jobQueues = new HashMap<>();
-
-    /**
      * List of cleanup jobs that shall get processed by the
      * {@link com.iota.iri.service.transactionpruning.TransactionPruner} (grouped by their class).
      */
-    private final Map<Class<? extends TransactionPrunerJob>, Deque<TransactionPrunerJob>> transactionPrunerJobs
-        = new ConcurrentHashMap<>();
+    private final Map<Class<? extends TransactionPrunerJob>, JobQueue> jobQueues = new HashMap<>();
 
     /**
      * Holds a flag that indicates if the state shall be persisted.
      */
-    private boolean persistRequested = true;
+    private boolean persistRequested = false;
 
     /**
      * TODO
      */
-    public AsyncTransactionPruner(SnapshotManager snapshotManager, SnapshotConfig config) {
-        this.snapshotManager = snapshotManager;
+    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot, SnapshotConfig config) {
+        this.tangle = tangle;
+        this.tipsViewModel = tipsViewModel;
+        this.snapshot = snapshot;
+        this.config = config;
 
-        registerSupportedJobTypes(config);
+        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new JobQueue());
+        addJobQueue(MilestonePrunerJob.class, new MilestonePrunerJobQueue(config));
+
+        registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
+        registerParser(UnconfirmedSubtanglePrunerJob.class, UnconfirmedSubtanglePrunerJob::parse);
     }
 
     /**
@@ -116,20 +114,12 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      * @throws TransactionPruningException if anything goes wrong while adding the job
      */
     public void addJob(TransactionPrunerJob job) throws TransactionPruningException {
-        job.registerGarbageCollector(this);
+        job.setTransactionPruner(this);
+        job.setTangle(tangle);
+        job.setTipsViewModel(tipsViewModel);
+        job.setSnapshot(snapshot);
 
         getJobQueue(job.getClass()).addJob(job);
-
-        /*
-        Deque<TransactionPrunerJob> jobQueue = getJobQueue(job.getClass());
-        jobQueue.addLast(job);
-
-        // consolidating the queue is optional
-        QueueConsolidator queueConsolidator = queueConsolidators.get(job.getClass());
-        if(queueConsolidator != null) {
-            queueConsolidator.consolidateQueue(this, snapshotManager, jobQueue);
-        }
-        */
 
         saveState();
     }
@@ -158,41 +148,37 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      * representation.
      */
     public void restoreState() throws TransactionPruningException {
-        try {
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(
-                    new BufferedInputStream(
-                        new FileInputStream(getStateFile())
-                    )
-                )
-            );
-
-            try {
-                String line;
-                while((line = reader.readLine()) != null) {
-                    String[] parts = line.split(";", 2);
-                    if(parts.length >= 2) {
-                        JobParser jobParser = this.jobParsers.get(parts[0]);
-                        if(jobParser == null) {
-                            throw new TransactionPruningException("could not determine a parser for cleanup job of type " + parts[0]);
-                        }
-
-                        addJob(jobParser.parse(parts[1]));
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(new BufferedInputStream(new FileInputStream(getStateFile())))
+        )) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(";", 2);
+                if (parts.length >= 2) {
+                    JobParser jobParser = this.jobParsers.get(parts[0]);
+                    if (jobParser == null) {
+                        throw new TransactionPruningException("could not determine a parser for cleanup job of type " + parts[0]);
                     }
+
+                    addJob(jobParser.parse(parts[1]));
                 }
-            } finally {
-                reader.close();
             }
         } catch(IOException e) {
-            throw new TransactionPruningException("could not read the state file", e);
+            if(getStateFile().exists()) {
+                throw new TransactionPruningException("could not read the state file", e);
+            }
         }
     }
 
     /**
      * This method fulfills the contract of {@link TransactionPruner#clear()}.
+     *
+     * It cycles through all registered {@link JobQueue}s and clears them.
      */
     public void clear() {
-        transactionPrunerJobs.clear();
+        for (JobQueue jobQueue : jobQueues.values()) {
+            jobQueue.clear();
+        }
     }
 
     /**
@@ -203,7 +189,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      *       {@link ThreadUtils} take care of only launching exactly one {@link Thread} that is not terminated.
      */
     public void start() {
-        ThreadUtils.spawnThread(this::cleanupThread, cleanupThreadIdentifier);
+        ThreadUtils.spawnThread(this::processJobsThread, cleanupThreadIdentifier);
         ThreadUtils.spawnThread(this::persistThread, persisterThreadIdentifier);
     }
 
@@ -213,26 +199,6 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     public void shutdown() {
         ThreadUtils.stopThread(cleanupThreadIdentifier);
         ThreadUtils.stopThread(persisterThreadIdentifier);
-    }
-
-    /**
-     * This method registers the builtin job types, so the {@link AsyncTransactionPruner} knows how to process the
-     * different kind of jobs it can hold.
-     */
-    private void registerSupportedJobTypes(SnapshotConfig config) {
-        addJobQueue(MilestonePrunerJob.class, new MilestonePrunerJobQueue(this, config));
-        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new JobQueue(this));
-
-        registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
-        registerParser(UnconfirmedSubtanglePrunerJob.class, UnconfirmedSubtanglePrunerJob::parse);
-
-        /*
-        registerQueueProcessor(MilestonePrunerJob.class, MilestonePrunerJob::processQueue);
-        registerQueueConsolidator(MilestonePrunerJob.class, MilestonePrunerJob::consolidateQueue);
-
-
-        registerQueueProcessor(UnconfirmedSubtanglePrunerJob.class, UnconfirmedSubtanglePrunerJob::processQueue);
-        */
     }
 
     private void addJobQueue(Class<? extends TransactionPrunerJob> jobClass, JobQueue jobQueue) {
@@ -254,39 +220,6 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     }
 
     /**
-     * This method allows us to register a {@link QueueProcessor} for the given job type.
-     *
-     * Since different kinds of jobs get processed in a different way, we are able to generically process them based on
-     * their type after having registered a processor for them.
-     *
-     * @param jobClass class of the job that the TransactionPruner shall be able to handle
-     * @param queueProcessor function that takes care of processing the queue for this particular type
-     */
-    /*
-    private void registerQueueProcessor(Class<? extends TransactionPrunerJob> jobClass, QueueProcessor queueProcessor) {
-        this.queueProcessors.put(jobClass, queueProcessor);
-    }
-    */
-
-    /**
-     * This method allows us to register a {@link QueueConsolidator} for the given job type.
-     *
-     * Some jobs can be consolidated to consume less space in the queue by grouping them together or skipping them
-     * completely. While the consolidation of multiple jobs into fewer ones is optional and only required for certain
-     * types of jobs, this method allows us to generically handle this use case by registering a handler for the job
-     * class that supports this feature.
-     *
-     * @param jobClass class of the job that the TransactionPruner shall be able to handle
-     * @param queueConsolidator lambda that takes care of consolidating the entries in a queue
-     */
-    /*
-    private void registerQueueConsolidator(Class<? extends TransactionPrunerJob> jobClass,
-                                           QueueConsolidator queueConsolidator) {
-        this.queueConsolidators.put(jobClass, queueConsolidator);
-    }
-    */
-
-    /**
      * This method contains the logic for persisting the pruner state, that gets executed in a separate {@link Thread}.
      *
      * It periodically checks the {@link #persistRequested} flag and triggers the writing of the state file until the
@@ -298,11 +231,18 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
                 if (persistRequested) {
                     Files.write(
                        Paths.get(getStateFile().getAbsolutePath()),
-                        () -> transactionPrunerJobs.values().stream()
-                              .flatMap(Collection::stream)
+                        () -> jobQueues.values().stream()
+                              .flatMap(jobQueue -> jobQueue.getJobs().stream())
                               .<CharSequence>map(this::serializeJobEntry)
                               .iterator()
                     );
+
+                    // TODO: REMOVE FILES IF EMPTY
+                    //try {
+                    //    Files.deleteIfExists(Paths.get(getStateFile().getAbsolutePath()));
+                    //} catch (IOException e) {
+                    //    throw new TransactionPruningException("failed to reset the TransactionPruner state", e);
+                    //}
 
                     persistRequested = false;
                 }
@@ -330,7 +270,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      *
      * It repeatedly calls {@link #processJobs()} until the TransactionPruner is shutting down.
      */
-    private void cleanupThread() {
+    private void processJobsThread() {
         while(!Thread.interrupted()) {
             try {
                 processJobs();
@@ -345,27 +285,17 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     /**
      * This method contains the logic for scheduling the jobs and executing them.
      *
-     * It iterates through all available queues and executes the corresponding {@link QueueProcessor} for each of them
-     * until all queues have been processed.
+     * It iterates through all available queues and triggers the processing of their jobs.
      *
      * @throws TransactionPruningException if anything goes wrong while processing the cleanup jobs
      */
     public void processJobs() throws TransactionPruningException {
-        for(Map.Entry<Class<? extends TransactionPrunerJob>, JobQueue> entry : jobQueues.entrySet()) {
+        for(JobQueue jobQueue : jobQueues.values()) {
             if(Thread.interrupted()) {
                 return;
             }
 
-            entry.getValue().processJobs();
-
-            /*
-            QueueProcessor queueProcessor = queueProcessors.get(entry.getKey());
-            if(queueProcessor == null) {
-                throw new TransactionPruningException("could not determine a queue processor for cleanup job of type " + entry.getKey().getCanonicalName());
-            }
-
-            queueProcessor.processQueue(this, snapshotManager, entry.getValue());
-            */
+            jobQueue.processJobs();
         }
     }
 
@@ -409,7 +339,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      * @return File handle to the state file.
      */
     private File getStateFile() {
-        return new File(snapshotManager.getConfiguration().getLocalSnapshotsBasePath() + ".snapshot.gc");
+        return new File(config.getLocalSnapshotsBasePath() + ".snapshot.gc");
     }
 
     /**
@@ -421,33 +351,5 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     @FunctionalInterface
     private interface JobParser {
         TransactionPrunerJob parse(String input) throws TransactionPruningException;
-    }
-
-    /**
-     * Functional interface for the lambda function that takes care of processing a queue.
-     *
-     * It is used to offer an interface for generically processing the different jobs that are supported by the
-     * {@link TransactionPruner}.
-     *
-     * @see AsyncTransactionPruner#registerQueueProcessor(Class, QueueProcessor) to register the processor
-     */
-    @FunctionalInterface
-    private interface QueueProcessor {
-        void processQueue(AsyncTransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException;
-    }
-
-    /**
-     * Functional interface for the lambda function that takes care of consolidating a queue.
-     *
-     * It is mainly used to merge multiple jobs that share the same status into a single one that covers all merged jobs and
-     * therefore reduce the memory footprint and file size of the {@link TransactionPruner} state file.
-     *
-     * The consolidation of the queues is optional and does not have to be supported by every job type.
-     *
-     * @see AsyncTransactionPruner#registerQueueConsolidator(Class, QueueConsolidator) to register the consolidator
-     */
-    @FunctionalInterface
-    private interface QueueConsolidator {
-        void consolidateQueue(TransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException;
     }
 }

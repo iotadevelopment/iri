@@ -14,6 +14,11 @@ public interface TransactionPruner {
      * This method adds a job to the TransactionPruner, that consequently can be executed by the {@link #processJobs()}
      * method.
      *
+     * In addition to adding the jobs to the internal list of jobs that have to be executed, it informs the job about
+     * the {@link TransactionPruner}, the {@link com.iota.iri.storage.Tangle}, the
+     * {@link com.iota.iri.controllers.TipsViewModel} and the {@link com.iota.iri.service.snapshot.Snapshot} instances
+     * that this job is working on.
+     *
      * @param job the job that shall be executed
      * @throws TransactionPruningException if anything goes wrong while adding the job
      */
