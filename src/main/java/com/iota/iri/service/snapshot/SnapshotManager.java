@@ -28,7 +28,7 @@ public class SnapshotManager {
     /**
      * Time in seconds that we wait for orphaned transactions to consider them oprhaned.
      */
-    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
+    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 300;
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
@@ -199,7 +199,7 @@ public class SnapshotManager {
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
     private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction) throws TraversalException {
-        if(transaction.getArrivalTime() + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
+        if((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
             return false;
         }
 
@@ -208,7 +208,7 @@ public class SnapshotManager {
             transaction.getHash(),
             currentTransaction -> !nonOrphanedTransactionFound.get(),
             currentTransaction -> {
-                if(currentTransaction.getArrivalTime() + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
+                if((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
                     nonOrphanedTransactionFound.set(true);
                 }
             }
