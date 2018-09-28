@@ -26,7 +26,7 @@ import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
 public class SnapshotManager {
     /**
-     * Time in seconds that we wait for orphaned transactions to consider them oprhaned.
+     * Time in seconds that we wait for orphaned transactions to consider them orphaned.
      */
     private static final int ORPHANED_TRANSACTION_GRACE_TIME = 300;
     /**
