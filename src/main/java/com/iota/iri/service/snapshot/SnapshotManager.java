@@ -275,7 +275,10 @@ public class SnapshotManager {
             } else {
                 try {
                     // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
-                    if (TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT) {
+                    if (
+                        TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT &&
+                        !Hash.NULL_HASH.equals(solidEntryPoint.getKey())
+                    ) {
                         transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
                     }
                 } catch (TransactionPruningException e) {
