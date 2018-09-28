@@ -1,12 +1,17 @@
-package com.iota.iri.service.transactionpruning;
+package com.iota.iri.service.transactionpruning.async;
 
+import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
+import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
+import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Pair;
 import com.iota.iri.utils.dag.DAGHelper;
 
@@ -21,7 +26,20 @@ import java.util.*;
  *
  * It gets processed one milestone at a time persisting the progress after each step.
  */
-public class MilestonePrunerJob extends TransactionPrunerJob {
+public class MilestonePrunerJob implements TransactionPrunerJob {
+    private SnapshotManager snapshotManager;
+
+    private SnapshotConfig snapshotConfig;
+
+    private TipsViewModel tipsViewModel;
+
+    private TransactionPruner transactionPruner;
+
+    /**
+     * Holds a reference to the tangle object which acts as a database interface.
+     */
+    private Tangle tangle;
+
     /**
      * Holds the milestone index where this job starts cleaning up (read only).
      */
@@ -37,18 +55,20 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      */
     private int currentIndex;
 
-    /**
-     * This method registers this job type in a {@link TransactionPruner}.
-     *
-     * It registers the {@link JobParser}, the {@link QueueProcessor} and the {@link QueueConsolidator} which will
-     * allow us to process jobs of this particular type.
-     *
-     * @param transactionPruner {@link TransactionPruner} that shall be able to process {@link MilestonePrunerJob}s
-     */
-    static void registerInGarbageCollector(TransactionPruner transactionPruner) {
-        transactionPruner.registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
-        transactionPruner.registerQueueProcessor(MilestonePrunerJob.class, MilestonePrunerJob::processQueue);
-        transactionPruner.registerQueueConsolidator(MilestonePrunerJob.class, MilestonePrunerJob::consolidateQueue);
+    public int getStartingIndex() {
+        return startingIndex;
+    }
+
+    public int getCurrentIndex() {
+        return currentIndex;
+    }
+
+    public int getTargetIndex() {
+        return getTargetIndex();
+    }
+
+    public void setTargetIndex(int targetIndex) {
+        this.targetIndex = targetIndex;
     }
 
     /**
@@ -68,19 +88,17 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      *
      * @throws TransactionPruningException if an error occurs while persisting the state
      */
-    private static void consolidateQueue(TransactionPruner transactionPruner, ArrayDeque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
+    protected static void consolidateQueue(TransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
         // if we have at least 2 jobs -> check if we can consolidate them at the beginning (both done)
         if(jobQueue.size() >= 2) {
             MilestonePrunerJob job1 = (MilestonePrunerJob) jobQueue.removeFirst();
             MilestonePrunerJob job2 = (MilestonePrunerJob) jobQueue.removeFirst();
 
             // if both first job are done -> consolidate them and persists the changes
-            if(job1.currentIndex == transactionPruner.snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.currentIndex == job1.startingIndex) {
+            if(job1.currentIndex == snapshotManager.getConfiguration().getMilestoneStartIndex() && job2.currentIndex == job1.startingIndex) {
                 MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job2.startingIndex, job1.currentIndex);
                 consolidatedJob.registerGarbageCollector(transactionPruner);
                 jobQueue.addFirst(consolidatedJob);
-
-                transactionPruner.persistChanges();
             }
 
             // otherwise just add them back to the queue
@@ -101,8 +119,6 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
                 MilestonePrunerJob consolidatedJob = new MilestonePrunerJob(job1.startingIndex, job1.currentIndex);
                 consolidatedJob.registerGarbageCollector(transactionPruner);
                 jobQueue.addLast(consolidatedJob);
-
-                transactionPruner.persistChanges();
             }
 
             // otherwise just add them back to the queue
@@ -114,12 +130,19 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
             }
         }
 
-        int previousStartIndex = transactionPruner.snapshotManager.getConfiguration().getMilestoneStartIndex();
+        int previousStartIndex = snapshotManager.getConfiguration().getMilestoneStartIndex();
         for(TransactionPrunerJob currentJob : jobQueue) {
             ((MilestonePrunerJob) currentJob).targetIndex = previousStartIndex;
 
             previousStartIndex = ((MilestonePrunerJob) currentJob).startingIndex;
         }
+    }
+
+    /**
+     * This method fulfills the contract of {@link TransactionPrunerJob#registerGarbageCollector(TransactionPruner)}.
+     */
+    public void registerGarbageCollector(TransactionPruner transactionPruner) {
+        this.transactionPruner = transactionPruner;
     }
 
     /**
@@ -136,7 +159,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      * @param jobQueue queue of {@link MilestonePrunerJob} jobs that shall get processed
      * @throws TransactionPruningException if anything goes wrong while processing the jobs
      */
-    private static void processQueue(TransactionPruner transactionPruner, ArrayDeque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
+    protected static void processQueue(TransactionPruner transactionPruner, SnapshotManager snapshotManager, Deque<TransactionPrunerJob> jobQueue) throws TransactionPruningException {
         while(!Thread.interrupted() && jobQueue.size() >= 2 || ((MilestonePrunerJob) jobQueue.getFirst()).targetIndex < ((MilestonePrunerJob) jobQueue.getFirst()).currentIndex) {
             MilestonePrunerJob firstJob = (MilestonePrunerJob) jobQueue.removeFirst();
             firstJob.process();
@@ -147,7 +170,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
 
                 secondJob.process();
 
-                consolidateQueue(transactionPruner, jobQueue);
+                consolidateQueue(transactionPruner, snapshotManager, jobQueue);
             } else {
                 jobQueue.addFirst(firstJob);
 
@@ -169,7 +192,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      * @return a new {@link MilestonePrunerJob} with the provided details
      * @throws TransactionPruningException if anything goes wrong while parsing the input
      */
-    private static MilestonePrunerJob parse(String input) throws TransactionPruningException {
+    protected static MilestonePrunerJob parse(String input) throws TransactionPruningException {
         String[] parts = input.split(";", 2);
         if(parts.length >= 2) {
             return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]));
@@ -201,7 +224,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      * @param startingIndex milestone index that defines where to start cleaning up
      * @param currentIndex milestone index that defines the next milestone that should be cleaned up by this job
      */
-    private MilestonePrunerJob(int startingIndex, int currentIndex) {
+    protected MilestonePrunerJob(int startingIndex, int currentIndex) {
         this.startingIndex = startingIndex;
         this.currentIndex = currentIndex;
     }
@@ -221,7 +244,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
 
             currentIndex--;
 
-            transactionPruner.persistChanges();
+            transactionPruner.saveState();
         }
     }
 
@@ -247,20 +270,20 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
         try {
             // collect elements to delete
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(transactionPruner.tangle, currentIndex);
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
             if (milestoneViewModel != null) {
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                if (!transactionPruner.snapshotManager.getInitialSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
+                if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
                     transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
                 }
-                DAGHelper.get(transactionPruner.tangle).traverseApprovees(
+                DAGHelper.get(tangle).traverseApprovees(
                 milestoneViewModel.getHash(),
                 approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
                 approvedTransaction -> {
                     elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
-                    if (!transactionPruner.snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
+                    if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
                         try {
                             transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
                         } catch(TransactionPruningException e) {
@@ -272,12 +295,12 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
             }
 
             // clean database entries
-            transactionPruner.tangle.deleteBatch(elementsToDelete);
+            tangle.deleteBatch(elementsToDelete);
 
             // clean runtime caches
             elementsToDelete.forEach(element -> {
                 if(Transaction.class.equals(element.hi)) {
-                    transactionPruner.tipsViewModel.removeTipHash((Hash) element.low);
+                    tipsViewModel.removeTipHash((Hash) element.low);
                 } else if(Milestone.class.equals(element.hi)) {
                     MilestoneViewModel.clear(((IntegerIndex) element.low).getValue());
                 }
@@ -296,7 +319,7 @@ public class MilestonePrunerJob extends TransactionPrunerJob {
      *
      * @return serialized representation of this job that can be used to persist its state
      */
-    String serialize() {
+    public String serialize() {
         return startingIndex + ";" + currentIndex;
     }
 }

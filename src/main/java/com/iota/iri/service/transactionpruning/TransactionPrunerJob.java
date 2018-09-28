@@ -1,16 +1,9 @@
 package com.iota.iri.service.transactionpruning;
 
 /**
- * This class is a template for a {@link TransactionPruner} job.
- *
- * It acts as a base class and a generic interface for processing the jobs in the {@link TransactionPruner}.
+ * This interface represents the basic contract for a job that get processed by the {@link TransactionPruner}.
  */
-abstract class TransactionPrunerJob {
-    /**
-     * Holds a reference to the {@link TransactionPruner} that this job belongs to.
-     */
-    TransactionPruner transactionPruner;
-
+public interface TransactionPrunerJob {
     /**
      * This method is used to inform the job about the {@link TransactionPruner} it belongs to.
      *
@@ -18,21 +11,19 @@ abstract class TransactionPrunerJob {
      *
      * @param transactionPruner TransactionPruner that this job belongs to
      */
-    void registerGarbageCollector(TransactionPruner transactionPruner) {
-        this.transactionPruner = transactionPruner;
-    }
+    void registerGarbageCollector(TransactionPruner transactionPruner);
 
     /**
      * This method processes the cleanup job and performs the actual pruning.
      *
      * @throws TransactionPruningException if something goes wrong while processing the job
      */
-    abstract void process() throws TransactionPruningException;
+    void process() throws TransactionPruningException;
 
     /**
-     * This method is used to serialize the job before it gets persisted in the {@link TransactionPruner} state file.
+     * This method is used to serialize the job before it gets persisted by the {@link TransactionPruner}.
      *
      * @return string representing a serialized version of this job
      */
-    abstract String serialize();
+    String serialize();
 }

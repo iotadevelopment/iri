@@ -12,7 +12,7 @@ public class TransactionPruningException extends Exception {
      * @param message reason why this error occurred
      * @param cause wrapped exception that caused this error
      */
-    TransactionPruningException(String message, Throwable cause) {
+    public TransactionPruningException(String message, Throwable cause) {
         super(message, cause);
     }
 
@@ -22,7 +22,7 @@ public class TransactionPruningException extends Exception {
      *
      * @param message reason why this error occurred
      */
-    TransactionPruningException(String message) {
+    public TransactionPruningException(String message) {
         super(message);
     }
 
@@ -32,7 +32,7 @@ public class TransactionPruningException extends Exception {
      *
      * @param cause wrapped exception that caused this error
      */
-    TransactionPruningException(Throwable cause) {
+    public TransactionPruningException(Throwable cause) {
         super(cause);
     }
 }
