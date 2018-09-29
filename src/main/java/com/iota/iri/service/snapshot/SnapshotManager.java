@@ -28,7 +28,7 @@ public class SnapshotManager {
     /**
      * Time in seconds that we wait for orphaned transactions to consider them orphaned.
      */
-    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 300;
+    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
