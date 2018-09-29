@@ -182,9 +182,7 @@ public class TransactionValidator {
                 if(!transaction.isSolid()) {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hashPointer)) {
                         solid = false;
-                        transactionRequester.requestTransaction(hashPointer, milestone);
-                        break;
-/*
+
                         if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
                             transactionRequester.requestTransaction(hashPointer, milestone);
                             break;
@@ -192,12 +190,9 @@ public class TransactionValidator {
                             transactionRequester.requestTransaction(hashPointer, milestone);
                             break;
                         }
-                        */
                     } else {
-                        if(solid) {
-                            nonAnalyzedTransactions.offer(transaction.getTrunkTransactionHash());
-                            nonAnalyzedTransactions.offer(transaction.getBranchTransactionHash());
-                        }
+                        nonAnalyzedTransactions.offer(transaction.getTrunkTransactionHash());
+                        nonAnalyzedTransactions.offer(transaction.getBranchTransactionHash());
                     }
                 }
             }
