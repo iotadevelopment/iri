@@ -6,6 +6,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -388,8 +389,8 @@ public class SnapshotMetaData implements Cloneable {
                     String.valueOf(seenMilestones.size())
                 ),
                 Stream.concat(
-                    solidEntryPoints.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
-                    seenMilestones.entrySet().stream().<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
+                    solidEntryPoints.entrySet().stream().sorted(Map.Entry.comparingByValue()).<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
+                    seenMilestones.entrySet().stream().sorted(Map.Entry.comparingByValue()).<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
                 )
             ).iterator()
         );
