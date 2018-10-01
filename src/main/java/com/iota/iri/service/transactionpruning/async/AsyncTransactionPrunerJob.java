@@ -6,6 +6,10 @@ import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.storage.Tangle;
 
+/**
+ * Fulfills the contract of {@link TransactionPrunerJob} while implementing the most basic functionality that is shared
+ * by the different kinds of jobs.
+ */
 public abstract class AsyncTransactionPrunerJob implements TransactionPrunerJob {
     private TransactionPruner transactionPruner;
 

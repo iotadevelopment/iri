@@ -5,6 +5,7 @@ import com.iota.iri.service.transactionpruning.TransactionPruningException;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.NoSuchElementException;
 
 public class JobQueue {
     private final Deque<TransactionPrunerJob> jobs = new ArrayDeque<>();
@@ -24,14 +25,27 @@ public class JobQueue {
     /**
      * This method processes the entire queue of this job type.
      *
-     * While it finds jobs, it retrieves the first job, processes it and then removes it from the queue, before
-     * persisting the changes to keep track of the progress.
+     * While it finds jobs, it retrieves the first job and processes it. If an error occurs while executing the job, we
+     * add it back to the end of the queue, so it can be tried again later.
      *
      * @throws TransactionPruningException if anything goes wrong while processing the jobs
      */
     public void processJobs() throws TransactionPruningException {
         while(!Thread.interrupted() && jobs.size() >= 1) {
-            jobs.removeFirst().process();
+            TransactionPrunerJob currentJob;
+
+            try {
+                currentJob = jobs.removeFirst();
+                try {
+                    currentJob.process();
+                } catch (TransactionPruningException e) {
+                    jobs.addLast(currentJob);
+
+                    throw e;
+                }
+            } catch(NoSuchElementException e) {
+                /* something cleared the job in the mean time -> ignore */
+            }
         }
     }
 }

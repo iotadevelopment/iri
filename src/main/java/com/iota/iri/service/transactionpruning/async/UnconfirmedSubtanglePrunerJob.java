@@ -74,7 +74,7 @@ public class UnconfirmedSubtanglePrunerJob extends AsyncTransactionPrunerJob {
             // clean runtime caches
             elementsToDelete.forEach(element -> getTipsViewModel().removeTipHash((Hash) element.low));
 
-            getTransactionPruner().saveState();
+            ((AsyncTransactionPruner) getTransactionPruner()).saveState();
         } catch (Exception e) {
             throw new TransactionPruningException("failed to cleanup orphaned approvers of transaction " + transactionHash, e);
         }

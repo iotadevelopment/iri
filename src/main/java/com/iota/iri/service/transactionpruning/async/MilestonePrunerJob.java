@@ -126,7 +126,7 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
 
             currentIndex--;
 
-            getTransactionPruner().saveState();
+            ((AsyncTransactionPruner) getTransactionPruner()).requestPersistence();
         }
     }
 

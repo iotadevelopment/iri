@@ -5,9 +5,6 @@ import com.iota.iri.service.snapshot.SnapshotManager;
 /**
  * This interface represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in
  * connection with local snapshots and eventually other parts of the code.
- *
- * It plans, manages and executes the cleanup jobs asynchronously in a separate thread so cleaning up does not affect
- * the performance of the other tasks of the node.
  */
 public interface TransactionPruner {
     /**
@@ -39,7 +36,7 @@ public interface TransactionPruner {
      * This method saves the current state of the {@link TransactionPruner}, so it can later be restored by
      * {@link #restoreState()}.
      *
-     * It is used to keep the state between IRI restarts and pick up pruning where it stopped when IRI shut down.
+     * It is used to maintain the state between IRI restarts and pick up pruning where it stopped when IRI shut down.
      *
      * @throws TransactionPruningException if anything goes wrong while saving the current state
      */
