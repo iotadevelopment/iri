@@ -142,7 +142,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
 
         getJobQueue(job.getClass()).addJob(job);
 
-        requestPersistence();
+        saveState();
     }
 
     /**
@@ -161,7 +161,11 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
      *       file on the hard disk. For now the trade off between faster processing times and leaving some garbage is
      *       reasonable.
      */
-    public void saveState() throws TransactionPruningException {
+    public void saveState() {
+        persistRequested = true;
+    }
+
+    public void saveStateNow() throws TransactionPruningException {
         try {
             AtomicInteger jobsPersisted = new AtomicInteger(0);
 
@@ -187,10 +191,6 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         } catch(Exception e) {
             throw new TransactionPruningException("failed to write the state file", e);
         }
-    }
-
-    public void requestPersistence() {
-        persistRequested = true;
     }
 
 
@@ -283,7 +283,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         while(!Thread.interrupted()) {
             try {
                 if (persistRequested) {
-                    saveState();
+                    saveStateNow();
 
                     persistRequested = false;
                 }

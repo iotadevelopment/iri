@@ -22,6 +22,7 @@ import com.iota.iri.service.tipselection.impl.WalkValidatorImpl;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.IotaIOUtils;
 import com.iota.iri.utils.MapIdentityManager;
+import com.iota.iri.utils.dag.DAGHelper;
 import io.undertow.Undertow;
 import io.undertow.security.api.AuthenticationMechanism;
 import io.undertow.security.api.AuthenticationMode;
@@ -214,6 +215,30 @@ public class API {
                         );*/
 
                     return ErrorResponse.create("reset successfull");
+                }
+                case "diagnostic": {
+                    Hash transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
+                    TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+
+                    if (milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                        return ErrorResponse.create("requested transaction does not exist");
+                    }
+
+                    AtomicInteger transactionsTraversed = new AtomicInteger(0);
+                    AtomicInteger lowestReferencedMilestone = new AtomicInteger(milestoneTransaction.snapshotIndex());
+
+                    DAGHelper.get(instance.tangle).traverseApprovees(
+                        transactionHash,
+                        transaction -> {
+                            transactionsTraversed.incrementAndGet();
+                            lowestReferencedMilestone.set(Math.min(lowestReferencedMilestone.get(), transaction.snapshotIndex()));
+
+                            return transaction.snapshotIndex() == transaction.snapshotIndex();
+                        },
+                        transaction -> {}
+                    );
+
+                    return ErrorResponse.create("lowest referenced milestone: " + lowestReferencedMilestone.get() + "; transactions traversed: " + transactionsTraversed.get());
                 }
                 case "getTransactionDetails": {
                     Hash transactionHash;
