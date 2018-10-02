@@ -233,7 +233,7 @@ public class API {
                             transactionsTraversed.incrementAndGet();
                             lowestReferencedMilestone.set(Math.min(lowestReferencedMilestone.get(), transaction.snapshotIndex()));
 
-                            return transaction.snapshotIndex() == transaction.snapshotIndex();
+                            return transaction.snapshotIndex() == milestoneTransaction.snapshotIndex();
                         },
                         transaction -> {}
                     );
