@@ -1,11 +1,10 @@
-package com.iota.iri.service.transactionpruning.async;
+package com.iota.iri.service.transactionpruning.jobs;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.Milestone;
 import com.iota.iri.model.Transaction;
-import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
@@ -15,22 +14,21 @@ import com.iota.iri.utils.dag.DAGHelper;
 import java.util.*;
 
 /**
- * This class represents a cleanup job for the {@link TransactionPruner}.
+ * Represents a cleanup job for the {@link TransactionPruner} that removes milestones and all of their directly and
+ * indirectly referenced transactions (and the orphaned subtangles branching off of the deleted transactions).
  *
- * It removes milestones and all of their directly and indirectly referenced transactions ( and the orphaned subtangles
- * branching off of the deleted transactions). Therefore it is used by the
- * {@link com.iota.iri.service.snapshot.SnapshotManager} to clean up milestones prior to a snapshot.
- *
- * It gets processed one milestone at a time persisting the progress after each step.
+ * It is used by the {@link com.iota.iri.service.snapshot.SnapshotManager} to clean up milestones prior to a snapshot.
+ * Even though it defines a range of milestones that shall be deleted, it gets processed one milestone at a time,
+ * persisting the progress after each step.
  */
-public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
+public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     /**
-     * Holds the milestone index where this job starts cleaning up (read only).
+     * Holds the milestone index where this job starts cleaning up.
      */
     private int startingIndex;
 
     /**
-     * Holds the milestone index where this job stops cleaning up (read only).
+     * Holds the milestone index where this job stops cleaning up.
      */
     private int targetIndex;
 
@@ -40,7 +38,8 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
     private int currentIndex;
 
     /**
-     * This method parses the string representation of a {@link MilestonePrunerJob} and creates the corresponding object.
+     * This method parses the string representation of a {@link MilestonePrunerJob} and creates the corresponding
+     * object.
      *
      * It splits the String input in two parts (delimited by a ";") and passes them into the constructor of a new
      * {@link MilestonePrunerJob} by interpreting them as {@link #startingIndex} and {@link #currentIndex} of the job.
@@ -52,9 +51,9 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
      * @return a new {@link MilestonePrunerJob} with the provided details
      * @throws TransactionPruningException if anything goes wrong while parsing the input
      */
-    protected static MilestonePrunerJob parse(String input) throws TransactionPruningException {
+    public static MilestonePrunerJob parse(String input) throws TransactionPruningException {
         String[] parts = input.split(";", 2);
-        if(parts.length >= 2) {
+        if(parts.length == 2) {
             return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]));
         }
 
@@ -63,8 +62,8 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
 
     /**
      * Does same as {@link #MilestonePrunerJob(int, int)} but defaults to the {@link #currentIndex} being the same as
-     * the {@link #startingIndex}. This is usually the case when we create a new job programmatically that does not get
-     * restored from a state file.
+     * the {@link #startingIndex}. This is usually the case when we create a NEW job programmatically that does not get
+     * restored from a state file, because we start cleaning up at the {@link #startingIndex}.
      *
      * @param startingIndex milestone index that defines where to start cleaning up
      */
@@ -73,40 +72,62 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
     }
 
     /**
-     * Constructor of the job receiving both values that are relevant for the job.
+     * Creates a job that cleans all milestones prior (and including) the {@code startingIndex} and that is set to have
+     * progressed already to the given {@code currentIndex}.
      *
-     * It simply stores the provided parameters in its according protected properties.
-     *
-     * Since cleanup jobs can be consolidated (to reduce the size of the {@link TransactionPruner} state file), we need
-     * to be able provide both parameters even tho the job usually always "starts" with its {@code currentIndex} being
-     * equal to the {@code startingIndex}.
+     * Since cleanup jobs can be consolidated (to reduce the size of the {@link TransactionPruner} state file) and
+     * restored (after IRI restarts), we need to be able provide both parameters even tho the job usually always
+     * "starts" with its {@code currentIndex} being equal to the {@code startingIndex}.
      *
      * @param startingIndex milestone index that defines where to start cleaning up
      * @param currentIndex milestone index that defines the next milestone that should be cleaned up by this job
      */
-    protected MilestonePrunerJob(int startingIndex, int currentIndex) {
-        this.startingIndex = startingIndex;
-        this.currentIndex = currentIndex;
+    private MilestonePrunerJob(int startingIndex, int currentIndex) {
+        setStartingIndex(startingIndex);
+        setCurrentIndex(currentIndex);
     }
 
+    /**
+     * Getter of the {@link #startingIndex}.
+     *
+     * @return milestone index where this job starts cleaning up
+     */
     public int getStartingIndex() {
         return startingIndex;
     }
 
-    public MilestonePrunerJob setStartingIndex(int startingIndex) {
+    /**
+     * Setter of the {@link #startingIndex}.
+     *
+     * @param startingIndex milestone index where this job starts cleaning up
+     */
+    public void setStartingIndex(int startingIndex) {
         this.startingIndex = startingIndex;
-
-        return this;
     }
 
+    /**
+     * Getter of the {@link #currentIndex}.
+     *
+     * @return milestone index of the oldest milestone that was cleaned up already (the current progress)
+     */
     public int getCurrentIndex() {
         return currentIndex;
     }
 
+    /**
+     * Getter of the {@link #targetIndex}.
+     *
+     * @return milestone index where this job stops cleaning up
+     */
     public int getTargetIndex() {
         return targetIndex;
     }
 
+    /**
+     * Setter of the {@link #targetIndex}.
+     *
+     * @param targetIndex milestone index where this job stops cleaning up
+     */
     public void setTargetIndex(int targetIndex) {
         this.targetIndex = targetIndex;
     }
@@ -121,13 +142,29 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
      * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
      */
     public void process() throws TransactionPruningException {
-        while(!Thread.interrupted() && targetIndex < currentIndex) {
+        while(!Thread.interrupted() && getTargetIndex() < getCurrentIndex()) {
             cleanupMilestoneTransactions();
 
-            currentIndex--;
+            setCurrentIndex(getCurrentIndex() - 1);
 
-            getTransactionPruner().saveState();
+            // persist changes if the job was executed by a TransactionPruner (tests might execute the job standalone)
+            if (getTransactionPruner() != null) {
+                getTransactionPruner().saveState();
+            }
         }
+    }
+
+    /**
+     * This method creates the serialized representation of the job, that is used to persist the state of the
+     * {@link TransactionPruner}.
+     *
+     * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
+     * describe the job.
+     *
+     * @return serialized representation of this job that can be used to persist its state
+     */
+    public String serialize() {
+        return getStartingIndex() + ";" + getCurrentIndex();
     }
 
     /**
@@ -139,8 +176,8 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
      * collecting them in a List of items to delete. Once all transactions where found we issue a batchDelete.
      *
      * While processing the transactions that are directly or indirectly referenced by the chosen milestone, we also
-     * issue additional {@link UnconfirmedSubtanglePrunerJob}s that remove the orphaned parts of the tangle that branch off
-     * the deleted transactions because they would otherwise loose their connection to the rest of the tangle unless
+     * issue additional {@link UnconfirmedSubtanglePrunerJob}s that remove the orphaned parts of the tangle that branch
+     * off the deleted transactions because they would otherwise loose their connection to the rest of the tangle unless
      * they are branching off a solid entry point (in which case we wait with the deletion until the solid entry point
      * becomes irrelevant).
      *
@@ -152,7 +189,7 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
         try {
             // collect elements to delete
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(getTangle(), currentIndex);
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(getTangle(), getCurrentIndex());
             if (milestoneViewModel != null) {
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
@@ -188,20 +225,18 @@ public class MilestonePrunerJob extends AsyncTransactionPrunerJob {
                 }
             });
         } catch(Exception e) {
-            throw new TransactionPruningException("failed to cleanup milestone #" + currentIndex, e);
+            throw new TransactionPruningException("failed to cleanup milestone #" + getCurrentIndex(), e);
         }
     }
 
     /**
-     * This method creates the serialized representation of the job, that is used to persist the state of the
-     * {@link TransactionPruner}.
+     * Setter of the {@link #currentIndex}.
      *
-     * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
-     * describe the job.
+     * It only gets called internally while processing the job, to keep track of the progress.
      *
-     * @return serialized representation of this job that can be used to persist its state
+     * @param currentIndex milestone index of the oldest milestone that was cleaned up already (the current progress)
      */
-    public String serialize() {
-        return startingIndex + ";" + currentIndex;
+    private void setCurrentIndex(int currentIndex) {
+        this.currentIndex = currentIndex;
     }
 }

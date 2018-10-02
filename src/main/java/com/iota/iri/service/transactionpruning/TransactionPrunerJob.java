@@ -5,7 +5,7 @@ import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.storage.Tangle;
 
 /**
- * This interface represents the basic contract for a job that get processed by the {@link TransactionPruner}.
+ * Represents the basic contract for a job that get processed by the {@link TransactionPruner}.
  */
 public interface TransactionPrunerJob {
     /**

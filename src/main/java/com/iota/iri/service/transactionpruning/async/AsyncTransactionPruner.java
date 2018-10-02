@@ -3,10 +3,11 @@ package com.iota.iri.service.transactionpruning.async;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.service.snapshot.Snapshot;
-import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
+import com.iota.iri.service.transactionpruning.jobs.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
@@ -118,8 +119,8 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         this.snapshot = snapshot;
         this.config = config;
 
-        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new JobQueue());
-        addJobQueue(MilestonePrunerJob.class, new MilestonePrunerJobQueue(config));
+        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new JobQueue(this));
+        addJobQueue(MilestonePrunerJob.class, new MilestonePrunerJobQueue(this, config));
 
         registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
         registerParser(UnconfirmedSubtanglePrunerJob.class, UnconfirmedSubtanglePrunerJob::parse);
@@ -172,7 +173,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
                 () -> jobQueues.values().stream()
-                      .flatMap(jobQueue -> jobQueue.getJobs().stream())
+                      .flatMap(JobQueue::stream)
                       .<CharSequence>map(jobEntry -> {
                           jobsPersisted.incrementAndGet();
 

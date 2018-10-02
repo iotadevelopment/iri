@@ -3,8 +3,8 @@ package com.iota.iri.service.transactionpruning;
 import com.iota.iri.service.snapshot.SnapshotManager;
 
 /**
- * This interface represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in
- * connection with local snapshots and eventually other parts of the code.
+ * Represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in connection with local
+ * snapshots and eventually other parts of the code.
  */
 public interface TransactionPruner {
     /**

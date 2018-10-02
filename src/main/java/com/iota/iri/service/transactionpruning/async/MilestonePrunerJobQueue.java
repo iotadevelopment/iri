@@ -1,20 +1,47 @@
 package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
+import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 
 import java.util.Deque;
 
+/**
+ * Represents a queue of {@link MilestonePrunerJob}s thar are being executed by the {@link AsyncTransactionPruner}.
+ *
+ * The {@link AsyncTransactionPruner} uses a separate queue for every job type, to be able to adjust the processing
+ * logic based on the type of the job.
+ */
 public class MilestonePrunerJobQueue extends JobQueue {
+    /**
+     * Holds a reference to the config with snapshot related parameters.
+     */
     private final SnapshotConfig snapshotConfig;
 
-    public MilestonePrunerJobQueue(SnapshotConfig snapshotConfig) {
-        super();
+    /**
+     * Creates a new queue that is tailored to handle {@link MilestonePrunerJob}s.
+     *
+     * Since the {@link MilestonePrunerJob}s can take a long time until they are fully processed, we handle them in a
+     * different way than other jobs and consolidate the queue whenever possible.
+     *
+     * @param transactionPruner reference to the container of this queue
+     * @param snapshotConfig reference to the config with snapshot related parameters
+     */
+    public MilestonePrunerJobQueue(TransactionPruner transactionPruner, SnapshotConfig snapshotConfig) {
+        super(transactionPruner);
 
         this.snapshotConfig = snapshotConfig;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * After adding the job we consolidate the queue.
+     *
+     * @param job job that shall be added to the queue
+     */
     @Override
     public void addJob(TransactionPrunerJob job) {
         super.addJob(job);
@@ -56,6 +83,8 @@ public class MilestonePrunerJobQueue extends JobQueue {
                 secondJob.process();
 
                 consolidate();
+
+                getTransactionPruner().saveState();
             } else {
                 jobQueue.addFirst(firstJob);
 
@@ -89,7 +118,8 @@ public class MilestonePrunerJobQueue extends JobQueue {
 
             // if both first job are done -> consolidate them and persists the changes
             if(job1.getCurrentIndex() == snapshotConfig.getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
-                jobQueue.addFirst(job1.setStartingIndex(job2.getStartingIndex()));
+                job1.setStartingIndex(job2.getStartingIndex());
+                jobQueue.addFirst(job1);
             }
 
             // otherwise just add them back to the queue
@@ -119,6 +149,7 @@ public class MilestonePrunerJobQueue extends JobQueue {
             }
         }
 
+        // update the target index of the jobs
         int previousStartIndex = snapshotConfig.getMilestoneStartIndex();
         for(TransactionPrunerJob currentJob : jobQueue) {
             ((MilestonePrunerJob) currentJob).setTargetIndex(previousStartIndex);
