@@ -279,7 +279,7 @@ public class SnapshotManager {
                         TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT &&
                         !Hash.NULL_HASH.equals(solidEntryPoint.getKey())
                     ) {
-                        transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                        //transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
                     }
                 } catch (TransactionPruningException e) {
                     log.error("could not add cleanup job to garbage collector", e);
