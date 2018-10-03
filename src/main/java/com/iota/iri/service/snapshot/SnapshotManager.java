@@ -511,7 +511,13 @@ public class SnapshotManager {
         }
 
         try {
-            transactionPruner.addJob(new MilestonePrunerJob(targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
+            int targetIndex = targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay();
+            int startingIndex = configuration.getMilestoneStartIndex() + 1;
+
+            if (targetIndex >= startingIndex) {
+                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
+            }
+
         } catch(TransactionPruningException e) {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }

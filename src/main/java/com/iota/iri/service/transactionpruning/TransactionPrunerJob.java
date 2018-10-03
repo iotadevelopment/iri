@@ -91,6 +91,20 @@ public interface TransactionPrunerJob {
     Snapshot getSnapshot();
 
     /**
+     * Getter for the execution status of the job.
+     *
+     * @return execution status of the job.
+     */
+    TransactionPrunerJobStatus getStatus();
+
+    /**
+     * Setter for the execution status of the job.
+     *
+     * @param transactionPrunerJobStatus new execution status of the job
+     */
+    void setStatus(TransactionPrunerJobStatus transactionPrunerJobStatus);
+
+    /**
      * This method processes the cleanup job and performs the actual pruning.
      *
      * @throws TransactionPruningException if something goes wrong while processing the job

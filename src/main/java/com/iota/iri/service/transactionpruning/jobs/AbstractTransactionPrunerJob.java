@@ -4,6 +4,7 @@ import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
+import com.iota.iri.service.transactionpruning.TransactionPrunerJobStatus;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.storage.Tangle;
 
@@ -12,6 +13,11 @@ import com.iota.iri.storage.Tangle;
  * by the different kinds of jobs.
  */
 public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJob {
+    /**
+     * Holds the execution status of the job.
+     */
+    TransactionPrunerJobStatus status = TransactionPrunerJobStatus.PENDING;
+
     /**
      * Holds a reference to the manager of the job that schedules it execution.
      */
@@ -94,6 +100,22 @@ public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJ
     @Override
     public Snapshot getSnapshot() {
         return snapshot;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public TransactionPrunerJobStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setStatus(TransactionPrunerJobStatus status) {
+        this.status = status;
     }
 
     /**

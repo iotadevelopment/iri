@@ -52,9 +52,9 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @throws TransactionPruningException if anything goes wrong while parsing the input
      */
     public static MilestonePrunerJob parse(String input) throws TransactionPruningException {
-        String[] parts = input.split(";", 2);
-        if(parts.length == 2) {
-            return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]));
+        String[] parts = input.split(";");
+        if(parts.length == 3) {
+            return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]), Integer.valueOf(parts[2]));
         }
 
         throw new TransactionPruningException("failed to parse TransactionPruner file - invalid input: " + input);
@@ -67,8 +67,8 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      *
      * @param startingIndex milestone index that defines where to start cleaning up
      */
-    public MilestonePrunerJob(int startingIndex) {
-        this(startingIndex, startingIndex);
+    public MilestonePrunerJob(int startingIndex, int targetIndex) {
+        this(startingIndex, startingIndex, targetIndex);
     }
 
     /**
@@ -82,9 +82,10 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @param startingIndex milestone index that defines where to start cleaning up
      * @param currentIndex milestone index that defines the next milestone that should be cleaned up by this job
      */
-    private MilestonePrunerJob(int startingIndex, int currentIndex) {
+    private MilestonePrunerJob(int startingIndex, int currentIndex, int targetIndex) {
         setStartingIndex(startingIndex);
         setCurrentIndex(currentIndex);
+        setTargetIndex(targetIndex);
     }
 
     /**
@@ -115,6 +116,15 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     }
 
     /**
+     * Setter of the {@link #currentIndex}.
+     *
+     * @param currentIndex milestone index of the oldest milestone that was cleaned up already (the current progress)
+     */
+    public void setCurrentIndex(int currentIndex) {
+        this.currentIndex = currentIndex;
+    }
+
+    /**
      * Getter of the {@link #targetIndex}.
      *
      * @return milestone index where this job stops cleaning up
@@ -142,15 +152,29 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
      */
     public void process() throws TransactionPruningException {
-        while(!Thread.interrupted() && getTargetIndex() < getCurrentIndex()) {
+        synchronized (this) {
+            setStatus(TransactionPrunerJobStatus.RUNNING);
+        }
+
+        while(!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
             cleanupMilestoneTransactions();
 
-            setCurrentIndex(getCurrentIndex() - 1);
+            setCurrentIndex(getCurrentIndex() + 1);
+
+            synchronized (this) {
+                if (getTargetIndex() < getCurrentIndex()) {
+                    setStatus(TransactionPrunerJobStatus.DONE);
+                }
+            }
 
             // persist changes if the job was executed by a TransactionPruner (tests might execute the job standalone)
             if (getTransactionPruner() != null) {
                 getTransactionPruner().saveState();
             }
+        }
+
+        synchronized (this) {
+            setStatus(TransactionPrunerJobStatus.DONE);
         }
     }
 
@@ -164,7 +188,7 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @return serialized representation of this job that can be used to persist its state
      */
     public String serialize() {
-        return getStartingIndex() + ";" + getCurrentIndex();
+        return getStartingIndex() + ";" + getCurrentIndex() + ";" + getTargetIndex();
     }
 
     /**
@@ -227,16 +251,5 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
         } catch(Exception e) {
             throw new TransactionPruningException("failed to cleanup milestone #" + getCurrentIndex(), e);
         }
-    }
-
-    /**
-     * Setter of the {@link #currentIndex}.
-     *
-     * It only gets called internally while processing the job, to keep track of the progress.
-     *
-     * @param currentIndex milestone index of the oldest milestone that was cleaned up already (the current progress)
-     */
-    private void setCurrentIndex(int currentIndex) {
-        this.currentIndex = currentIndex;
     }
 }

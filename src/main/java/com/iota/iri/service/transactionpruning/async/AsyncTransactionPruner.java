@@ -119,7 +119,7 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         this.snapshot = snapshot;
         this.config = config;
 
-        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new JobQueue(this));
+        addJobQueue(UnconfirmedSubtanglePrunerJob.class, new SimpleJobQueue(this));
         addJobQueue(MilestonePrunerJob.class, new MilestonePrunerJobQueue(this, config));
 
         registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
