@@ -8,7 +8,6 @@ import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 
 import java.util.Deque;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Stream;
 
@@ -20,7 +19,7 @@ import java.util.stream.Stream;
  */
 public class MilestonePrunerJobQueue implements JobQueue {
     /**
-     * Holds the milestone index that was
+     * Holds the youngest (highest) milestone index that was successfully cleaned (gets updated when a job finishes).
      */
     private int youngestFullyCleanedMilestoneIndex;
 
@@ -29,25 +28,19 @@ public class MilestonePrunerJobQueue implements JobQueue {
      */
     private final TransactionPruner transactionPruner;
 
-    /**
-     * Holds a reference to the config with snapshot related parameters.
-     */
-    private final SnapshotConfig snapshotConfig;
-
     private final Deque<TransactionPrunerJob> jobs = new ConcurrentLinkedDeque<>();
 
     /**
      * Creates a new queue that is tailored to handle {@link MilestonePrunerJob}s.
      *
      * Since the {@link MilestonePrunerJob}s can take a long time until they are fully processed, we handle them in a
-     * different way than other jobs and consolidate the queue whenever possible.
+     * different way than other jobs and consolidate the queue whenever we add a new job.
      *
      * @param transactionPruner reference to the container of this queue
      * @param snapshotConfig reference to the config with snapshot related parameters
      */
     public MilestonePrunerJobQueue(TransactionPruner transactionPruner, SnapshotConfig snapshotConfig) {
         this.transactionPruner = transactionPruner;
-        this.snapshotConfig = snapshotConfig;
 
         youngestFullyCleanedMilestoneIndex = snapshotConfig.getMilestoneStartIndex();
     }
@@ -55,20 +48,28 @@ public class MilestonePrunerJobQueue implements JobQueue {
     /**
      * {@inheritDoc}
      *
-     * After adding the job we consolidate the queue.
+     * This queue will only accept {@link MilestonePrunerJob}s, since it is tailored to the logic related to cleaning up
+     * milestones.
+     *
+     * Since the {@link MilestonePrunerJob}s can take a long time to finish, we try to consolidate the queue when we add
+     * new jobs, so the state file doesn't get to big while the node is busy cleaning up the milestones. To do so, we
+     * first check if the job that shall be added isn't covered by existing cleanup jobs, yet. If it targets a milestone
+     * outside of the already covered range, we also check if the last existing job can be extended to cover the target
+     * milestone index of our new job.
+     *
+     * If the job can not be appended to an existing job, we add it to the end of our queue.
      *
      * @param job job that shall be added to the queue
+     * @throws if anything goes wrong while adding the job
      */
     @Override
     public void addJob(TransactionPrunerJob job) throws TransactionPruningException {
-        // if wrong type -> abort
         if (!(job instanceof MilestonePrunerJob)) {
             throw new TransactionPruningException("the MilestonePrunerJobQueue only supports MilestonePrunerJobs");
         }
 
-        // we usually only create jobs from 1 thread anyway but - better be safe than sorry
+        // we usually only create jobs from 1 thread anyway, but better be safe than sorry
         synchronized (jobs) {
-            // create variables for the relevant jobs for our consolidated addition
             MilestonePrunerJob newMilestonePrunerJob = (MilestonePrunerJob) job;
             MilestonePrunerJob lastMilestonePrunerJob = (MilestonePrunerJob) jobs.peekLast();
 
@@ -86,7 +87,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
             if (lastTargetIndex >= newMilestonePrunerJob.getStartingIndex()) {
                 newMilestonePrunerJob.setStartingIndex(lastTargetIndex + 1);
             }
-            if (lastTargetIndex > newMilestonePrunerJob.getCurrentIndex()) {
+            if (lastTargetIndex >= newMilestonePrunerJob.getCurrentIndex()) {
                 newMilestonePrunerJob.setCurrentIndex(lastTargetIndex + 1);
             }
 
@@ -101,7 +102,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
                 }
             }
 
-            // otherwise just add it as a new job
+            // otherwise just add it as a new job at the end of the queue
             jobs.add(newMilestonePrunerJob);
         }
     }
@@ -117,14 +118,14 @@ public class MilestonePrunerJobQueue implements JobQueue {
     }
 
     /**
-     * This method processes the entire queue of this job.
+     * {@inheritDoc}
      *
-     * It first retrieves the first job and processes it until it is completely done. If it finds a second job, it
-     * immediately tries to process that one as well. If both jobs are done it triggers a consolidation to merge both
-     * done jobs into a single one.
+     * It retrieves the first job while leaving it in the queue, so the job can persist its changes when it finishes a
+     * sub-task. After the job was successfully processed, we update the internal
+     * {@link #youngestFullyCleanedMilestoneIndex} marker (so jobs that might be added later can continue where this job
+     * stopped, without having to reexamine all the previous milestones) and remove it from the queue.
      *
-     * We keep the first done job in the queue (even though it might have been consolidated) because we need its
-     * {@link MilestonePrunerJob#startingIndex} to determine the next jobs {@link MilestonePrunerJob#targetIndex}.
+     * After every processed job, we persist the changes by calling the {@link TransactionPruner#saveState()} method.
      *
      * @throws TransactionPruningException if anything goes wrong while processing the jobs
      */
@@ -137,6 +138,12 @@ public class MilestonePrunerJobQueue implements JobQueue {
 
                 youngestFullyCleanedMilestoneIndex = currentJob.getTargetIndex();
 
+                // we always leave the last job in the queue to be able to "serialize" the queue status and allow
+                // to skip already processed milestones even when IRI restarts
+                if (jobs.size() == 1) {
+                    break;
+                }
+
                 jobs.poll();
             } finally {
                 transactionPruner.saveState();
@@ -146,69 +153,6 @@ public class MilestonePrunerJobQueue implements JobQueue {
 
     @Override
     public Stream<TransactionPrunerJob> stream() {
-        return ((Deque<TransactionPrunerJob>) jobs).stream();
-    }
-
-    /**
-     * This method consolidates the cleanup jobs by merging two or more jobs together if they are either both done or
-     * pending.
-     *
-     * It is used to clean up the queue and the corresponding {@link AsyncTransactionPruner} file, so it always has a
-     * size of less than 4 jobs.
-     *
-     * Since the jobs are getting processed from the beginning of the queue, we first check if the first two jobs are
-     * "done" and merge them into a single one that reflects the "done" status of both jobs. Consecutively we check if
-     * there are two or more pending jobs at the end that can also be consolidated.
-     *
-     * It is important to note that the jobs always clean from their startingPosition to the startingPosition of the
-     * previous job (or the {@code milestoneStartIndex} of the last global snapshot if there is no previous one) without
-     * any gaps in between which is required to be able to merge them.
-     */
-    private void consolidate() {
-        // if we have at least 2 jobs -> check if we can consolidate them at the beginning (both done)
-        if(jobs.size() >= 2) {
-            MilestonePrunerJob job1 = (MilestonePrunerJob) jobs.removeFirst();
-            MilestonePrunerJob job2 = (MilestonePrunerJob) jobs.removeFirst();
-
-            // if both first job are done -> consolidate them and persists the changes
-            if(job1.getCurrentIndex() == snapshotConfig.getMilestoneStartIndex() && job2.getCurrentIndex() == job1.getStartingIndex()) {
-                job1.setStartingIndex(job2.getStartingIndex());
-                jobs.addFirst(job1);
-            }
-
-            // otherwise just add them back to the queue
-            else {
-                jobs.addFirst(job2);
-                jobs.addFirst(job1);
-            }
-        }
-
-        // if we have at least 2 jobs -> check if we can consolidate them at the end (both pending)
-        boolean cleanupSuccessful = true;
-        while(jobs.size() >= 2 && cleanupSuccessful) {
-            MilestonePrunerJob job1 = (MilestonePrunerJob) jobs.removeLast();
-            MilestonePrunerJob job2 = (MilestonePrunerJob) jobs.removeLast();
-
-            // if both jobs are pending -> consolidate them and persists the changes
-            if(job1.getCurrentIndex() == job1.getStartingIndex() && job2.getCurrentIndex() == job2.getStartingIndex()) {
-                jobs.addLast(job1);
-            }
-
-            // otherwise just add them back to the queue
-            else {
-                jobs.addLast(job2);
-                jobs.addLast(job1);
-
-                cleanupSuccessful = false;
-            }
-        }
-
-        // update the target index of the jobs
-        int previousStartIndex = snapshotConfig.getMilestoneStartIndex();
-        for(TransactionPrunerJob currentJob : jobs) {
-            ((MilestonePrunerJob) currentJob).setTargetIndex(previousStartIndex);
-
-            previousStartIndex = ((MilestonePrunerJob) currentJob).getStartingIndex();
-        }
+        return jobs.stream();
     }
 }

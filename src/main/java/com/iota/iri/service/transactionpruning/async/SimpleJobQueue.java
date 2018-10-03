@@ -75,6 +75,7 @@ public class SimpleJobQueue implements JobQueue {
 
                 jobs.poll();
             } catch (TransactionPruningException e) {
+                // only add the job back to the end of the queue if the queue wasn't cleaned in the mean time
                 synchronized (jobs) {
                     if (jobs.poll() == currentJob) {
                         jobs.addLast(currentJob);

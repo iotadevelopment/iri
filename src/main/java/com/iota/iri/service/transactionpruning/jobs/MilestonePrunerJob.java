@@ -152,29 +152,32 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
      */
     public void process() throws TransactionPruningException {
-        synchronized (this) {
+        if (getStatus() != TransactionPrunerJobStatus.DONE) {
             setStatus(TransactionPrunerJobStatus.RUNNING);
-        }
 
-        while(!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
-            cleanupMilestoneTransactions();
+            try {
+                while (!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
+                    cleanupMilestoneTransactions();
 
-            setCurrentIndex(getCurrentIndex() + 1);
+                    setCurrentIndex(getCurrentIndex() + 1);
 
-            synchronized (this) {
-                if (getTargetIndex() < getCurrentIndex()) {
-                    setStatus(TransactionPrunerJobStatus.DONE);
+                    // synchronize this call because the MilestonePrunerJobQueue needs it to check if we can be extended
+                    synchronized (this) {
+                        if (getCurrentIndex() > getTargetIndex()) {
+                            setStatus(TransactionPrunerJobStatus.DONE);
+                        }
+                    }
+
+                    // persist changes if the job was executed by a TransactionPruner (tests might execute the job standalone)
+                    if (getTransactionPruner() != null) {
+                        getTransactionPruner().saveState();
+                    }
                 }
-            }
+            } catch (TransactionPruningException e) {
+                setStatus(TransactionPrunerJobStatus.FAILED);
 
-            // persist changes if the job was executed by a TransactionPruner (tests might execute the job standalone)
-            if (getTransactionPruner() != null) {
-                getTransactionPruner().saveState();
+                throw e;
             }
-        }
-
-        synchronized (this) {
-            setStatus(TransactionPrunerJobStatus.DONE);
         }
     }
 
