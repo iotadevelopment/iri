@@ -183,6 +183,8 @@ public class SnapshotManager {
         return latestSnapshot;
     }
 
+    private boolean dumped = false;
+
     /**
      * This method determines if a transaction is orphaned.
      *
@@ -199,7 +201,15 @@ public class SnapshotManager {
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
     private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction) throws TraversalException {
-        if((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
+        long timeDiff = (referenceTransaction.getArrivalTime() / 1000L) - referenceTransaction.getTimestamp();
+
+        if (!dumped) {
+            System.out.println(timeDiff);
+
+            dumped = true;
+        }
+
+        if(((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
             return false;
         }
 
@@ -208,7 +218,7 @@ public class SnapshotManager {
             transaction.getHash(),
             currentTransaction -> !nonOrphanedTransactionFound.get(),
             currentTransaction -> {
-                if((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME > referenceTransaction.getTimestamp()) {
+                if(((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
                     nonOrphanedTransactionFound.set(true);
                 }
             }
