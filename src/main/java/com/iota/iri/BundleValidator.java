@@ -19,7 +19,7 @@ public class BundleValidator {
             return transactions;
         }
         final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail);
-
+System.out.println(bundleTransactions.size());
         for (TransactionViewModel transactionViewModel : bundleTransactions.values()) {
 
             if (transactionViewModel.getCurrentIndex() == 0 && transactionViewModel.getValidity() >= 0) {
