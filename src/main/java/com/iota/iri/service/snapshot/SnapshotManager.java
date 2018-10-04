@@ -155,6 +155,8 @@ public class SnapshotManager {
         shuttingDown = true;
         initialSnapshot = null;
         latestSnapshot = null;
+
+        ((AsyncTransactionPruner) transactionPruner).shutdown();
     }
 
     public SnapshotConfig getConfiguration() {
