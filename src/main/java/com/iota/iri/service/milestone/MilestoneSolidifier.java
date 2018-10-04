@@ -204,7 +204,7 @@ public class MilestoneSolidifier {
     }
 
     private void adjustSolidificationQueueSize() {
-        if (transactionRequester.numberOfTransactionsToRequest() < 100 && unsolidMilestonesPool.size() > currentSolidificationQueueSize) {
+        if (transactionRequester.numberOfTransactionsToRequest() < 500 && unsolidMilestonesPool.size() > currentSolidificationQueueSize) {
             currentSolidificationQueueSize++;
         } else {
             currentSolidificationQueueSize = DEFAULT_SOLIDIFICATION_QUEUE_SIZE;
