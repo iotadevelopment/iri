@@ -86,6 +86,10 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
         setStartingIndex(startingIndex);
         setCurrentIndex(currentIndex);
         setTargetIndex(targetIndex);
+
+        if (currentIndex > targetIndex) {
+            setStatus(TransactionPrunerJobStatus.DONE);
+        }
     }
 
     /**
