@@ -280,7 +280,7 @@ public class SnapshotManager {
 
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
-            if(targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)) {
+            if(/*targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && */isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)) {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             } else {
                 try {

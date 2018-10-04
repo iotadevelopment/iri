@@ -106,7 +106,7 @@ public class DAGHelper {
                             currentTransactionConsumer.accept(currentTransaction);
                         }
 
-                        ApproveeViewModel.load(tangle, currentTransactionHash).getHashes().stream().forEach(approverHash -> transactionsToExamine.add(approverHash));
+                        transactionsToExamine.addAll(ApproveeViewModel.load(tangle, currentTransactionHash).getHashes());
                     }
                 }
             }
