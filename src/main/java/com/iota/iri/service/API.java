@@ -254,6 +254,8 @@ public class API {
 
                     String isConsistent = "" + transaction.getValidity();
 
+                    System.out.println(instance.transactionValidator.checkSolidity(transactionHash, true));
+
                     String isSolid = transaction.isSolid() ? "true" : "false";
 
                     String isSnapshot = transaction.isSnapshot() ? "true" : "false";
