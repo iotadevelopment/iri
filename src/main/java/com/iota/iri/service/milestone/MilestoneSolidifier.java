@@ -204,7 +204,7 @@ public class MilestoneSolidifier {
     private void processNewlyAddedMilestones() {
         for (
             Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator();
-            iterator.hasNext();
+            !Thread.interrupted() && iterator.hasNext();
         ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
@@ -228,7 +228,7 @@ public class MilestoneSolidifier {
     private void processSolidificationQueue() {
         for (
             Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator();
-            iterator.hasNext();
+            !Thread.interrupted() && iterator.hasNext();
         ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
@@ -257,6 +257,7 @@ public class MilestoneSolidifier {
 
         Map.Entry<Hash, Integer> nextSolidificationCandidate;
         while (
+            !Thread.interrupted() &&
             milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE &&
             (nextSolidificationCandidate = getNextSolidificationCandidate()) != null
         ) {
