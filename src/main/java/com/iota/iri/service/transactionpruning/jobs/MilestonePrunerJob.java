@@ -221,7 +221,7 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
                 elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
                 elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
                 if (!getSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
-                    getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
+                    //getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
                 }
                 DAGHelper.get(getTangle()).traverseApprovees(
                 milestoneViewModel.getHash(),
@@ -230,11 +230,11 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
                     elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
 
                     if (!getSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
-                        try {
-                            getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
-                        } catch(TransactionPruningException e) {
-                            throw new RuntimeException(e);
-                        }
+                        //try {
+                            //getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
+                        //} catch(TransactionPruningException e) {
+                        //    throw new RuntimeException(e);
+                        //}
                     }
                 }
                 );
