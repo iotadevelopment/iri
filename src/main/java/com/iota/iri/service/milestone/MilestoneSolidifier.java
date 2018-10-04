@@ -277,7 +277,7 @@ public class MilestoneSolidifier {
         Map.Entry<Hash, Integer> nextSolidificationCandidate;
         while (
             !Thread.interrupted() &&
-            milestonesToSolidify.size() < DEFAULT_SOLIDIFICATION_QUEUE_SIZE &&
+            milestonesToSolidify.size() < currentSolidificationQueueSize &&
             (nextSolidificationCandidate = getNextSolidificationCandidate()) != null
         ) {
             addToSolidificationQueue(nextSolidificationCandidate);
