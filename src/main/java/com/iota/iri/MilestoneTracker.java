@@ -100,7 +100,7 @@ public class MilestoneTracker {
         this.snapshotManager = snapshotManager;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
-        this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator);
+        this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator, transactionRequester);
         this.dagHelper = DAGHelper.get(tangle);
 
         //configure

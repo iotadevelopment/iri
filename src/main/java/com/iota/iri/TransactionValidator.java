@@ -184,9 +184,15 @@ public class TransactionValidator {
                         solid = false;
 
                         if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
+                            if (hash.toString().equals("IDMFRVHWOADTDZSOUAZAUFPRTQHVUI9T9AUQ9SNIDGCEBVCFGBWGTXUFPBDGIJRHQGXPPOFMVNMXZ9999")) {
+                                System.out.println(hashPointer);
+                            }
                             transactionRequester.requestTransaction(hashPointer, milestone);
                             break;
                         } else if (!milestone && !transactionRequester.contains(hashPointer)) {
+                            if (hash.toString().equals("IDMFRVHWOADTDZSOUAZAUFPRTQHVUI9T9AUQ9SNIDGCEBVCFGBWGTXUFPBDGIJRHQGXPPOFMVNMXZ9999")) {
+                                System.out.println(hashPointer);
+                            }
                             transactionRequester.requestTransaction(hashPointer, milestone);
                             break;
                         }

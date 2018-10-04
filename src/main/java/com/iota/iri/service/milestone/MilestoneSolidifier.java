@@ -2,6 +2,7 @@ package com.iota.iri.service.milestone;
 
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
+import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
@@ -25,7 +26,7 @@ public class MilestoneSolidifier {
     /**
      * Defines the amount of milestones that we "simultaneously" try to solidify in one pass.
      */
-    private static final int SOLIDIFICATION_QUEUE_SIZE = 10;
+    private static final int DEFAULT_SOLIDIFICATION_QUEUE_SIZE = 10;
 
     /**
      * Defines the interval in which solidity checks are issued (in milliseconds).
@@ -41,6 +42,11 @@ public class MilestoneSolidifier {
     private static final int SOLIDIFICATION_TRANSACTIONS_LIMIT = 20000;
 
     /**
+     * Holds the current size of the solidification queue (we use a feedback loop to speed up sync).
+     */
+    private int currentSolidificationQueueSize = DEFAULT_SOLIDIFICATION_QUEUE_SIZE;
+
+    /**
      * Logger for this class allowing us to dump debug and status messages.
      */
     private final StatusLogger statusLogger = new StatusLogger(LoggerFactory.getLogger(MilestoneSolidifier.class));
@@ -54,6 +60,8 @@ public class MilestoneSolidifier {
      * Holds a reference to the TransactionValidator which allows us to issue solidity checks.
      */
     private TransactionValidator transactionValidator;
+
+    private TransactionRequester transactionRequester;
 
     /**
      * Holds the milestones that were newly added, but not examined yet.
@@ -97,9 +105,11 @@ public class MilestoneSolidifier {
      * @param snapshotManager SnapshotManager instance that is used by the node
      * @param transactionValidator TransactionValidator instance that is used by the node
      */
-    public MilestoneSolidifier(SnapshotManager snapshotManager, TransactionValidator transactionValidator) {
+    public MilestoneSolidifier(SnapshotManager snapshotManager, TransactionValidator transactionValidator,
+                               TransactionRequester transactionRequester) {
         this.snapshotManager = snapshotManager;
         this.transactionValidator = transactionValidator;
+        this.transactionRequester = transactionRequester;
     }
 
     /**
@@ -161,7 +171,7 @@ public class MilestoneSolidifier {
             return;
         }
 
-        if (milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE) {
+        if (milestonesToSolidify.size() < currentSolidificationQueueSize) {
             milestonesToSolidify.put(milestoneEntry.getKey(), milestoneEntry.getValue());
 
             if (youngestMilestoneInQueue == null || milestoneEntry.getValue() > youngestMilestoneInQueue.getValue()) {
@@ -186,9 +196,18 @@ public class MilestoneSolidifier {
         while(!Thread.interrupted()) {
             processNewlyAddedMilestones();
             processSolidificationQueue();
+            adjustSolidificationQueueSize();
             refillSolidificationQueue();
 
             ThreadUtils.sleep(SOLIDIFICATION_INTERVAL);
+        }
+    }
+
+    private void adjustSolidificationQueueSize() {
+        if (transactionRequester.numberOfTransactionsToRequest() < 100 && unsolidMilestonesPool.size() > currentSolidificationQueueSize) {
+            currentSolidificationQueueSize++;
+        } else {
+            currentSolidificationQueueSize = DEFAULT_SOLIDIFICATION_QUEUE_SIZE;
         }
     }
 
@@ -258,7 +277,7 @@ public class MilestoneSolidifier {
         Map.Entry<Hash, Integer> nextSolidificationCandidate;
         while (
             !Thread.interrupted() &&
-            milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE &&
+            milestonesToSolidify.size() < DEFAULT_SOLIDIFICATION_QUEUE_SIZE &&
             (nextSolidificationCandidate = getNextSolidificationCandidate()) != null
         ) {
             addToSolidificationQueue(nextSolidificationCandidate);
