@@ -252,6 +252,10 @@ public class API {
 
                     String exists = transaction.getType() != TransactionViewModel.PREFILLED_SLOT ? "true" : "false";
 
+                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                        instance.transactionRequester.requestTransaction(transactionHash, true);
+                    }
+
                     String isConsistent = "" + transaction.getValidity();
 
                     System.out.println(instance.transactionValidator.checkSolidity(transactionHash, true));
