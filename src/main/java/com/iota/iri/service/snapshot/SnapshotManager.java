@@ -303,9 +303,9 @@ public class SnapshotManager {
                     currentMilestone.getHash(),
                     currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
                     currentTransaction -> {
-                        if(isSolidEntryPoint(currentTransaction.getHash(), targetMilestone)) {
+                        //if(isSolidEntryPoint(currentTransaction.getHash(), targetMilestone)) {
                             solidEntryPoints.put(currentTransaction.getHash(), targetMilestone.index());
-                        }
+                        //}
                     }
                 );
 
