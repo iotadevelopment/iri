@@ -303,7 +303,9 @@ public class SnapshotManager {
             // add new solid entry points
             progressLogger.start(Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshot.getIndex()));
             MilestoneViewModel nextMilestone = targetMilestone;
+            int i = 0;
             while(nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
+                System.out.println(++i);
                 MilestoneViewModel currentMilestone = nextMilestone;
                 dagHelper.traverseApprovees(
                     currentMilestone.getHash(),
