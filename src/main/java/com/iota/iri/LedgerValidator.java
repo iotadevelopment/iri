@@ -118,6 +118,7 @@ public class LedgerValidator {
                             }
                             if (!validBundle) {
                                 System.out.println(2);
+                                System.out.println(BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash()).size());
                                 return null;
                             }
                         }
