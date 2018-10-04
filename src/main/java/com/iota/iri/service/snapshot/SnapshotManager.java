@@ -185,8 +185,6 @@ public class SnapshotManager {
         return latestSnapshot;
     }
 
-    private boolean dumped = false;
-
     /**
      * This method determines if a transaction is orphaned.
      *
@@ -204,12 +202,6 @@ public class SnapshotManager {
      */
     private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction) throws TraversalException {
         long timeDiff = (referenceTransaction.getArrivalTime() / 1000L) - referenceTransaction.getTimestamp();
-
-        if (!dumped) {
-            System.out.println(timeDiff);
-
-            dumped = true;
-        }
 
         if(((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
             return false;
@@ -305,9 +297,7 @@ public class SnapshotManager {
             // add new solid entry points
             progressLogger.start(Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshot.getIndex()));
             MilestoneViewModel nextMilestone = targetMilestone;
-            int i = 0;
             while(nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
-                System.out.println(++i);
                 MilestoneViewModel currentMilestone = nextMilestone;
                 dagHelper.traverseApprovees(
                     currentMilestone.getHash(),
