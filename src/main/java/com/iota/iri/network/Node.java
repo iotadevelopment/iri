@@ -51,7 +51,7 @@ public class Node {
     private final DatagramPacket sendingPacket;
     private final DatagramPacket tipRequestingPacket;
 
-    private final ExecutorService executor = Executors.newFixedThreadPool(5);
+    private final ExecutorService executor = Executors.newFixedThreadPool(6);
     private final NodeConfig configuration;
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
