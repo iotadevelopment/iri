@@ -274,7 +274,12 @@ public class SnapshotManager {
 
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
-            if(targetMilestone.index() - solidEntryPoint.getValue() <= 500/*targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)*/) {
+            if(
+                targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && (
+                    targetMilestone.index() - solidEntryPoint.getValue() <= OUTER_SHELL_SIZE ||
+                    isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)
+                )
+            ) {
                 solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
             } else {
                 try {
@@ -283,7 +288,7 @@ public class SnapshotManager {
                         TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT &&
                         !Hash.NULL_HASH.equals(solidEntryPoint.getKey())
                     ) {
-                        //transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                        transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
                     }
                 } catch (TransactionPruningException e) {
                     log.error("could not add cleanup job to garbage collector", e);
@@ -303,9 +308,9 @@ public class SnapshotManager {
                     currentMilestone.getHash(),
                     currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
                     currentTransaction -> {
-                        //if(isSolidEntryPoint(currentTransaction.getHash(), targetMilestone)) {
+                        if(isSolidEntryPoint(currentTransaction.getHash(), targetMilestone)) {
                             solidEntryPoints.put(currentTransaction.getHash(), targetMilestone.index());
-                        //}
+                        }
                     }
                 );
 
