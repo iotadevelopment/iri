@@ -186,7 +186,7 @@ public class TransactionValidator {
 
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
-                    if (debug && txCount < 20) {
+                    if (debug && txCount < 50) {
                         System.out.println(" => " + hashPointer.toString());
                         txCount++;
                     }
