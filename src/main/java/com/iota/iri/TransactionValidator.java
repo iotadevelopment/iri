@@ -161,7 +161,12 @@ public class TransactionValidator {
      * @return true if the transaction is solid and false otherwise
      * @throws Exception if anything goes wrong while trying to solidify the transaction
      */
+
     public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions) throws Exception {
+        return checkSolidity(hash, milestone, maxProcessedTransactions, false);
+    }
+
+    public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions, boolean debug) throws Exception {
         if(TransactionViewModel.fromHash(tangle, hash).isSolid()) {
             return true;
         }
@@ -172,6 +177,7 @@ public class TransactionValidator {
         boolean solid = true;
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
+        int txCount = 0;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
                 if(analyzedHashes.size() >= maxProcessedTransactions) {
@@ -180,14 +186,18 @@ public class TransactionValidator {
 
                 final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
+                    if (debug && txCount < 20) {
+                        System.out.println(" => " + hashPointer.toString());
+                        txCount++;
+                    }
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hashPointer)) {
                         solid = false;
 
                         if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
-                            transactionRequester.requestTransaction(hashPointer, milestone);
+                            transactionRequester.requestTransaction(hashPointer, true);
                             break;
                         } else if (!milestone && !transactionRequester.contains(hashPointer)) {
-                            transactionRequester.requestTransaction(hashPointer, milestone);
+                            transactionRequester.requestTransaction(hashPointer, false);
                             break;
                         }
                     } else {
