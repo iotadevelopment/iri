@@ -45,7 +45,7 @@ public class SnapshotManager {
      * to it, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
      * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
      */
-    private static final int SOLID_ENTRY_POINT_LIFETIME = 10000;
+    private static final int SOLID_ENTRY_POINT_LIFETIME = 50000;
 
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
