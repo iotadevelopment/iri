@@ -403,6 +403,7 @@ public class SnapshotManager {
         System.out.println("mar");
 
         snapshot.setSolidEntryPoints(generateSolidEntryPoints(snapshot, targetMilestone));
+        System.out.println("kar");
         snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
 
         System.out.println("ppar");
