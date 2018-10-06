@@ -3,6 +3,7 @@ package com.iota.iri;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotStateDiff;
 import com.iota.iri.zmq.MessageQ;
@@ -167,6 +168,21 @@ public class LedgerValidator {
                             transactionViewModel2.getBundleHash());
                     nonAnalyzedTransactions.offer(transactionViewModel2.getTrunkTransactionHash());
                     nonAnalyzedTransactions.offer(transactionViewModel2.getBranchTransactionHash());
+                }
+
+                // if we reference sth before the local snapshot -> add it to the solid entry points
+                else {
+                    Snapshot initialSnapshot = snapshotManager.getInitialSnapshot();
+
+                    if (
+                        transactionViewModel2.snapshotIndex() <= initialSnapshot.getIndex() &&
+                        !initialSnapshot.hasSolidEntryPoint(transactionViewModel2.getHash())
+                    ) {
+                        snapshotManager.getInitialSnapshot().getSolidEntryPoints().put(
+                            transactionViewModel2.getHash(),
+                            initialSnapshot.getIndex()
+                        );
+                    }
                 }
             }
         }
