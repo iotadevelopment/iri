@@ -190,7 +190,7 @@ public class TransactionValidator {
                 if(!transaction.isSolid()) {
                     if (debug && txCount < 50) {
                         if (transaction.getTimestamp() < transactionToSolidify.getTimestamp() - 172800) {
-                            System.out.println("WHOOOT");
+                            System.out.println("DIFF: " + transaction.getTimestamp() + " / " + transactionToSolidify.getTimestamp() + " = " + (transactionToSolidify.getTimestamp() - transaction.getTimestamp()));
                         }
                         System.out.println(" => " + hashPointer.toString());
                         txCount++;
