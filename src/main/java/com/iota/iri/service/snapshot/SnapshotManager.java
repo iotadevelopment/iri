@@ -326,6 +326,11 @@ public class SnapshotManager {
             throw new SnapshotException("could not generate the solid entry points for " + targetMilestone, e);
         }
 
+        // fix coo bug
+        solidEntryPoints.put(new Hash("RLEVESXKXTWAFAUZELUOXGSZAAZBRHYXOBIHAXGYXGRDTBYSR9EKBKVONGV9KIRNKGBXBYZWYKSLZ9999"), targetMilestone.index());
+        solidEntryPoints.put(new Hash("KJRVLFERRGVIOPVENRTNBTHDKOMGCHVZUZSOKUZQVZZTDMLFDHH9UAJEWIEHAFDWFMPBVOYSCVMCA9999"), targetMilestone.index());
+        solidEntryPoints.put(new Hash("EPXCDOLLQEYUHJJFRUVRSZFDUAX9KHBNEYJWHGKJGA9UZHTPVYKGMTATBLW9RSAEYZLXIMZDMGLNZ9999"), targetMilestone.index());
+
         solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
         return solidEntryPoints;
