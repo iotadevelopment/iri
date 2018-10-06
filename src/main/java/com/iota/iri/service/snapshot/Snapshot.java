@@ -92,6 +92,7 @@ public class Snapshot {
      * This is used to synchronize the access from different Threads.
      */
     public void lockWrite() {
+        System.out.println("lockw");
         readWriteLock.writeLock().lock();
     }
 
@@ -101,6 +102,7 @@ public class Snapshot {
      * This is used to synchronize the access from different Threads.
      */
     public void unlockWrite() {
+        System.out.println("unlockw");
         readWriteLock.writeLock().unlock();
     }
 
