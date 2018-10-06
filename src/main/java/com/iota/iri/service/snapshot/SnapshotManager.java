@@ -527,12 +527,14 @@ public class SnapshotManager {
             throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
         }
 
+        System.out.println("a");
         Snapshot targetSnapshot = null;
         try {
             targetSnapshot = generateSnapshot(targetMilestone);
         } catch(Exception e) {
             throw new SnapshotException("could not generate the snapshot", e);
         }
+        System.out.println("u");
 
         try {
             int targetIndex = targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay();
@@ -545,6 +547,8 @@ public class SnapshotManager {
         } catch(TransactionPruningException e) {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }
+
+        System.out.println("o");
 
         try {
             targetSnapshot.state.writeFile(basePath + ".snapshot.state");
