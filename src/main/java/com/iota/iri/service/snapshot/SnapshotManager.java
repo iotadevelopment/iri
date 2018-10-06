@@ -132,6 +132,8 @@ public class SnapshotManager {
                                               ? configuration.getLocalSnapshotsIntervalSynced()
                                               : configuration.getLocalSnapshotsIntervalUnsynced();
 
+                System.out.println(milestoneTracker.getStatus() == INITIALIZED);
+
                 if(latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + localSnapshotInterval) {
                     try {
                         takeLocalSnapshot();
