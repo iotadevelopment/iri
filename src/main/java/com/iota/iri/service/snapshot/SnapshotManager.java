@@ -250,6 +250,8 @@ public class SnapshotManager {
      * @return true if the transaction is a solid entry point and false otherwise
      */
     private boolean isSolidEntryPoint(Hash transactionHash, MilestoneViewModel targetMilestone) {
+        System.out.println(transactionHash);
+
         Set<TransactionViewModel> unconfirmedApprovers = new HashSet<>();
 
         try {
