@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
@@ -48,13 +47,13 @@ public class SnapshotManager {
      */
     private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
 
-    public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
+    private static final String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
-    public static int SNAPSHOT_PUBKEY_DEPTH = 6;
+    private static final int SNAPSHOT_PUBKEY_DEPTH = 6;
 
-    public static int SNAPSHOT_INDEX = 9;
+    private static final int SNAPSHOT_INDEX = 9;
 
-    public static int SPENT_ADDRESSES_INDEX = 7;
+    public static final int SPENT_ADDRESSES_INDEX = 7;
 
     private Tangle tangle;
 
@@ -119,7 +118,7 @@ public class SnapshotManager {
         }
     }
 
-    public void spawnMonitorThread(MilestoneTracker milestoneTracker) {
+    private void spawnMonitorThread(MilestoneTracker milestoneTracker) {
         (new Thread(() -> {
             log.info("Local Snapshot Monitor started ...");
 
@@ -230,7 +229,7 @@ public class SnapshotManager {
      *
      * To check if the transaction has non-orphaned approvers we first check if any of its approvers got confirmed by a
      * future milestone, since this is very cheap. If non of them got confirmed by another milestone we do the more
-     * expensive check from {@link #isOrphaned(TransactionViewModel, TransactionViewModel)}.
+     * expensive check from {@link #isOrphaned(TransactionViewModel, TransactionViewModel, HashSet)}.
      *
      * Since solid entry points have a limited life time and to prevent potential problems due to temporary errors in
      * the database, we assume that the checked transaction is a solid entry point if any error occurs while determining
@@ -273,24 +272,25 @@ public class SnapshotManager {
     }
 
     private HashMap<Hash, Integer> generateSolidEntryPoints(Snapshot snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
-        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [2/3 generating solid entry points]", log);
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
+        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger("Taking local snapshot [2/4 analyzing old solid entry points]", log);
         // check the old solid entry points and copy them if they are still relevant
-        snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
-            if(!Hash.NULL_HASH.equals(solidEntryPoint.getKey())) {
-                if(
-                    targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME &&
-                    isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)
+        oldSolidEntryPointsProgressLogger.start(snapshot.getSolidEntryPoints().size());
+        snapshot.getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
+            if (!Hash.NULL_HASH.equals(hash)) {
+                if (
+                    targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME &&
+                    isSolidEntryPoint(hash, targetMilestone)
                 ) {
-                    solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
+                    solidEntryPoints.put(hash, milestoneIndex);
                 } else {
                     try {
                         // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
                         if (
-                            TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT
+                        TransactionViewModel.fromHash(tangle, hash).getType() == TransactionViewModel.PREFILLED_SLOT
                         ) {
-                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(hash));
                         }
                     } catch (TransactionPruningException e) {
                         log.error("could not add cleanup job to garbage collector", e);
@@ -299,8 +299,11 @@ public class SnapshotManager {
                     }
                 }
             }
+
+            oldSolidEntryPointsProgressLogger.progress();
         });
 
+        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [3/4 generating solid entry points]", log);
         try {
             // add new solid entry points
             progressLogger.start(Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshot.getIndex()));
@@ -339,7 +342,7 @@ public class SnapshotManager {
         return solidEntryPoints;
     }
 
-    public HashMap<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
+    private HashMap<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
         ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
         HashMap<Hash, Integer> seenMilestones = new HashMap<>();
 
@@ -360,7 +363,7 @@ public class SnapshotManager {
         return seenMilestones;
     }
 
-    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+    private Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
         if(targetMilestone == null) {
             throw new SnapshotException("the target milestone must not be null");
         } else if(targetMilestone.index() > latestSnapshot.getIndex()) {
@@ -397,7 +400,7 @@ public class SnapshotManager {
         return snapshot;
     }
 
-    public Snapshot loadLocalSnapshot() {
+    private Snapshot loadLocalSnapshot() {
         try {
             // if local snapshots are enabled
             if(configuration.getLocalSnapshotsEnabled()) {
@@ -447,7 +450,7 @@ public class SnapshotManager {
         return null;
     }
 
-    public Snapshot loadBuiltInSnapshot() throws IOException, IllegalStateException {
+    private Snapshot loadBuiltInSnapshot() throws IOException, IllegalStateException {
         if (builtinSnapshot == null) {
             // read the config vars for the built in snapshot files
             boolean testnet = configuration.isTestnet();
@@ -499,7 +502,7 @@ public class SnapshotManager {
         return builtinSnapshot.clone();
     }
 
-    public void takeLocalSnapshot() throws SnapshotException {
+    private void takeLocalSnapshot() throws SnapshotException {
         // load necessary configuration parameters
         String basePath = configuration.getLocalSnapshotsBasePath();
         int snapshotDepth = configuration.getLocalSnapshotsDepth();
@@ -508,7 +511,7 @@ public class SnapshotManager {
         int targetMilestoneIndex = latestSnapshot.getIndex() - snapshotDepth;
 
         // try to load the milestone
-        MilestoneViewModel targetMilestone = null;
+        MilestoneViewModel targetMilestone;
         try {
             targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
         } catch(Exception e) {
@@ -520,7 +523,7 @@ public class SnapshotManager {
             throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
         }
 
-        Snapshot targetSnapshot = null;
+        Snapshot targetSnapshot;
         try {
             targetSnapshot = generateSnapshot(targetMilestone);
         } catch(Exception e) {
