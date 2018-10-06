@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
@@ -288,8 +289,11 @@ public class SnapshotManager {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
         System.out.println("brah");
+        AtomicInteger blub = new AtomicInteger(0);
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
+            System.out.println(blub.incrementAndGet());
+
             if(
                 targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && (
                     targetMilestone.index() - solidEntryPoint.getValue() <= OUTER_SHELL_SIZE ||
