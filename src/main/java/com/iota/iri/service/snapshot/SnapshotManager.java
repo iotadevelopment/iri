@@ -36,8 +36,6 @@ public class SnapshotManager {
 
     private static Snapshot builtinSnapshot = null;
 
-    private static final int OUTER_SHELL_SIZE = 500;
-
     /**
      * Maximum age in milestones since creation of solid entry points.
      *
@@ -306,7 +304,7 @@ public class SnapshotManager {
         ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [3/4 generating solid entry points]", log);
         try {
             // add new solid entry points
-            progressLogger.start(Math.min(OUTER_SHELL_SIZE, targetMilestone.index() - initialSnapshot.getIndex()));
+            progressLogger.start(targetMilestone.index() - initialSnapshot.getIndex());
             MilestoneViewModel nextMilestone = targetMilestone;
             while(nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
                 MilestoneViewModel currentMilestone = nextMilestone;
