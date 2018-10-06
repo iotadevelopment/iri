@@ -272,9 +272,8 @@ public class SnapshotManager {
     private HashMap<Hash, Integer> generateSolidEntryPoints(Snapshot snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
-        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger("Taking local snapshot [2/4 analyzing old solid entry points]", log);
         // check the old solid entry points and copy them if they are still relevant
-        oldSolidEntryPointsProgressLogger.start(snapshot.getSolidEntryPoints().size());
+        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger("Taking local snapshot [2/4 analyzing old solid entry points]", log).start(snapshot.getSolidEntryPoints().size());
         snapshot.getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash)) {
                 if (
