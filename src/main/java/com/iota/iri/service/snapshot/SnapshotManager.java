@@ -375,15 +375,17 @@ public class SnapshotManager {
         } else if(targetMilestone.index() < initialSnapshot.getIndex()) {
             throw new SnapshotException("the snapshot target " + targetMilestone + " is too old");
         }
-
+        System.out.println("ar");
         initialSnapshot.lockRead();
         latestSnapshot.lockRead();
 
+        System.out.println("ur");
         Snapshot snapshot;
         try {
             int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
             int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
 
+            System.out.println("gar");
             if(distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
                 snapshot = initialSnapshot.clone();
 
@@ -393,13 +395,17 @@ public class SnapshotManager {
 
                 snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
             }
+            System.out.println("tar");
         } finally {
             initialSnapshot.unlockRead();
             latestSnapshot.unlockRead();
         }
+        System.out.println("mar");
 
         snapshot.setSolidEntryPoints(generateSolidEntryPoints(snapshot, targetMilestone));
         snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
+
+        System.out.println("ppar");
 
         return snapshot;
     }
