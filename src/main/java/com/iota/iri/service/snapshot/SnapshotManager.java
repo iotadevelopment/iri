@@ -46,7 +46,7 @@ public class SnapshotManager {
      * to it, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
      * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
      */
-    private static final int SOLID_ENTRY_POINT_LIFETIME = 50000;
+    private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
 
     public static String SNAPSHOT_PUBKEY = "TTXJUGKTNPOOEXSTQVVACENJOQUROXYKDRCVK9LHUXILCLABLGJTIPNF9REWHOIMEUKWQLUOKD9CZUYAC";
 
@@ -276,34 +276,30 @@ public class SnapshotManager {
         ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [2/3 generating solid entry points]", log);
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
-        AtomicInteger blub = new AtomicInteger(0);
-        /*
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
-            if(
-                targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME && (
-                    targetMilestone.index() - solidEntryPoint.getValue() <= OUTER_SHELL_SIZE ||
+            if(!Hash.NULL_HASH.equals(solidEntryPoint.getKey())) {
+                if(
+                    targetMilestone.index() - solidEntryPoint.getValue() <= SOLID_ENTRY_POINT_LIFETIME &&
                     isSolidEntryPoint(solidEntryPoint.getKey(), targetMilestone)
-                )
-            ) {
-                solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
-            } else {
-                try {
-                    // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
-                    if (
-                        TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT &&
-                        !Hash.NULL_HASH.equals(solidEntryPoint.getKey())
-                    ) {
-                        transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
-                    }
-                } catch (TransactionPruningException e) {
-                    log.error("could not add cleanup job to garbage collector", e);
-                } catch (Exception e) {
+                ) {
+                    solidEntryPoints.put(solidEntryPoint.getKey(), solidEntryPoint.getValue());
+                } else {
+                    try {
+                        // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
+                        if (
+                            TransactionViewModel.fromHash(tangle, solidEntryPoint.getKey()).getType() == TransactionViewModel.PREFILLED_SLOT
+                        ) {
+                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(solidEntryPoint.getKey()));
+                        }
+                    } catch (TransactionPruningException e) {
+                        log.error("could not add cleanup job to garbage collector", e);
+                    } catch (Exception e) {
 
+                    }
                 }
             }
         });
-        */
 
         try {
             // add new solid entry points
