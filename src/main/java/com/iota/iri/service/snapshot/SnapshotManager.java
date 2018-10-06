@@ -142,6 +142,8 @@ public class SnapshotManager {
                     }
                 }
 
+                System.out.println("===");
+
                 try {
                     Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
                 } catch(InterruptedException e) {
@@ -149,6 +151,8 @@ public class SnapshotManager {
 
                     shuttingDown = true;
                 }
+
+                System.out.println("===>");
             }
 
             System.out.println("WHOOT");
