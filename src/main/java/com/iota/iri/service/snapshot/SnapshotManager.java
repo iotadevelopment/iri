@@ -282,6 +282,7 @@ public class SnapshotManager {
         ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [2/3 generating solid entry points]", log);
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
+        System.out.println("brah");
         // check the old solid entry points and copy them if they are still relevant
         snapshot.getSolidEntryPoints().entrySet().stream().forEach(solidEntryPoint -> {
             if(
@@ -307,6 +308,7 @@ public class SnapshotManager {
                 }
             }
         });
+        System.out.println("bruh");
 
         try {
             // add new solid entry points
