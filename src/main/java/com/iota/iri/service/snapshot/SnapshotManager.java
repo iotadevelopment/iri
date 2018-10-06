@@ -210,7 +210,7 @@ public class SnapshotManager {
      * @return true if the transaction got orphaned and false otherwise
      * @throws TraversalException if anything goes wrong while traversing the graph
      */
-    private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction) throws TraversalException {
+    private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction, HashSet<Hash> processedTransactions) throws TraversalException {
         long timeDiff = (referenceTransaction.getArrivalTime() / 1000L) - referenceTransaction.getTimestamp();
 
         if(((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
@@ -225,7 +225,8 @@ public class SnapshotManager {
                 if(((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
                     nonOrphanedTransactionFound.set(true);
                 }
-            }
+            },
+            processedTransactions
         );
 
         return !nonOrphanedTransactionFound.get();
@@ -265,9 +266,11 @@ public class SnapshotManager {
 
         System.out.println(transactionHash);
 
+            HashSet<Hash> processedTransactions = new HashSet<>();
+
             TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
             for (TransactionViewModel unconfirmedApprover : unconfirmedApprovers) {
-                if(!isOrphaned(unconfirmedApprover, milestoneTransaction)) {
+                if(!isOrphaned(unconfirmedApprover, milestoneTransaction, processedTransactions)) {
                     return true;
                 }
             }
