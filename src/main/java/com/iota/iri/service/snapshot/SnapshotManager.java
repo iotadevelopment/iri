@@ -150,6 +150,8 @@ public class SnapshotManager {
                     shuttingDown = true;
                 }
             }
+
+            System.out.println("WHOOT");
         }, "Local Snapshot Monitor")).start();
     }
 
