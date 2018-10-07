@@ -73,7 +73,6 @@ public class LedgerValidator {
                 final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, transactionPointer);
                 if (transactionViewModel.snapshotIndex() == 0 || transactionViewModel.snapshotIndex() > latestSnapshotIndex) {
                     numberOfAnalyzedTransactions++;
-                    System.out.println(transactionViewModel.getHash());
                     if (transactionViewModel.getType() == TransactionViewModel.PREFILLED_SLOT) {
                         transactionRequester.requestTransaction(transactionViewModel.getHash(), milestone);
                         return null;
@@ -121,7 +120,6 @@ public class LedgerValidator {
                                 }
                             }
                             if (!validBundle) {
-                                System.out.println(numberOfAnalyzedTransactions);
                                 System.out.println(2);
                                 System.out.println(BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash(), true).size());
                                 return null;
