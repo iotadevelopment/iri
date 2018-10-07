@@ -158,6 +158,9 @@ public class BundleValidator {
     private static Map<Hash, TransactionViewModel> loadTransactionsFromTangle(Tangle tangle, TransactionViewModel tail, boolean debug) {
         final Map<Hash, TransactionViewModel> bundleTransactions = new HashMap<>();
         final Hash bundleHash = tail.getBundleHash();
+        if (debug) {
+            System.out.println(tail.getHash());
+        }
         try {
             TransactionViewModel tx = tail;
             long i = 0, end = tx.lastIndex();
