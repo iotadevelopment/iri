@@ -81,6 +81,8 @@ public class LedgerValidator {
 
                         if (transactionViewModel.getCurrentIndex() == 0) {
 
+
+
                             boolean validBundle = false;
 
                             final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash());
@@ -118,18 +120,15 @@ public class LedgerValidator {
                                 }
                             }
                             if (!validBundle) {
+                                System.out.println(numberOfAnalyzedTransactions);
                                 System.out.println(2);
                                 System.out.println(BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash(), true).size());
                                 return null;
                             }
                         }
 
-                        if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getTrunkTransactionHash())) {
-                            nonAnalyzedTransactions.offer(transactionViewModel.getTrunkTransactionHash());
-                        }
-                        if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getBranchTransactionHash())) {
-                            nonAnalyzedTransactions.offer(transactionViewModel.getBranchTransactionHash());
-                        }
+                        nonAnalyzedTransactions.offer(transactionViewModel.getTrunkTransactionHash());
+                        nonAnalyzedTransactions.offer(transactionViewModel.getBranchTransactionHash());
                     }
                 }
             }
