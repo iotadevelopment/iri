@@ -124,8 +124,12 @@ public class LedgerValidator {
                             }
                         }
 
-                        nonAnalyzedTransactions.offer(transactionViewModel.getTrunkTransactionHash());
-                        nonAnalyzedTransactions.offer(transactionViewModel.getBranchTransactionHash());
+                        if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getTrunkTransactionHash())) {
+                            nonAnalyzedTransactions.offer(transactionViewModel.getTrunkTransactionHash());
+                        }
+                        if (!snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getBranchTransactionHash())) {
+                            nonAnalyzedTransactions.offer(transactionViewModel.getBranchTransactionHash());
+                        }
                     }
                 }
             }
