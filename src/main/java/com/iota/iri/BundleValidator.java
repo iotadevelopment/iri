@@ -28,7 +28,7 @@ public class BundleValidator {
         if (debug) {
             System.out.println("a");
         }
-        final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail);
+        final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail, debug);
         if (debug) {
             System.out.println(bundleTransactions.size());
         }
@@ -155,7 +155,7 @@ public class BundleValidator {
         return (value != 0 || transactionViewModels.size() == 0);
     }
 
-    private static Map<Hash, TransactionViewModel> loadTransactionsFromTangle(Tangle tangle, TransactionViewModel tail) {
+    private static Map<Hash, TransactionViewModel> loadTransactionsFromTangle(Tangle tangle, TransactionViewModel tail, boolean debug) {
         final Map<Hash, TransactionViewModel> bundleTransactions = new HashMap<>();
         final Hash bundleHash = tail.getBundleHash();
         try {
@@ -164,6 +164,7 @@ public class BundleValidator {
             do {
                 bundleTransactions.put(tx.getHash(), tx);
                 tx = tx.getTrunkTransaction(tangle);
+                System.out.println(tx.getHash() + " => " + bundleHash);
             } while (i++ < end && tx.getCurrentIndex() != 0 && tx.getBundleHash().equals(bundleHash));
         } catch (Exception e) {
             e.printStackTrace();
