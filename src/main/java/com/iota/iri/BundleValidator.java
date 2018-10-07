@@ -164,7 +164,9 @@ public class BundleValidator {
             do {
                 bundleTransactions.put(tx.getHash(), tx);
                 tx = tx.getTrunkTransaction(tangle);
-                System.out.println(tx.getHash() + " => " + bundleHash);
+                if (debug) {
+                    System.out.println(tx.getHash() + " => " + bundleHash);
+                }
             } while (i++ < end && tx.getCurrentIndex() != 0 && tx.getBundleHash().equals(bundleHash));
         } catch (Exception e) {
             e.printStackTrace();
