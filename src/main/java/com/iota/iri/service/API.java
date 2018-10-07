@@ -235,7 +235,9 @@ public class API {
 
                             return transaction.snapshotIndex() == milestoneTransaction.snapshotIndex();
                         },
-                        transaction -> {}
+                        transaction -> {
+                            System.out.println(transaction.getHash());
+                        }
                     );
 
                     return ErrorResponse.create("lowest referenced milestone: " + lowestReferencedMilestone.get() + "; transactions traversed: " + transactionsTraversed.get());
