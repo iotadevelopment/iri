@@ -150,10 +150,7 @@ public class API {
             return;
         }
 
-        String[] previousEpochsSpentAddressesFiles = instance
-                .configuration
-                .getPreviousEpochSpentAddressesFiles()
-                .split(" ");
+        String[] previousEpochsSpentAddressesFiles = Configuration.PREVIOUS_EPOCHS_SPENT_ADDRESSES_TXT.split(" ");
         for (String previousEpochsSpentAddressesFile : previousEpochsSpentAddressesFiles) {
             InputStream in = Snapshot.class.getResourceAsStream(previousEpochsSpentAddressesFile);
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
