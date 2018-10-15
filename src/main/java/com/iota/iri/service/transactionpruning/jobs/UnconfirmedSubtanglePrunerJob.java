@@ -1,7 +1,8 @@
 package com.iota.iri.service.transactionpruning.jobs;
 
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.Transaction;
+import com.iota.iri.model.HashFactory;
+import com.iota.iri.model.persistables.Transaction;
 import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
@@ -33,7 +34,7 @@ public class UnconfirmedSubtanglePrunerJob extends AbstractTransactionPrunerJob 
      * @return a new {@link UnconfirmedSubtanglePrunerJob} with the provided hash
      */
     public static UnconfirmedSubtanglePrunerJob parse(String input) {
-        return new UnconfirmedSubtanglePrunerJob(new Hash(input));
+        return new UnconfirmedSubtanglePrunerJob(HashFactory.TRANSACTION.create(input));
     }
 
     /**
