@@ -9,14 +9,13 @@ import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.storage.Tangle;
 
 /**
- * Fulfills the contract of {@link TransactionPrunerJob} while implementing the most basic functionality that is shared
- * by the different kinds of jobs.
+ * Implements the most basic functionality that is shared by the different kinds of jobs.
  */
 public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJob {
     /**
      * Holds the execution status of the job.
      */
-    TransactionPrunerJobStatus status = TransactionPrunerJobStatus.PENDING;
+    private TransactionPrunerJobStatus status = TransactionPrunerJobStatus.PENDING;
 
     /**
      * Holds a reference to the manager of the job that schedules it execution.

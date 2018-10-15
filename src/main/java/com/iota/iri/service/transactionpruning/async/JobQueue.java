@@ -5,6 +5,10 @@ import com.iota.iri.service.transactionpruning.TransactionPruningException;
 
 import java.util.stream.Stream;
 
+/**
+ * Represents a queue of jobs which is used by the {@link AsyncTransactionPruner} to internally organize the different
+ * kind of jobs.
+ */
 public interface JobQueue {
     /**
      * Allows to add a job to the queue.

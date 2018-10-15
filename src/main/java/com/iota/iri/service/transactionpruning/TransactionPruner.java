@@ -1,10 +1,9 @@
 package com.iota.iri.service.transactionpruning;
 
-import com.iota.iri.service.snapshot.SnapshotManager;
-
 /**
- * Represents the manager for the cleanup jobs that are issued by the {@link SnapshotManager} in connection with local
- * snapshots and eventually other parts of the code.
+ * Represents the manager for the cleanup jobs that are issued by the
+ * {@link com.iota.iri.service.snapshot.SnapshotManager} in connection with local snapshots and eventually other parts
+ * of the code.
  */
 public interface TransactionPruner {
     /**
@@ -25,8 +24,7 @@ public interface TransactionPruner {
      * This method executes all jobs that where added to the {@link TransactionPruner} through
      * {@link #addJob(TransactionPrunerJob)}.
      *
-     * The jobs will only be executed exactly once. If the jobs are removed or marked as done after being processed is
-     * up to the specific implementation.
+     * The jobs will only be executed exactly once before being removed from the {@link TransactionPruner}.
      *
      * @throws TransactionPruningException if anything goes wrong while processing the jobs
      */
@@ -52,7 +50,8 @@ public interface TransactionPruner {
     void restoreState() throws TransactionPruningException;
 
     /**
-     * This method empties the queues of the TransactionPruner and removes any previously added jobs.
+     * This method removes all queued jobs and resets the state of the {@link TransactionPruner}. It can for example be
+     * used to cleanup after tests.
      *
      * @throws TransactionPruningException if anything goes wrong while clearing the jobs
      * */

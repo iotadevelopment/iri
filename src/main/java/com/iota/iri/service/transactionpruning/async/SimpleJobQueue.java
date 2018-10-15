@@ -21,7 +21,7 @@ public class SimpleJobQueue implements JobQueue {
     private final TransactionPruner transactionPruner;
 
     /**
-     * List of jobs that is used to internally store the queued jobs.
+     * Used to internally store the queued jobs.
      */
     private final Deque<TransactionPrunerJob> jobs = new ConcurrentLinkedDeque<>();
 
@@ -41,7 +41,10 @@ public class SimpleJobQueue implements JobQueue {
      * {@inheritDoc}
      *
      * It simply adds the job to the underlying {@link #jobs}.
+     *
+     * Note: Since we always add to the end and remove from the start, we do not need to synchronize this.
      */
+    @Override
     public void addJob(TransactionPrunerJob job) {
         jobs.addLast(job);
     }
@@ -49,6 +52,7 @@ public class SimpleJobQueue implements JobQueue {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void clear() {
         synchronized (jobs) {
             jobs.clear();
@@ -67,6 +71,7 @@ public class SimpleJobQueue implements JobQueue {
      *
      * After every processed job, we persist the changes by calling the {@link TransactionPruner#saveState()} method.
      */
+    @Override
     public void processJobs() throws TransactionPruningException {
         TransactionPrunerJob currentJob;
         while (!Thread.interrupted() && (currentJob = jobs.peek()) != null) {
@@ -92,6 +97,7 @@ public class SimpleJobQueue implements JobQueue {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Stream<TransactionPrunerJob> stream() {
         return jobs.stream();
     }

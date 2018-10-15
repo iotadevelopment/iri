@@ -41,15 +41,13 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * This method parses the string representation of a {@link MilestonePrunerJob} and creates the corresponding
      * object.
      *
-     * It splits the String input in two parts (delimited by a ";") and passes them into the constructor of a new
-     * {@link MilestonePrunerJob} by interpreting them as {@link #startingIndex} and {@link #currentIndex} of the job.
-     *
-     * The {@link #targetIndex} is derived by the jobs position in the queue and the fact that milestone deletions
-     * happen sequentially from the newest to the oldest milestone.
+     * It splits the String input in three parts (delimited by a ";") and passes them into the constructor of a new
+     * {@link MilestonePrunerJob} by interpreting them as {@link #startingIndex}, {@link #currentIndex} and
+     * {@link #targetIndex} of the job.
      *
      * @param input serialized String representation of a {@link MilestonePrunerJob}
      * @return a new {@link MilestonePrunerJob} with the provided details
-     * @throws TransactionPruningException if anything goes wrong while parsing the input
+     * @throws TransactionPruningException if the string can not be parsed
      */
     public static MilestonePrunerJob parse(String input) throws TransactionPruningException {
         String[] parts = input.split(";");
@@ -79,6 +77,9 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * restored (after IRI restarts), we need to be able provide both parameters even tho the job usually always
      * "starts" with its {@code currentIndex} being equal to the {@code startingIndex}.
      *
+     * If the {@link #currentIndex} is bigger than the {@link #targetIndex} we set the state to DONE (necessary when
+     * restoring the job from the state file).
+     *
      * @param startingIndex milestone index that defines where to start cleaning up
      * @param currentIndex milestone index that defines the next milestone that should be cleaned up by this job
      */
@@ -90,6 +91,60 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
         if (currentIndex > targetIndex) {
             setStatus(TransactionPrunerJobStatus.DONE);
         }
+    }
+
+    /**
+     * This method starts the processing of the job which triggers the actual removal of database entries.
+     *
+     * It iterates from the {@link #currentIndex} to the provided {@link #targetIndex} and processes every milestone
+     * one by one. After each step is finished we persist the progress to be able to continue with the current progress
+     * upon IRI restarts.
+     *
+     * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
+     */
+    @Override
+    public void process() throws TransactionPruningException {
+        if (getStatus() != TransactionPrunerJobStatus.DONE) {
+            setStatus(TransactionPrunerJobStatus.RUNNING);
+
+            try {
+                while (!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
+                    cleanupMilestoneTransactions();
+
+                    setCurrentIndex(getCurrentIndex() + 1);
+
+                    // synchronize this call because the MilestonePrunerJobQueue needs it to check if we can be extended
+                    synchronized (this) {
+                        if (getCurrentIndex() > getTargetIndex()) {
+                            setStatus(TransactionPrunerJobStatus.DONE);
+                        }
+                    }
+
+                    // persist changes if the job was executed by a TransactionPruner (tests might run it standalone)
+                    if (getTransactionPruner() != null) {
+                        getTransactionPruner().saveState();
+                    }
+                }
+            } catch (TransactionPruningException e) {
+                setStatus(TransactionPrunerJobStatus.FAILED);
+
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * This method creates the serialized representation of the job, that is used to persist the state of the
+     * {@link TransactionPruner}.
+     *
+     * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
+     * describe the job.
+     *
+     * @return serialized representation of this job that can be used to persist its state
+     */
+    @Override
+    public String serialize() {
+        return getStartingIndex() + ";" + getCurrentIndex() + ";" + getTargetIndex();
     }
 
     /**
@@ -144,58 +199,6 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      */
     public void setTargetIndex(int targetIndex) {
         this.targetIndex = targetIndex;
-    }
-
-    /**
-     * This method starts the processing of the job which triggers the actual removal of database entries.
-     *
-     * It iterates from the {@link #currentIndex} to the provided {@link #targetIndex} and processes every milestone
-     * one by one. After each step is finished we persist the progress to be able to continue with the current progress
-     * upon IRI restarts.
-     *
-     * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
-     */
-    public void process() throws TransactionPruningException {
-        if (getStatus() != TransactionPrunerJobStatus.DONE) {
-            setStatus(TransactionPrunerJobStatus.RUNNING);
-
-            try {
-                while (!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
-                    cleanupMilestoneTransactions();
-
-                    setCurrentIndex(getCurrentIndex() + 1);
-
-                    // synchronize this call because the MilestonePrunerJobQueue needs it to check if we can be extended
-                    synchronized (this) {
-                        if (getCurrentIndex() > getTargetIndex()) {
-                            setStatus(TransactionPrunerJobStatus.DONE);
-                        }
-                    }
-
-                    // persist changes if the job was executed by a TransactionPruner (tests might execute the job standalone)
-                    if (getTransactionPruner() != null) {
-                        getTransactionPruner().saveState();
-                    }
-                }
-            } catch (TransactionPruningException e) {
-                setStatus(TransactionPrunerJobStatus.FAILED);
-
-                throw e;
-            }
-        }
-    }
-
-    /**
-     * This method creates the serialized representation of the job, that is used to persist the state of the
-     * {@link TransactionPruner}.
-     *
-     * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
-     * describe the job.
-     *
-     * @return serialized representation of this job that can be used to persist its state
-     */
-    public String serialize() {
-        return getStartingIndex() + ";" + getCurrentIndex() + ";" + getTargetIndex();
     }
 
     /**

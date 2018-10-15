@@ -28,6 +28,9 @@ public class MilestonePrunerJobQueue implements JobQueue {
      */
     private final TransactionPruner transactionPruner;
 
+    /**
+     * Used to internally store the queued jobs.
+     */
     private final Deque<TransactionPrunerJob> jobs = new ConcurrentLinkedDeque<>();
 
     /**
@@ -59,8 +62,8 @@ public class MilestonePrunerJobQueue implements JobQueue {
      *
      * If the job can not be appended to an existing job, we add it to the end of our queue.
      *
-     * @param job job that shall be added to the queue
-     * @throws if anything goes wrong while adding the job
+     * @param job the {@link MilestonePrunerJob} that shall be added to the queue
+     * @throws TransactionPruningException if the given job is no {@link MilestonePrunerJob}
      */
     @Override
     public void addJob(TransactionPrunerJob job) throws TransactionPruningException {
@@ -68,7 +71,6 @@ public class MilestonePrunerJobQueue implements JobQueue {
             throw new TransactionPruningException("the MilestonePrunerJobQueue only supports MilestonePrunerJobs");
         }
 
-        // we usually only create jobs from 1 thread anyway, but better be safe than sorry
         synchronized (jobs) {
             MilestonePrunerJob newMilestonePrunerJob = (MilestonePrunerJob) job;
             MilestonePrunerJob lastMilestonePrunerJob = (MilestonePrunerJob) jobs.peekLast();
@@ -102,7 +104,6 @@ public class MilestonePrunerJobQueue implements JobQueue {
                 }
             }
 
-            // otherwise just add it as a new job at the end of the queue
             jobs.add(newMilestonePrunerJob);
         }
     }
@@ -151,6 +152,9 @@ public class MilestonePrunerJobQueue implements JobQueue {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Stream<TransactionPrunerJob> stream() {
         return jobs.stream();

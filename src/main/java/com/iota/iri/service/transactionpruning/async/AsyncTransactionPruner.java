@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * To start the background processing of pruning tasks one has to make use of the additional {@link #start()} and
  * {@link #shutdown()} methods.
  */
-public class AsyncTransactionPruner implements com.iota.iri.service.transactionpruning.TransactionPruner {
+public class AsyncTransactionPruner implements TransactionPruner {
     /**
      * The interval in milliseconds that the {@link AsyncTransactionPruner} will check if new cleanup tasks are
      * available and need to be processed.
@@ -49,22 +49,22 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     private static final Logger log = LoggerFactory.getLogger(AsyncTransactionPruner.class);
 
     /**
-     * Tangle object which acts as a database interface
+     * Tangle object which acts as a database interface.
      */
     private final Tangle tangle;
 
     /**
-     * Manager for the tips (required for removing pruned transactions from this manager)
+     * Manager for the tips (required for removing pruned transactions from this manager).
      */
     private final TipsViewModel tipsViewModel;
 
     /**
-     * Last local or global snapshot that acts as a starting point for the state of ledger
+     * Last local or global snapshot that acts as a starting point for the state of ledger.
      */
     private final Snapshot snapshot;
 
     /**
-     * Configuration with important snapshot related configuration parameters.
+     * Configuration with important snapshot related parameters.
      */
     private final SnapshotConfig config;
 
@@ -85,8 +85,8 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     private final ThreadIdentifier persisterThreadIdentifier = new ThreadIdentifier("Transaction Pruner Persister");
 
     /**
-     * A map of {@link JobParser}s allowing us to determine how to parse the jobs from the
-     * {@link com.iota.iri.service.transactionpruning.TransactionPruner} state file, based on their type.
+     * A map of {@link JobParser}s allowing us to determine how to parse the jobs from the state file, based on their
+     * type.
      */
     private final Map<String, JobParser> jobParsers = new HashMap<>();
 
@@ -127,14 +127,11 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     }
 
     /**
-     * This method fulfills the contract of {@link TransactionPruner#addJob(TransactionPrunerJob)}.
+     * {@inheritDoc}
      *
-     * It first registers the required dependencies in the job that are relevant for its execution and that do not get
-     * passed in via its constructor and then it adds the job to its corresponding queue.
-     *
-     * @param job the job that shall be executed
-     * @throws TransactionPruningException if anything goes wrong while adding the job
+     * It adds the job to its corresponding queue.
      */
+    @Override
     public void addJob(TransactionPrunerJob job) throws TransactionPruningException {
         job.setTransactionPruner(this);
         job.setTangle(tangle);
@@ -147,61 +144,47 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     }
 
     /**
-     * This method fulfills the contract of {@link TransactionPruner#saveState()}.
+     * {@inheritDoc}
      *
-     * It iterates over all
+     * It iterates through all available queues and triggers the processing of their jobs.
      *
-     * It does so by setting the {@link #persistRequested} flag to true, which will make the "Persister Thread" save the
-     * state on its next iteration.
-     *
-     * Note: We incorporate a background job that periodically saves the state rather than doing it "live", to reduce
-     *       the cost of this operation. While this can theoretically lead to a situation where the saved state is not
-     *       100% correct and the latest changes get lost (if IRI crashes or gets restarted before the new changes could
-     *       be persisted), the impact is marginal because it only leads to some floating "zombie" transactions that
-     *       will stay in the database. This will be "solved" once we persist the changes in the database instead of a
-     *       file on the hard disk. For now the trade off between faster processing times and leaving some garbage is
-     *       reasonable.
+     * @throws TransactionPruningException if anything goes wrong while processing the cleanup jobs
      */
+    @Override
+    public void processJobs() throws TransactionPruningException {
+        for(JobQueue jobQueue : jobQueues.values()) {
+            if(Thread.interrupted()) {
+                return;
+            }
+
+            jobQueue.processJobs();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * We incorporate a background job that periodically saves the state rather than doing it "live", to reduce the cost
+     * of this operation. While this can theoretically lead to a situation where the saved state is not 100% correct and
+     * the latest changes get lost (if IRI crashes or gets restarted before the new changes could be persisted), the
+     * impact is marginal because it only leads to some floating "zombie" transactions that will stay in the database.
+     * This will be "solved" once we persist the changes in the database instead of a file on the hard disk. For now the
+     * trade off between faster processing times and leaving some garbage is reasonable.
+     */
+    @Override
     public void saveState() {
         persistRequested = true;
     }
 
-    public void saveStateNow() throws TransactionPruningException {
-        try {
-            AtomicInteger jobsPersisted = new AtomicInteger(0);
-
-            Files.write(
-                Paths.get(getStateFile().getAbsolutePath()),
-                () -> jobQueues.values().stream()
-                      .flatMap(JobQueue::stream)
-                      .<CharSequence>map(jobEntry -> {
-                          jobsPersisted.incrementAndGet();
-
-                          return this.serializeJobEntry(jobEntry);
-                      })
-                      .iterator()
-            );
-
-            if (jobsPersisted.get() == 0) {
-                try {
-                    Files.deleteIfExists(Paths.get(getStateFile().getAbsolutePath()));
-                } catch (IOException e) {
-                    throw new TransactionPruningException("failed to remove the state file", e);
-                }
-            }
-        } catch(Exception e) {
-            throw new TransactionPruningException("failed to write the state file", e);
-        }
-    }
-
-
-
-
     /**
-     * This method fulfills the contract of {@link TransactionPruner#restoreState()} by reading the serialized job
-     * queues from the state file returned by {@link #getStateFile()} and parsing them back into their original
-     * representation.
+     * {@inheritDoc}
+     *
+     * It reads the state by parsing the state file and passing it into the registered parsers for each job type.
+     *
+     * Every line holds a job entry that starts with the fully qualified class name of the job followed by a ";" and the
+     * serialized representation of the job.
      */
+    @Override
     public void restoreState() throws TransactionPruningException {
         try (BufferedReader reader = new BufferedReader(
             new InputStreamReader(new BufferedInputStream(new FileInputStream(getStateFile())))
@@ -226,14 +209,17 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     }
 
     /**
-     * This method fulfills the contract of {@link TransactionPruner#clear()}.
+     * {@inheritDoc}
      *
-     * It cycles through all registered {@link JobQueue}s and clears them.
+     * It cycles through all registered {@link JobQueue}s and clears them before persisting the state.
      */
-    public void clear() {
+    @Override
+    public void clear() throws TransactionPruningException {
         for (JobQueue jobQueue : jobQueues.values()) {
             jobQueue.clear();
         }
+
+        saveStateNow();
     }
 
     /**
@@ -256,22 +242,22 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         ThreadUtils.stopThread(persisterThreadIdentifier);
     }
 
-    private void addJobQueue(Class<? extends TransactionPrunerJob> jobClass, JobQueue jobQueue) {
-        jobQueues.put(jobClass, jobQueue);
-    }
-
     /**
-     * This method allows to register a {@link JobParser} for a given job type.
+     * This method contains the logic for the processing of the cleanup jobs, that gets executed in a separate
+     * {@link Thread}.
      *
-     * When we serialize the pending jobs to save the current state, we also dump their class names, which allows us to
-     * generically parse their serialized representation using the registered parser function back into the
-     * corresponding job.
-     *
-     * @param jobClass class of the job that the TransactionPruner shall be able to handle
-     * @param jobParser parser function for the serialized version of jobs of the given type
+     * It repeatedly calls {@link #processJobs()} until the TransactionPruner is shutting down.
      */
-    private void registerParser(Class<?> jobClass, JobParser jobParser) {
-        this.jobParsers.put(jobClass.getCanonicalName(), jobParser);
+    private void processJobsThread() {
+        while(!Thread.interrupted()) {
+            try {
+                processJobs();
+            } catch(TransactionPruningException e) {
+                log.error("error while processing the transaction pruner jobs", e);
+            }
+
+            ThreadUtils.sleep(GARBAGE_COLLECTOR_RESCAN_INTERVAL);
+        }
     }
 
     /**
@@ -307,48 +293,74 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
     }
 
     /**
-     * This method contains the logic for the processing of the cleanup jobs, that gets executed in a separate
-     * {@link Thread}.
+     * Saves the state by serializing the jobs into a state file that is stored on the hard disk of the node.
      *
-     * It repeatedly calls {@link #processJobs()} until the TransactionPruner is shutting down.
+     * If no jobs are queued it removes the state file.
+     *
+     * @throws TransactionPruningException if anything goes wrong while persisting the state
      */
-    private void processJobsThread() {
-        while(!Thread.interrupted()) {
-            try {
-                processJobs();
-            } catch(TransactionPruningException e) {
-                log.error("error while processing the transaction pruner jobs", e);
-            }
+    private void saveStateNow() throws TransactionPruningException {
+        try {
+            AtomicInteger jobsPersisted = new AtomicInteger(0);
 
-            ThreadUtils.sleep(GARBAGE_COLLECTOR_RESCAN_INTERVAL);
+            Files.write(
+                Paths.get(getStateFile().getAbsolutePath()),
+                () -> jobQueues.values().stream()
+                      .flatMap(JobQueue::stream)
+                      .<CharSequence>map(jobEntry -> {
+                          jobsPersisted.incrementAndGet();
+
+                          return this.serializeJobEntry(jobEntry);
+                      })
+                      .iterator()
+            );
+
+            if (jobsPersisted.get() == 0) {
+                try {
+                    Files.deleteIfExists(Paths.get(getStateFile().getAbsolutePath()));
+                } catch (IOException e) {
+                    throw new TransactionPruningException("failed to remove the state file", e);
+                }
+            }
+        } catch(Exception e) {
+            throw new TransactionPruningException("failed to write the state file", e);
         }
     }
 
     /**
-     * This method contains the logic for scheduling the jobs and executing them.
+     * Registers the job queue that is responsible for processing the jobs of the given type.
      *
-     * It iterates through all available queues and triggers the processing of their jobs.
+     * The {@link JobQueue} implements the specific logic how the jobs are being executed and scheduled.
      *
-     * @throws TransactionPruningException if anything goes wrong while processing the cleanup jobs
+     * @param jobClass type of the job that we want to be able to process
+     * @param jobQueue the queue that is responsible for processing the transactions
      */
-    public void processJobs() throws TransactionPruningException {
-        for(JobQueue jobQueue : jobQueues.values()) {
-            if(Thread.interrupted()) {
-                return;
-            }
+    private void addJobQueue(Class<? extends TransactionPrunerJob> jobClass, JobQueue jobQueue) {
+        jobQueues.put(jobClass, jobQueue);
+    }
 
-            jobQueue.processJobs();
-        }
+    /**
+     * This method allows to register a {@link JobParser} for a given job type.
+     *
+     * When we serialize the pending jobs to save the current state, we also dump their class names, which allows us to
+     * generically parse their serialized representation using the registered parser function back into the
+     * corresponding job.
+     *
+     * @param jobClass class of the job that the TransactionPruner shall be able to handle
+     * @param jobParser parser function for the serialized version of jobs of the given type
+     */
+    private void registerParser(Class<?> jobClass, JobParser jobParser) {
+        this.jobParsers.put(jobClass.getCanonicalName(), jobParser);
     }
 
     /**
      * This method retrieves the job queue belonging to a given job type.
      *
-     * It first checks if a corresponding queue exists already and creates a new one if no queue was created yet for the
-     * given job type.
+     * Before returning the {@link JobQueue} we check if one exists.
      *
      * @param jobClass type of the job that we want to retrieve the queue for
      * @return the list of jobs for the provided job type
+     * @throws TransactionPruningException if there is no {@link JobQueue} for the given job type
      */
     private JobQueue getJobQueue(Class<? extends TransactionPrunerJob> jobClass) throws TransactionPruningException {
         JobQueue jobQueue = jobQueues.get(jobClass);
@@ -358,17 +370,6 @@ public class AsyncTransactionPruner implements com.iota.iri.service.transactionp
         }
 
         return jobQueue;
-        /*
-        if (transactionPrunerJobs.get(jobClass) == null) {
-            synchronized(this) {
-                if (transactionPrunerJobs.get(jobClass) == null) {
-                    transactionPrunerJobs.put(jobClass, new ArrayDeque<>());
-                }
-            }
-        }
-
-        return transactionPrunerJobs.get(jobClass);
-        */
     }
 
     /**

@@ -3,7 +3,8 @@ package com.iota.iri.service.transactionpruning;
 /**
  * This class is used to wrap exceptions that are specific to the transaction pruning logic.
  *
- * It allows us to distinct between the different kinds of errors that can happen during the execution of the code.
+ * It allows us to distinct between the different kinds of errors that can happen during the execution of the pruning
+ * logic.
  */
 public class TransactionPruningException extends Exception {
     /**
