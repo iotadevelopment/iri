@@ -1097,7 +1097,7 @@ public class API {
             instance.snapshotManager.getLatestSnapshot().unlockRead();
         }
 
-        final List<String> elements = addresses.stream().map(address -> balances.get(address).toString())
+        final List<String> elements = addressList.stream().map(address -> balances.get(address).toString())
                 .collect(Collectors.toCollection(LinkedList::new));
 
         return GetBalancesResponse.create(elements, hashes.stream().map(h -> h.toString()).collect(Collectors.toList()), index);
