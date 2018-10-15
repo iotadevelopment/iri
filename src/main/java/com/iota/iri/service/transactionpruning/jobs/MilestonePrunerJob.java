@@ -94,13 +94,11 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     }
 
     /**
-     * This method starts the processing of the job which triggers the actual removal of database entries.
+     * {@inheritDoc}
      *
      * It iterates from the {@link #currentIndex} to the provided {@link #targetIndex} and processes every milestone
      * one by one. After each step is finished we persist the progress to be able to continue with the current progress
      * upon IRI restarts.
-     *
-     * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
      */
     @Override
     public void process() throws TransactionPruningException {
@@ -134,13 +132,10 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     }
 
     /**
-     * This method creates the serialized representation of the job, that is used to persist the state of the
-     * {@link TransactionPruner}.
+     * {@inheritDoc}
      *
      * It simply concatenates the {@link #startingIndex} and the {@link #currentIndex} as they are necessary to fully
      * describe the job.
-     *
-     * @return serialized representation of this job that can be used to persist its state
      */
     @Override
     public String serialize() {
@@ -216,6 +211,8 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * becomes irrelevant).
      *
      * After removing the entries from the database it also removes the entries from the relevant runtime caches.
+     *
+     * Note: We do not delete unconfirmed subtangles while they are still part of the solid entry points.
      *
      * @throws TransactionPruningException if something goes wrong while cleaning up the milestone
      */

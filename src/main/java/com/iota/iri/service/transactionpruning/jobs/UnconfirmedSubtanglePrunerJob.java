@@ -47,49 +47,48 @@ public class UnconfirmedSubtanglePrunerJob extends AbstractTransactionPrunerJob 
     }
 
     /**
-     * This method starts the processing of the job which triggers the actual removal of database entries.
+     * {@inheritDoc}
      *
      * It iterates through all approvers and collects their hashes if they have not been approved. Then its deletes them
      * from the database (atomic) and also removes them from the runtime caches. After the job is done
-     *
-     * @throws TransactionPruningException if anything goes wrong while cleaning up or persisting the changes
      */
+    @Override
     public void process() throws TransactionPruningException {
-        setStatus(TransactionPrunerJobStatus.RUNNING);
+        if (getStatus() != TransactionPrunerJobStatus.DONE) {
+            setStatus(TransactionPrunerJobStatus.RUNNING);
 
-        try {
-            // collect elements to delete
-            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            DAGHelper.get(getTangle()).traverseApprovers(
-                transactionHash,
-                approverTransaction -> approverTransaction.snapshotIndex() == 0,
-                approverTransaction -> elementsToDelete.add(new Pair<>(
-                    approverTransaction.getHash(), Transaction.class
-                ))
-            );
+            try {
+                List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
+                DAGHelper.get(getTangle()).traverseApprovers(
+                    transactionHash,
+                    approverTransaction -> approverTransaction.snapshotIndex() == 0,
+                    approverTransaction -> elementsToDelete.add(new Pair<>(
+                        approverTransaction.getHash(), Transaction.class
+                    ))
+                );
 
-            // clean database entries
-            getTangle().deleteBatch(elementsToDelete);
+                // clean database entries
+                getTangle().deleteBatch(elementsToDelete);
 
-            // clean runtime caches
-            elementsToDelete.forEach(element -> getTipsViewModel().removeTipHash((Hash) element.low));
+                // clean runtime caches
+                elementsToDelete.forEach(element -> getTipsViewModel().removeTipHash((Hash) element.low));
 
-            setStatus(TransactionPrunerJobStatus.DONE);
-        } catch (Exception e) {
-            throw new TransactionPruningException(
-                "failed to cleanup orphaned approvers of transaction " + transactionHash, e
-            );
+                setStatus(TransactionPrunerJobStatus.DONE);
+            } catch (Exception e) {
+                setStatus(TransactionPrunerJobStatus.FAILED);
+                throw new TransactionPruningException(
+                    "failed to cleanup orphaned approvers of transaction " + transactionHash, e
+                );
+            }
         }
     }
 
     /**
-     * This method creates the serialized representation of the job, that is used to persist the state of the
-     * {@link TransactionPruner}.
+     * {@inheritDoc}
      *
      * It simply dumps the string representation of the {@link #transactionHash} .
-     *
-     * @return serialized representation of this job that can be used to persist its state
      */
+    @Override
     public String serialize() {
         return transactionHash.toString();
     }
