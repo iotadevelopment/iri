@@ -6,6 +6,7 @@ import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.HashId;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
@@ -303,7 +304,7 @@ public class CumulativeWeightCalculatorTest {
         byte[] bytes = transactionHash1.bytes();
         bytes =  Arrays.copyOf(bytes, bytes.length);
         Arrays.fill(bytes, bytes.length-5, bytes.length-1, (byte)1);
-        return new Hash(bytes);
+        return HashFactory.TRANSACTION.create(bytes);
     }
 
 

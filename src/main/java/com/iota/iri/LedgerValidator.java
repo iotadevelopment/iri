@@ -13,9 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-/**
- * Created by paul on 4/15/17.
- */
 public class LedgerValidator {
 
     private final SnapshotManager snapshotManager;

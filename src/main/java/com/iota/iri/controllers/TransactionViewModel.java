@@ -2,6 +2,12 @@ package com.iota.iri.controllers;
 
 import com.iota.iri.model.*;
 import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.model.persistables.Address;
+import com.iota.iri.model.persistables.Approvee;
+import com.iota.iri.model.persistables.Bundle;
+import com.iota.iri.model.persistables.ObsoleteTag;
+import com.iota.iri.model.persistables.Tag;
+import com.iota.iri.model.persistables.Transaction;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
@@ -19,7 +25,7 @@ public class TransactionViewModel implements Cacheable {
 
     private static Cache<TransactionViewModel> cache = new Cache<>();
 
-    public final com.iota.iri.model.Transaction transaction;
+    private final Transaction transaction;
 
     public static final int SIZE = 1604;
     private static final int TAG_SIZE_IN_BYTES = 17; // = ceil(81 TRITS / 5 TRITS_PER_BYTE)
@@ -70,7 +76,7 @@ public class TransactionViewModel implements Cacheable {
     }
 
     public static TransactionViewModel find(Tangle tangle, byte[] hash) throws Exception {
-        TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.find(Transaction.class, hash), new Hash(hash));
+        TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.find(Transaction.class, hash), HashFactory.TRANSACTION.create(hash));
         fillMetadata(tangle, transactionViewModel);
         return transactionViewModel;
     }
@@ -89,7 +95,7 @@ public class TransactionViewModel implements Cacheable {
         return tangle.maybeHas(Transaction.class, hash);
     }
 
-    public TransactionViewModel(final Transaction transaction, final Hash hash) {
+    public TransactionViewModel(final Transaction transaction, Hash hash) {
         this.transaction = transaction == null || transaction.bytes == null ? new Transaction(): transaction;
         this.hash = hash == null ? Hash.NULL_HASH : hash;
         weightMagnitude = this.hash.trailingZeros();
@@ -98,30 +104,26 @@ public class TransactionViewModel implements Cacheable {
     }
 
     public TransactionViewModel(final byte[] trits, Hash hash) {
+        transaction = new Transaction();
+
         if(trits.length == 8019) {
-            transaction = new com.iota.iri.model.Transaction();
             this.trits = new byte[trits.length];
             System.arraycopy(trits, 0, this.trits, 0, trits.length);
             transaction.bytes = Converter.allocateBytesForTrits(trits.length);
             Converter.bytes(trits, 0, transaction.bytes, 0, trits.length);
-            this.hash = hash;
 
-            transaction.type = FILLED_SLOT;
-
-            weightMagnitude = this.hash.trailingZeros();
             transaction.validity = 0;
             transaction.arrivalTime = 0;
-        }
-        else {
-            transaction = new Transaction();
+        } else {
             transaction.bytes = new byte[SIZE];
             System.arraycopy(trits, 0, transaction.bytes, 0, SIZE);
-            this.hash = hash;
-            weightMagnitude = this.hash.trailingZeros();
-            transaction.type = FILLED_SLOT;
         }
 
         cache.add(this);
+
+        this.hash = hash;
+        weightMagnitude = this.hash.trailingZeros();
+        transaction.type = FILLED_SLOT;
     }
 
     public static int getNumberOfStoredTransactions(Tangle tangle) throws Exception {
@@ -270,7 +272,7 @@ public class TransactionViewModel implements Cacheable {
 
     public Hash getAddressHash() {
         if(transaction.address == null) {
-            transaction.address = new Hash(trits(), ADDRESS_TRINARY_OFFSET);
+            transaction.address = HashFactory.ADDRESS.create(trits(), ADDRESS_TRINARY_OFFSET);
         }
         return transaction.address;
     }
@@ -280,28 +282,28 @@ public class TransactionViewModel implements Cacheable {
             byte[] tagBytes = Converter.allocateBytesForTrits(OBSOLETE_TAG_TRINARY_SIZE);
             Converter.bytes(trits(), OBSOLETE_TAG_TRINARY_OFFSET, tagBytes, 0, OBSOLETE_TAG_TRINARY_SIZE);
 
-            transaction.obsoleteTag = new Hash(tagBytes, 0, TAG_SIZE_IN_BYTES);
+            transaction.obsoleteTag = HashFactory.TAG.create(tagBytes, 0, TAG_SIZE_IN_BYTES);
         }
         return transaction.obsoleteTag;
     }
 
     public Hash getBundleHash() {
         if(transaction.bundle == null) {
-            transaction.bundle = new Hash(trits(), BUNDLE_TRINARY_OFFSET);
+            transaction.bundle = HashFactory.BUNDLE.create(trits(), BUNDLE_TRINARY_OFFSET);
         }
         return transaction.bundle;
     }
 
     public Hash getTrunkTransactionHash() {
         if(transaction.trunk == null) {
-            transaction.trunk = new Hash(trits(), TRUNK_TRANSACTION_TRINARY_OFFSET);
+            transaction.trunk = HashFactory.TRANSACTION.create(trits(), TRUNK_TRANSACTION_TRINARY_OFFSET);
         }
         return transaction.trunk;
     }
 
     public Hash getBranchTransactionHash() {
         if(transaction.branch == null) {
-            transaction.branch = new Hash(trits(), BRANCH_TRANSACTION_TRINARY_OFFSET);
+            transaction.branch = HashFactory.TRANSACTION.create(trits(), BRANCH_TRANSACTION_TRINARY_OFFSET);
         }
         return transaction.branch;
     }
@@ -310,7 +312,7 @@ public class TransactionViewModel implements Cacheable {
         if(transaction.tag == null) {
             byte[] tagBytes = Converter.allocateBytesForTrits(TAG_TRINARY_SIZE);
             Converter.bytes(trits(), TAG_TRINARY_OFFSET, tagBytes, 0, TAG_TRINARY_SIZE);
-            transaction.tag = new Hash(tagBytes, 0, TAG_SIZE_IN_BYTES);
+            transaction.tag = HashFactory.TAG.create(tagBytes, 0, TAG_SIZE_IN_BYTES);
         }
         return transaction.tag;
     }

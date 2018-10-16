@@ -19,14 +19,15 @@ import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
-import com.iota.iri.zmq.MessageQ;
+import com.iota.iri.model.Hash;
+import com.iota.iri.model.HashFactory;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.Converter;
+import com.iota.iri.zmq.MessageQ;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.iota.iri.hash.ISS;
-import com.iota.iri.model.Hash;
-import com.iota.iri.utils.Converter;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -105,7 +106,7 @@ public class MilestoneTracker {
 
         //configure
         this.testnet = config.isTestnet();
-        this.coordinator = new Hash(config.getCoordinator());
+        this.coordinator = HashFactory.ADDRESS.create(config.getCoordinator());
         this.numOfKeysInMilestone = config.getNumberOfKeysInMilestone();
         this.acceptAnyTestnetCoo = config.isDontValidateTestnetMilestoneSig();
         this.isRescanning = config.isRescanDb() || config.isRevalidate();
@@ -423,11 +424,11 @@ public class MilestoneTracker {
                         final byte[] signatureFragmentTrits = Arrays.copyOfRange(transactionViewModel.trits(), TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET, TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET + TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE);
 
                         final byte[] merkleRoot = ISS.getMerkleRoot(mode, ISS.address(mode, ISS.digest(mode,
-                        Arrays.copyOf(ISS.normalizedBundle(trunkTransactionTrits),
-                        ISS.NUMBER_OF_FRAGMENT_CHUNKS),
-                        signatureFragmentTrits)),
-                        transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
-                        if ((testnet && acceptAnyTestnetCoo) || (new Hash(merkleRoot)).equals(coordinator)) {
+                                Arrays.copyOf(ISS.normalizedBundle(trunkTransactionTrits),
+                                        ISS.NUMBER_OF_FRAGMENT_CHUNKS),
+                                signatureFragmentTrits)),
+                                transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
+                        if ((testnet && acceptAnyTestnetCoo) || (HashFactory.ADDRESS.create(merkleRoot)).equals(coordinator)) {
                             MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(index, transactionViewModel.getHash());
                             newMilestoneViewModel.store(tangle);
 

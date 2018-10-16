@@ -3,8 +3,10 @@ package com.iota.iri.controllers;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.Transaction;
 import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.model.HashFactory;
+import com.iota.iri.model.TransactionHash;
+import com.iota.iri.model.persistables.Transaction;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -70,19 +72,19 @@ public class TransactionViewModelTest {
 
 
         byte[] trits = getRandomTransactionTrits();
-        trunkTx = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
+        trunkTx = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
 
-        branchTx = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
+        branchTx = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
 
         byte[] childTx = getRandomTransactionTrits();
         System.arraycopy(trunkTx.getHash().trits(), 0, childTx, TransactionViewModel.TRUNK_TRANSACTION_TRINARY_OFFSET, TransactionViewModel.TRUNK_TRANSACTION_TRINARY_SIZE);
         System.arraycopy(branchTx.getHash().trits(), 0, childTx, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_OFFSET, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_SIZE);
-        transactionViewModel = new TransactionViewModel(childTx, Hash.calculate(SpongeFactory.Mode.CURLP81, childTx));
+        transactionViewModel = new TransactionViewModel(childTx, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, childTx));
 
         childTx = getRandomTransactionTrits();
         System.arraycopy(trunkTx.getHash().trits(), 0, childTx, TransactionViewModel.TRUNK_TRANSACTION_TRINARY_OFFSET, TransactionViewModel.TRUNK_TRANSACTION_TRINARY_SIZE);
         System.arraycopy(branchTx.getHash().trits(), 0, childTx, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_OFFSET, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_SIZE);
-        otherTxVM = new TransactionViewModel(childTx, Hash.calculate(SpongeFactory.Mode.CURLP81, childTx));
+        otherTxVM = new TransactionViewModel(childTx, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, childTx));
 
         otherTxVM.store(tangle, snapshotManager);
         transactionViewModel.store(tangle, snapshotManager);
@@ -325,7 +327,7 @@ public class TransactionViewModelTest {
     @Test
     public void findShouldBeSuccessful() throws Exception {
         byte[] trits = getRandomTransactionTrits();
-        TransactionViewModel transactionViewModel = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
+        TransactionViewModel transactionViewModel = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
         transactionViewModel.store(tangle, snapshotManager);
         Hash hash = transactionViewModel.getHash();
         Assert.assertArrayEquals(TransactionViewModel.find(tangle,
@@ -336,9 +338,9 @@ public class TransactionViewModelTest {
     @Test
     public void findShouldReturnNull() throws Exception {
         byte[] trits = getRandomTransactionTrits();
-        TransactionViewModel transactionViewModel = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
+        TransactionViewModel transactionViewModel = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
         trits = getRandomTransactionTrits();
-        TransactionViewModel transactionViewModelNoSave = new TransactionViewModel(trits, Hash.calculate(SpongeFactory.Mode.CURLP81, trits));
+        TransactionViewModel transactionViewModelNoSave = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
         transactionViewModel.store(tangle, snapshotManager);
         Hash hash = transactionViewModelNoSave.getHash();
         Assert.assertFalse(Arrays.equals(TransactionViewModel.find(tangle,
@@ -435,6 +437,6 @@ public class TransactionViewModelTest {
             out[i] = (byte) (seed.nextInt(3) - 1);
         }
 
-        return new Hash(out);
+        return HashFactory.TRANSACTION.create(out);
     }
 }
