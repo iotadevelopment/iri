@@ -15,17 +15,16 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.iota.iri.controllers.TransactionViewModel.*;
 
 public class TransactionValidator {
-    private final Logger log = LoggerFactory.getLogger(TransactionValidator.class);
+    private static final Logger log = LoggerFactory.getLogger(TransactionValidator.class);
     private final Tangle tangle;
     private final SnapshotManager snapshotManager;
     private final TipsViewModel tipsViewModel;
     private final TransactionRequester transactionRequester;
-    private int MIN_WEIGHT_MAGNITUDE = 81;
+    private int minWeightMagnitude = 81;
     private static final long MAX_TIMESTAMP_FUTURE = 2 * 60 * 60;
     private static final long MAX_TIMESTAMP_FUTURE_MS = MAX_TIMESTAMP_FUTURE * 1000;
 
@@ -55,11 +54,11 @@ public class TransactionValidator {
     }
 
     void setMwm(boolean testnet, int mwm) {
-        MIN_WEIGHT_MAGNITUDE = mwm;
+        minWeightMagnitude = mwm;
 
         //lowest allowed MWM encoded in 46 bytes.
         if (!testnet){
-            MIN_WEIGHT_MAGNITUDE = Math.max(MIN_WEIGHT_MAGNITUDE, 13);
+            minWeightMagnitude = Math.max(minWeightMagnitude, 13);
         }
     }
 
@@ -69,7 +68,7 @@ public class TransactionValidator {
     }
 
     public int getMinWeightMagnitude() {
-        return MIN_WEIGHT_MAGNITUDE;
+        return minWeightMagnitude;
     }
 
     private boolean hasInvalidTimestamp(TransactionViewModel transactionViewModel) {
@@ -94,17 +93,17 @@ public class TransactionValidator {
         }
         for (int i = VALUE_TRINARY_OFFSET + VALUE_USABLE_TRINARY_SIZE; i < VALUE_TRINARY_OFFSET + VALUE_TRINARY_SIZE; i++) {
             if (transactionViewModel.trits()[i] != 0) {
-                throw new RuntimeException("Invalid transaction value");
+                throw new IllegalStateException("Invalid transaction value");
             }
         }
 
         int weightMagnitude = transactionViewModel.weightMagnitude;
         if(weightMagnitude < minWeightMagnitude) {
-            throw new RuntimeException("Invalid transaction hash");
+            throw new IllegalStateException("Invalid transaction hash");
         }
 
         if (transactionViewModel.value() != 0 && transactionViewModel.getAddressHash().trits()[Curl.HASH_LENGTH - 1] != 0) {
-            throw new RuntimeException("Invalid transaction address");
+            throw new IllegalStateException("Invalid transaction address");
         }
     }
 
@@ -114,17 +113,11 @@ public class TransactionValidator {
         return transactionViewModel;
     }
 
-    public TransactionViewModel validateBytes(final byte[] bytes, int minWeightMagnitude) {
-        return validateBytes(bytes, minWeightMagnitude, SpongeFactory.create(SpongeFactory.Mode.CURLP81));
-    }
-
     public TransactionViewModel validateBytes(final byte[] bytes, int minWeightMagnitude, Sponge curl) {
-        TransactionViewModel transactionViewModel = new TransactionViewModel(bytes, TransactionHash.calculate(bytes, TransactionViewModel.TRINARY_SIZE, curl));
+        TransactionViewModel transactionViewModel = new TransactionViewModel(bytes, TransactionHash.calculate(bytes, TRINARY_SIZE, curl));
         runValidation(transactionViewModel, minWeightMagnitude);
         return transactionViewModel;
     }
-
-    private final AtomicInteger nextSubSolidGroup = new AtomicInteger(1);
 
     /**
      * This method does the same as {@link #checkSolidity(Hash, boolean, int)} but defaults to an unlimited amount
@@ -211,7 +204,7 @@ public class TransactionValidator {
             }
         }
         if (solid) {
-            TransactionViewModel.updateSolidTransactions(tangle, snapshotManager, analyzedHashes);
+            updateSolidTransactions(tangle, snapshotManager, analyzedHashes);
         }
         analyzedHashes.clear();
         return solid;
@@ -234,7 +227,8 @@ public class TransactionValidator {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    // Ignoring InterruptedException. Do not use Thread.currentThread().interrupt() here.
+                    log.error("Thread was interrupted: ", e);
                 }
             }
         };
@@ -257,10 +251,10 @@ public class TransactionValidator {
         while(cascadeIterator.hasNext() && !shuttingDown.get()) {
             try {
                 Hash hash = cascadeIterator.next();
-                TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hash);
+                TransactionViewModel transaction = fromHash(tangle, hash);
                 Set<Hash> approvers = transaction.getApprovers(tangle).getHashes();
                 for(Hash h: approvers) {
-                    TransactionViewModel tx = TransactionViewModel.fromHash(tangle, h);
+                    TransactionViewModel tx = fromHash(tangle, h);
                     if(quietQuickSetSolid(tx)) {
                         tx.update(tangle, snapshotManager, "solid|height");
                         tipsViewModel.setSolid(h);
@@ -288,11 +282,11 @@ public class TransactionValidator {
         }
     }
 
-    public boolean quietQuickSetSolid(TransactionViewModel transactionViewModel) {
+    private boolean quietQuickSetSolid(TransactionViewModel transactionViewModel) {
         try {
             return quickSetSolid(transactionViewModel);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error(e.getMessage(), e);
             return false;
         }
     }
@@ -317,7 +311,6 @@ public class TransactionValidator {
                 return true;
             }
         }
-        //return isSolid();
         return false;
     }
 
@@ -338,7 +331,7 @@ public class TransactionValidator {
     }
 
     public static class StaleTimestampException extends RuntimeException {
-        public StaleTimestampException (String message) {
+        StaleTimestampException (String message) {
             super(message);
         }
     }
