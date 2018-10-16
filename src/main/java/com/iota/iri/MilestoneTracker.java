@@ -1,39 +1,51 @@
 package com.iota.iri;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ConcurrentHashMap;
-
-import javax.net.ssl.HttpsURLConnection;
-
+import com.iota.iri.conf.ConsensusConfig;
 import com.iota.iri.conf.IotaConfig;
-import com.iota.iri.controllers.*;
+import com.iota.iri.controllers.AddressViewModel;
+import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.controllers.TransactionViewModel;
+import com.iota.iri.hash.Curl;
+import com.iota.iri.hash.ISS;
+import com.iota.iri.hash.ISSInPlace;
 import com.iota.iri.hash.SpongeFactory;
+import com.iota.iri.model.Hash;
+import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotManager;
-import com.iota.iri.utils.ProgressLogger;
-import com.iota.iri.utils.dag.DAGHelper;
-import com.iota.iri.model.Hash;
-import com.iota.iri.model.HashFactory;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Converter;
+import com.iota.iri.utils.ProgressLogger;
+import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.zmq.MessageQ;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.iota.iri.hash.ISS;
+import javax.net.ssl.HttpsURLConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.iota.iri.MilestoneTracker.Validity.*;
-import static com.iota.iri.MilestoneTracker.Status.*;
+import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
+import static com.iota.iri.MilestoneTracker.Status.INITIALIZING;
+import static com.iota.iri.MilestoneTracker.Validity.INCOMPLETE;
+import static com.iota.iri.MilestoneTracker.Validity.INVALID;
+import static com.iota.iri.MilestoneTracker.Validity.VALID;
 
 public class MilestoneTracker {
     /**
@@ -280,7 +292,7 @@ public class MilestoneTracker {
         if (coordinator.equals(potentialMilestoneTransaction.getAddressHash()) && potentialMilestoneTransaction.getCurrentIndex() == 0) {
             int milestoneIndex = getIndex(potentialMilestoneTransaction);
 
-            switch (validateMilestone(SpongeFactory.Mode.CURLP27, potentialMilestoneTransaction, milestoneIndex)) {
+            switch (validateMilestone(SpongeFactory.Mode.CURLP27, 1, potentialMilestoneTransaction, milestoneIndex)) {
                 case VALID:
                     if (milestoneIndex > latestMilestoneIndex) {
                         messageQ.publish("lmi %d %d", latestMilestoneIndex, milestoneIndex);
@@ -395,7 +407,7 @@ public class MilestoneTracker {
         }
     }
 
-    public Validity validateMilestone(SpongeFactory.Mode mode, TransactionViewModel transactionViewModel, int index) throws Exception {
+    Validity validateMilestone(SpongeFactory.Mode mode, int securityLevel, TransactionViewModel transactionViewModel, int index) throws Exception {
         if (index < 0 || index >= 0x200000) {
             return INVALID;
         }
@@ -411,23 +423,32 @@ public class MilestoneTracker {
         else {
             for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
 
-                //if (Arrays.equals(bundleTransactionViewModels.get(0).getHash(),transactionViewModel.getHash())) {
-                if (bundleTransactionViewModels.get(0).getHash().equals(transactionViewModel.getHash())) {
+                final TransactionViewModel tail = bundleTransactionViewModels.get(0);
+                if (tail.getHash().equals(transactionViewModel.getHash())) {
+                    //the signed transaction - which references the confirmed transactions and contains
+                    // the Merkle tree siblings.
+                    final TransactionViewModel siblingsTx = bundleTransactionViewModels.get(securityLevel);
 
-                    //final TransactionViewModel transactionViewModel2 = StorageTransactions.instance().loadTransaction(transactionViewModel.trunkTransactionPointer);
-                    final TransactionViewModel transactionViewModel2 = transactionViewModel.getTrunkTransaction(tangle);
-                    if (transactionViewModel2.getType() == TransactionViewModel.FILLED_SLOT
-                        && transactionViewModel.getBranchTransactionHash().equals(transactionViewModel2.getTrunkTransactionHash())
-                        && transactionViewModel.getBundleHash().equals(transactionViewModel2.getBundleHash())) {
+                    if (isMilestoneBundleStructureValid(bundleTransactionViewModels, securityLevel)) {
+                        //milestones sign the normalized hash of the sibling transaction.
+                        byte[] signedHash = ISS.normalizedBundle(siblingsTx.getHash().trits());
 
-                        final byte[] trunkTransactionTrits = transactionViewModel.getTrunkTransactionHash().trits();
-                        final byte[] signatureFragmentTrits = Arrays.copyOfRange(transactionViewModel.trits(), TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET, TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_OFFSET + TransactionViewModel.SIGNATURE_MESSAGE_FRAGMENT_TRINARY_SIZE);
+                        //validate leaf signature
+                        ByteBuffer bb = ByteBuffer.allocate(Curl.HASH_LENGTH * securityLevel);
+                        byte[] digest = new byte[Curl.HASH_LENGTH];
 
-                        final byte[] merkleRoot = ISS.getMerkleRoot(mode, ISS.address(mode, ISS.digest(mode,
-                                Arrays.copyOf(ISS.normalizedBundle(trunkTransactionTrits),
-                                        ISS.NUMBER_OF_FRAGMENT_CHUNKS),
-                                signatureFragmentTrits)),
-                                transactionViewModel2.trits(), 0, index, numOfKeysInMilestone);
+                        for (int i = 0; i < securityLevel; i++) {
+                            ISSInPlace.digest(mode, signedHash, ISS.NUMBER_OF_FRAGMENT_CHUNKS * i,
+                                    bundleTransactionViewModels.get(i).getSignature(), 0, digest);
+                            bb.put(digest);
+                        }
+
+                        byte[] digests = bb.array();
+                        byte[] address = ISS.address(mode, digests);
+
+                        //validate Merkle path
+                        byte[] merkleRoot = ISS.getMerkleRoot(mode, address,
+                                siblingsTx.trits(), 0, index, numOfKeysInMilestone);
                         if ((testnet && acceptAnyTestnetCoo) || (HashFactory.ADDRESS.create(merkleRoot)).equals(coordinator)) {
                             MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(index, transactionViewModel.getHash());
                             newMilestoneViewModel.store(tangle);
@@ -554,5 +575,15 @@ public class MilestoneTracker {
 
             e.printStackTrace();
         }
+    }
+
+    private boolean isMilestoneBundleStructureValid(List<TransactionViewModel> bundleTxs, int securityLevel) {
+        TransactionViewModel head = bundleTxs.get(securityLevel);
+        return bundleTxs.stream()
+                .limit(securityLevel)
+                .allMatch(tx ->
+                        tx.getBranchTransactionHash().equals(head.getTrunkTransactionHash()));
+        //trunks of bundles are checked in Bundle validation - no need to check again.
+        //bundleHash equality is checked in BundleValidator.validate() (loadTransactionsFromTangle)
     }
 }
