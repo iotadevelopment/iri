@@ -5,6 +5,7 @@ import com.iota.iri.SignedFiles;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
+import com.iota.iri.model.HashFactory;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotState;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
@@ -442,12 +443,14 @@ public class SnapshotManager {
 
                     log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
 
+                    log.info("" + snapshotState.getBalance(HashFactory.ADDRESS.create("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")));
+
                     // return our Snapshot
                     return new SnapshotImpl(snapshotState, snapshotMetaData);
                 }
             }
         } catch (Exception e) {
-            log.info("No valid Local Snapshot file found");
+            log.error("No valid Local Snapshot file found", e);
         }
 
         // otherwise just return null
