@@ -4,7 +4,6 @@ import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.HashFactory;
 import com.iota.iri.service.snapshot.*;
 import com.iota.iri.storage.Tangle;
 
@@ -108,8 +107,6 @@ public class SnapshotImpl implements Snapshot {
 
         try {
             for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
-                System.out.println(currentMilestoneIndex);
-                System.out.println(state.getBalance(HashFactory.ADDRESS.create("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")));
                 MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                 if (currentMilestone != null) {
                     StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());

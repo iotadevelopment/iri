@@ -2,7 +2,6 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotManager;
@@ -224,9 +223,6 @@ public class LedgerValidator {
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
                 if(successfullyProcessed) {
-                    System.out.println(snapshotManager.getLatestSnapshot().getIndex());
-                System.out.println(milestoneVM.index());
-                System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")));
                     successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());

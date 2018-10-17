@@ -45,10 +45,8 @@ public class SnapshotStateImpl implements SnapshotState {
         BufferedReader reader = null;
         try {
             InputStream snapshotStream = SnapshotImpl.class.getResourceAsStream(snapshotStateFilePath);
-            System.out.println("FROM RESOURCE " + snapshotStateFilePath);
             if (snapshotStream == null) {
                 snapshotStream = new FileInputStream(snapshotStateFilePath);
-                System.out.println("FROM FILE " + snapshotStateFilePath);
             }
             reader = new BufferedReader(new InputStreamReader(new BufferedInputStream(snapshotStream)));
 
@@ -58,9 +56,6 @@ public class SnapshotStateImpl implements SnapshotState {
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
                 if (parts.length >= 2) {
-                    if (parts[1].equals("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")) {
-                        System.out.println("=> " + parts[1]);
-                    }
                     state.put(HashFactory.ADDRESS.create(parts[0]), Long.valueOf(parts[1]));
                 } else {
                     throw new SnapshotException("malformed snapshot state file at " + snapshotStateFilePath);
@@ -147,9 +142,9 @@ public class SnapshotStateImpl implements SnapshotState {
      */
     @Override
     public void applyStateDiff(SnapshotStateDiff diff) throws SnapshotException {
-        //if (!diff.isConsistent()) {
-        //    throw new SnapshotException("cannot apply an inconsistent SnapshotStateDiff");
-        //}
+        if (!diff.isConsistent()) {
+            throw new SnapshotException("cannot apply an inconsistent SnapshotStateDiff");
+        }
 
         diff.getBalanceChanges().forEach((addressHash, balance) -> {
             if (balances.computeIfPresent(addressHash, (hash, aLong) -> balance + aLong) == null) {
