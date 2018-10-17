@@ -61,7 +61,7 @@ public class SnapshotStateImpl implements SnapshotState {
                     if (parts[1].equals("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")) {
                         System.out.println("=> " + parts[1]);
                     }
-                    state.put(HashFactory.TRANSACTION.create(parts[0]), Long.valueOf(parts[1]));
+                    state.put(HashFactory.ADDRESS.create(parts[0]), Long.valueOf(parts[1]));
                 } else {
                     throw new SnapshotException("malformed snapshot state file at " + snapshotStateFilePath);
                 }
