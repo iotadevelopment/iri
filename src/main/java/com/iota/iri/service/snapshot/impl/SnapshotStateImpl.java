@@ -45,8 +45,10 @@ public class SnapshotStateImpl implements SnapshotState {
         BufferedReader reader = null;
         try {
             InputStream snapshotStream = SnapshotImpl.class.getResourceAsStream(snapshotStateFilePath);
+            System.out.println("FROM RESOURCE " + snapshotStateFilePath);
             if (snapshotStream == null) {
                 snapshotStream = new FileInputStream(snapshotStateFilePath);
+                System.out.println("FROM FILE " + snapshotStateFilePath);
             }
             reader = new BufferedReader(new InputStreamReader(new BufferedInputStream(snapshotStream)));
 
