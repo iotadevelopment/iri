@@ -2,356 +2,173 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
+import java.io.File;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
- * This class represents the meta data of a snapshot.
+ * Represents the meta data of a snapshot.
  *
  * Since a snapshot represents the state of the ledger at a given point and this point is defined by a chosen milestone
- * in the tangle, we store milestone specific values like a hash, and an index but also derived values that are only
- * relevant to the local snapshots logic.
+ * in the tangle, we store milestone specific values like a hash, an index and the timestamp but also derived values
+ * that are only relevant for the local snapshots logic.
  */
-public class SnapshotMetaData implements Cloneable {
+public interface SnapshotMetaData {
     /**
-     * Holds the initial transaction hash that this snapshot was created with.
+     * Getter of the hash of the transaction that the snapshot belonged to when it was created.
      *
-     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
-     *       this value differs from the {@link #hash}.
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
+     *       so this value differs from the value returned by {@link #getHash()}.
+     *
+     * @return hash of the transaction that the snapshot belonged to when it was created
      */
-    protected Hash initialHash;
+    Hash getInitialHash();
 
     /**
-     * Holds the current transaction hash of the snapshot.
+     * Getter of the index of the milestone that the snapshot belonged to to when it was created.
+     *
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
+     *       so this value differs from the value returned by {@link #getIndex()}.
+     *
+     * @return index of the milestone that the snapshot belonged to to when it was created
      */
-    private Hash hash;
+    int getInitialIndex();
 
     /**
-     * Holds the initial transaction index that this snapshot was created with.
+     *  Getter of the timestamp of the transaction that the snapshot belonged to when it was created.
      *
-     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
-     *       this value differs from the {@link #index}.
+     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
+     *       so this value differs from the value returned by {@link #getTimestamp()}.
+     *
+     * @return timestamp of the transaction that the snapshot belonged to when it was created
      */
-    protected int initialIndex;
+    long getInitialTimestamp();
 
     /**
-     * Holds the current index of the snapshot.
+     * Getter of the hash of the transaction that the snapshot currently belongs to.
+     *
+     * @return hash of the transaction that the snapshot currently belongs to
      */
-    private int index;
+    Hash getHash();
 
     /**
-     * Holds the initial timestamp of the milestone transaction that this snapshot was created with.
+     * Setter of the hash of the transaction that the snapshot currently belongs to.
      *
-     * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive milestones, so
-     *       this value differs from the {@link #timestamp}.
+     * @param hash hash of the transaction that the snapshot currently belongs to
      */
-    protected long initialTimestamp;
+    void setHash(Hash hash);
 
     /**
-     * Holds the timestamp of the milestone that this snapshot is associated to.
+     * Getter of the milestone index that the snapshot currently belongs to.
+     *
+     * Note: At the moment we use milestones as a reference for snapshots.
+     *
+     * @return milestone index that the snapshot currently belongs to
      */
-    private long timestamp;
+    int getIndex();
 
     /**
-     * Hashes that were pruned when creating the snapshot and that still had non-orphaned approvers.
+     * Setter of the milestone index that the snapshot currently belongs to.
      *
-     * When we try to solidify transactions, we stop and consider the transaction solid if it references a transaction
-     * in this Set.
+     * Note: At the moment we use milestones as a reference for snapshots.
+     *
+     * @param index milestone index that the snapshot currently belongs to
      */
-    protected HashMap<Hash, Integer> solidEntryPoints;
+    void setIndex(int index);
 
     /**
-     * Holds a list of milestone hashes that were issued after the milestone that was used to create the snapshot.
+     * Getter of the timestamp of the transaction that the snapshot currently belongs to.
      *
-     * It is saved to allow unsynced nodes to request those milestones when they use the corresponding snapshot files to
-     * bootstrap their node.
+     * @return timestamp of the transaction that the snapshot currently belongs to
      */
-    private HashMap<Hash, Integer> seenMilestones;
+    long getTimestamp();
 
     /**
-     * This method retrieves the meta data of a snapshot from a file.
+     * Setter of the timestamp of the transaction that the snapshot currently belongs to.
      *
-     * It is used by local snapshots to determine the relevant information about the saved snapshot.
-     *
-     * @param snapshotMetaDataFile File object with the path to the snapshot metadata file
-     * @return SnapshotMetaData instance holding all the relevant details about the snapshot
-     * @throws FileNotFoundException if the metadata file does not exist
-     * @throws IOException if the metadata file is not readable
-     * @throws IllegalArgumentException if the metadata file exists but is malformed
+     * @param timestamp timestamp of the transaction that the snapshot currently belongs to
      */
-    public static SnapshotMetaData fromFile(File snapshotMetaDataFile) throws FileNotFoundException, IOException, SnapshotException {
-        // create a reader for our file
-        BufferedReader reader = new BufferedReader(
-            new InputStreamReader(
-                new BufferedInputStream(
-                    new FileInputStream(snapshotMetaDataFile)
-                )
-            )
-        );
-
-        // create variables to store the read values
-        Hash hash;
-        int index;
-        long timestamp;
-        int solidEntryPointsSize;
-        int seenMilestonesSize;
-
-        // read the hash
-        String line;
-        if((line = reader.readLine()) != null) {
-            hash = new Hash(line);
-        } else {
-            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-        }
-
-        // read the index
-        if((line = reader.readLine()) != null) {
-            index = Integer.parseInt(line);
-        } else {
-            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-        }
-
-        // read the timestamp
-        if((line = reader.readLine()) != null) {
-            timestamp = Long.parseLong(line);
-        } else {
-            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-        }
-
-        // read the solid entry points size
-        if((line = reader.readLine()) != null) {
-            solidEntryPointsSize = Integer.parseInt(line);
-        } else {
-            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-        }
-
-        // read the solid entry points size
-        if((line = reader.readLine()) != null) {
-            seenMilestonesSize = Integer.parseInt(line);
-        } else {
-            throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-        }
-
-        // read the solid entry points from our file
-        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
-        for(int i = 0; i < solidEntryPointsSize; i++) {
-            if((line = reader.readLine()) != null) {
-                String[] parts = line.split(";", 2);
-                if(parts.length >= 2) {
-                    solidEntryPoints.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
-                }
-            } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-            }
-        }
-
-        // read the seen milestones
-        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
-        for(int i = 0; i < seenMilestonesSize; i++) {
-            if((line = reader.readLine()) != null) {
-                String[] parts = line.split(";", 2);
-                if(parts.length >= 2) {
-                    seenMilestones.put(new Hash(parts[0]), Integer.parseInt(parts[1]));
-                }
-            } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
-            }
-        }
-
-        // close the reader
-        reader.close();
-
-        // create and return our SnapshotMetaData object
-        return new SnapshotMetaData(hash, index, timestamp, solidEntryPoints, seenMilestones);
-    }
+    void setTimestamp(long timestamp);
 
     /**
-     * Constructor of the SnapshotMetaData class.
+     * Getter for the solid entry points of the snapshot.
      *
-     * It simply stores the passed in parameters for later use.
+     * A solid entry point is a confirmed transaction that had non-orphaned approvers during the time of the snapshot
+     * creation and therefore a connection to the most recent part of the tangle. The solid entry points allow us to
+     * stop the solidification process without having to go all the way back to the genesis.
      *
-     * @param  hash transaction hash representing
-     * @param index index of the Snapshot that this metadata belongs to
-     * @param solidEntryPoints Set of transaction hashes that were cut off when creating the snapshot
+     * Note: Nodes that do not use local snapshots will only have one solid entry point (the NULL_HASH).
+     *
+     * @return map with the transaction hashes associated to their milestone index
      */
-    public SnapshotMetaData(Hash hash, int index, Long timestamp, HashMap<Hash, Integer> solidEntryPoints, HashMap<Hash, Integer> seenMilestones) {
-        this.initialHash = hash;
-        this.hash = hash;
-        this.initialIndex = index;
-        this.index = index;
-        this.initialTimestamp = timestamp;
-        this.timestamp = timestamp;
-        this.solidEntryPoints = new HashMap<>(solidEntryPoints);
-        this.seenMilestones = new HashMap<>(seenMilestones);
-    }
+    Map<Hash, Integer> getSolidEntryPoints();
 
     /**
-     * This method is the setter of the milestone hash.
+     * Setter for the solid entry points of this snapshot.
      *
-     * It simply stores the passed value in the private property.
+     * A solid entry point is a confirmed transaction that had non-orphaned approvers during the time of the snapshot
+     * creation and therefore a connection to the most recent part of the tangle. The solid entry points allow us to
+     * stop the solidification process without having to go all the way back to the genesis.
      *
-     * @param hash transaction hash of the milestone
+     * Note: Nodes that do not use local snapshots should only have one solid entry point (the NULL_HASH).
+     *
+     * @param solidEntryPoints map with the transaction hashes associated to their milestone index
      */
-    public void setHash(Hash hash) {
-        this.hash = hash;
-    }
+    void setSolidEntryPoints(Map<Hash, Integer> solidEntryPoints);
 
     /**
-     * This method is the getter of the initial milestone hash.
+     * This method checks if a given transaction is a solid entry point.
      *
-     * It simply returns the stored private property.
+     * It simply performs a member check on the value returned by {@link #getSolidEntryPoints()} and therefore is a
+     * utility method that makes it easier to check a single transaction.
      *
-     * @return initial transaction hash of the milestone that the {@link SnapshotMetaData} was created with
-     */
-    public Hash getInitialHash() {
-        return initialHash;
-    }
-
-    /**
-     * This method is the getter of the milestone hash.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return transaction hash of the milestone
-     */
-    public Hash getHash() {
-        return hash;
-    }
-
-    /**
-     * This method is the setter of the milestone index.
-     *
-     * It simply stores the passed value in the private property.
-     *
-     * @param index index that shall be set
-     */
-    public void setIndex(int index) {
-        this.index = index;
-    }
-
-    /**
-     * This method is the getter of the index.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return current index of this metadata
-     */
-    public int getIndex() {
-        return this.index;
-    }
-
-    /**
-     * This method is the getter of the initial milestone index.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return initial milestone index that the {@link SnapshotMetaData} was created with
-     */
-    public int getInitialIndex() {
-        return initialIndex;
-    }
-
-    /**
-     * This method is the setter of the timestamp.
-     *
-     * It simply stores the passed value in the private property.
-     *
-     * @param timestamp timestamp when the snapshot was created or updated
-     */
-    protected void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    /**
-     * This method is the getter of the timestamp.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return timestamp when the snapshot was created or updated
-     */
-    public long getTimestamp() {
-        return this.timestamp;
-    }
-
-    /**
-     * This method is the getter of the initial timestamp of the milestone transaction.
-     *
-     * It simply returns the stored private property.
-     *
-     * @return initial timestamp of the milestone transaction that the {@link SnapshotMetaData} was created with
-     */
-    public long getInitialTimestamp() {
-        return initialTimestamp;
-    }
-
-
-
-
-
-    /**
-     * This method performs a member check on the underlying solid entry points.
-     *
-     * It can be used to check if a transaction referenced by a hash can be considered solid. For nodes that do not use
-     * local snapshots this set consists of the NULL_HASH only.
-     *
-     * @param solidEntrypoint hash that shall be checked
+     * @param solidEntrypoint transaction hash that shall be checked
      * @return true if the hash is a solid entry point and false otherwise
      */
-    public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
-        return solidEntryPoints.containsKey(solidEntrypoint);
-    }
-
-    public int getSolidEntryPointIndex(Hash solidEntrypoint) {
-        return solidEntryPoints.get(solidEntrypoint);
-    }
+    boolean hasSolidEntryPoint(Hash solidEntrypoint);
 
     /**
-     * This method is the getter of the solid entry points.
+     * Returns the index of the milestone that was responsible for confirming the transaction that is now a solid
+     * entry point.
      *
-     * It simply returns the stored private property.
-     *
-     * @return set of transaction hashes that shall be considered solid when being referenced
+     * @param solidEntrypoint transaction hash of the solid entry point
+     * @return index of the milestone that once confirmed the solid entry point or null if the given transaction is no
+     *         solid entry point
      */
-    public HashMap<Hash, Integer> getSolidEntryPoints() {
-        return solidEntryPoints;
-    }
+    int getSolidEntryPointIndex(Hash solidEntrypoint);
 
     /**
-     * This method is the setter of the solid entry points.
+     * Getter for the seen milestones.
      *
-     * It simply stores the passed value in the private property, with optionally locking the object first.
+     * Note: Since new nodes use local snapshot files as a way to bootstrap their database, we store the hashes of all
+     *       milestones that have been following the snapshot in its meta data. This allows these nodes to immediately
+     *       start requesting the missing milestones without having to discover them one by one, which massively
+     *       increases the sync speed of new nodes.
      *
-     * @param solidEntryPoints set of solid entry points that shall be stored
+     * @return map of milestone transaction hashes associated to their milestone index
      */
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
-        this.solidEntryPoints = solidEntryPoints;
-    }
+    Map<Hash, Integer> getSeenMilestones();
 
     /**
-     * This method is the getter of the seen milestones.
+     * Setter for the seen milestones.
      *
-     * It simply returns the stored private property.
+     * Note: Since new nodes use local snapshot files as a way to bootstrap their database, we store the hashes of all
+     *       milestones that have been following the snapshot in its meta data. This allows these nodes to immediately
+     *       start requesting the missing milestones without having to discover them one by one, which massively
+     *       increases the sync speed of new nodes.
      *
-     * @return set of milestones that were known
+     * @param seenMilestones map of milestone transaction hashes associated to their milestone index
      */
-    public HashMap<Hash, Integer> getSeenMilestones() {
-        return seenMilestones;
-    }
+    void setSeenMilestones(Map<Hash, Integer> seenMilestones);
 
     /**
-     * This method is the setter of the seen milestones.
+     * Replaces the meta data of this instance with the values of another meta data object.
      *
-     * It simply stores the passed value in the private property, with optionally locking the object first.
+     * This can for example be used to "reset" the meta data after a failed modification attempt (while being able to
+     * keep the same instance).
      *
-     * @param seenMilestones set of solid entry points that shall be stored
+     * @param newMetaData the new meta data that shall overwrite the current one
      */
-    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
-        this.seenMilestones = seenMilestones;
-    }
+    void update(SnapshotMetaData newMetaData);
 
     /**
      * This method writes a file containing a serialized version of this metadata object.
@@ -359,70 +176,8 @@ public class SnapshotMetaData implements Cloneable {
      * It can be used to store the current values and read them on a later point in time. It is used by the local
      * snapshot manager to generate and maintain the snapshot files.
      *
-     * @param filePath path to the snapshot metadata file
-     * @return return a file handle to the generated file
-     * @throws IOException if something goes wrong while writing to the file
+     * @param filePath File handle to the snapshot metadata file
+     * @throws SnapshotException if something goes wrong while writing to the file
      */
-    public File writeFile(String filePath) throws IOException {
-        return writeFile(new File(filePath));
-    }
-
-    /**
-     * This method writes a file containing a serialized version of this metadata object.
-     *
-     * It can be used to store the current values and read them on a later point in time. It is used by the local
-     * snapshot manager to generate and maintain the snapshot files.
-     *
-     * @param metaDataFile File handle to the snapshot metadata file
-     * @return return a file handle to the generated file
-     * @throws IOException if something goes wrong while writing to the file
-     */
-    public File writeFile(File metaDataFile) throws IOException {
-        Files.write(
-            Paths.get(metaDataFile.getAbsolutePath()),
-            () -> Stream.concat(
-                Stream.of(
-                    hash.toString(),
-                    String.valueOf(index),
-                    String.valueOf(timestamp),
-                    String.valueOf(solidEntryPoints.size()),
-                    String.valueOf(seenMilestones.size())
-                ),
-                Stream.concat(
-                    solidEntryPoints.entrySet().stream().sorted(Map.Entry.comparingByValue()).<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue()),
-                    seenMilestones.entrySet().stream().sorted(Map.Entry.comparingByValue()).<CharSequence>map(entry -> entry.getKey().toString() + ";" + entry.getValue())
-                )
-            ).iterator()
-        );
-
-        return metaDataFile;
-    }
-
-    /**
-     * This method creates a deep clone of the SnapshotMetaData object.
-     *
-     * It can be used to make a copy of the object, that then can be modified without affecting the original object.
-     *
-     * @return deep copy of the original object
-     */
-    public SnapshotMetaData clone() {
-        SnapshotMetaData result = new SnapshotMetaData(initialHash, initialIndex, initialTimestamp, solidEntryPoints, seenMilestones);
-
-        result.setIndex(index);
-        result.setHash(hash);
-        result.setTimestamp(timestamp);
-
-        return result;
-    }
-
-    protected void update(SnapshotMetaData newMetaData) {
-        initialIndex = newMetaData.initialIndex;
-        index = newMetaData.index;
-        hash = newMetaData.hash;
-        initialHash = newMetaData.initialHash;
-        timestamp = newMetaData.timestamp;
-        initialTimestamp = newMetaData.initialTimestamp;
-        solidEntryPoints = new HashMap<>(newMetaData.solidEntryPoints);
-        seenMilestones = new HashMap<>(newMetaData.seenMilestones);
-    }
+    void writeFile(String filePath) throws SnapshotException;
 }

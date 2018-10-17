@@ -1,12 +1,13 @@
-package com.iota.iri.service.snapshot;
+package com.iota.iri.service.snapshot.impl;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotException;
+import com.iota.iri.service.snapshot.SnapshotState;
+import com.iota.iri.service.snapshot.SnapshotStateDiff;
 import com.iota.iri.storage.Tangle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,11 +25,6 @@ import java.util.stream.Collectors;
  */
 public class Snapshot {
     /**
-     * Logger for this class allowing us to dump debug and status messages.
-     */
-    private static final Logger log = LoggerFactory.getLogger(Snapshot.class);
-
-    /**
      * Holds a reference to the state of this snapshot.
      */
     protected final SnapshotState state;
@@ -36,7 +32,7 @@ public class Snapshot {
     /**
      * Holds a reference to the metadata of this snapshot.
      */
-    protected final SnapshotMetaData metaData;
+    protected final SnapshotMetaDataImpl metaData;
 
     /**
      * Holds a set of milestones indexes that were skipped while advancing the Snapshot state.
@@ -63,7 +59,7 @@ public class Snapshot {
      * @param state the state of the Snapshot containing all its balances
      * @param metaData the metadata of the Snapshot containing its milestone index and other properties
      */
-    public Snapshot(SnapshotState state, SnapshotMetaData metaData) {
+    public Snapshot(SnapshotState state, SnapshotMetaDataImpl metaData) {
         this.state = state;
         this.metaData = metaData;
     }
@@ -121,8 +117,8 @@ public class Snapshot {
     public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         lockWrite();
 
-        SnapshotMetaData metaDataBeforeChanges = metaData.clone();
-        SnapshotState stateBeforeChanges = state.clone();
+        SnapshotMetaDataImpl metaDataBeforeChanges = metaData.clone();
+        SnapshotStateImpl stateBeforeChanges = new SnapshotStateImpl(state);
 
         try {
             for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
@@ -130,7 +126,7 @@ public class Snapshot {
                 if (currentMilestone != null) {
                     StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
                     if(!stateDiffViewModel.isEmpty()) {
-                        state.applyStateDiff(new SnapshotStateDiff(stateDiffViewModel.getDiff()));
+                        state.applyStateDiff(new SnapshotStateDiffImpl(stateDiffViewModel.getDiff()));
                     }
 
                     metaData.setIndex(currentMilestone.index());
@@ -221,7 +217,7 @@ public class Snapshot {
         lockRead();
 
         try {
-            return new Snapshot(state.clone(), metaData.clone());
+            return new Snapshot(new SnapshotStateImpl(state), new SnapshotMetaDataImpl(metaData));
         } finally {
             unlockRead();
         }
@@ -249,7 +245,7 @@ public class Snapshot {
             // revert the last balance changes
             StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, getHash());
             if (!stateDiffViewModel.isEmpty()) {
-                SnapshotStateDiff snapshotStateDiff = new SnapshotStateDiff(
+                SnapshotStateDiffImpl snapshotStateDiff = new SnapshotStateDiffImpl(
                     stateDiffViewModel.getDiff().entrySet().stream().map(
                         hashLongEntry -> new HashMap.SimpleEntry<>(
                             hashLongEntry.getKey(), -1 * hashLongEntry.getValue()

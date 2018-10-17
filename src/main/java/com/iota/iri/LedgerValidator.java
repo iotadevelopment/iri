@@ -3,9 +3,9 @@ package com.iota.iri;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.Snapshot;
-import com.iota.iri.service.snapshot.SnapshotManager;
-import com.iota.iri.service.snapshot.SnapshotStateDiff;
+import com.iota.iri.service.snapshot.impl.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -49,7 +49,7 @@ public class LedgerValidator {
      * @param tip                                the hash of a transaction to start the search from
      * @param latestSnapshotIndex                index of the latest snapshot to traverse to
      * @param milestone                          marker to indicate whether to stop only at confirmed transactions
-     * @return {state}                           the addresses that have a balance changed since the last diff check
+     * @return {state}                           the addresses that have a balance changed since the last balanceChanges check
      * @throws Exception
      */
     public Map<Hash,Long> getLatestDiff(final Set<Hash> visitedNonMilestoneSubtangleHashes, Hash tip, int latestSnapshotIndex, boolean milestone) throws Exception {
@@ -223,7 +223,7 @@ public class LedgerValidator {
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
                 if(successfullyProcessed) {
-                    successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiff(balanceChanges)).isConsistent();
+                    successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
 
@@ -268,7 +268,7 @@ public class LedgerValidator {
                 currentState.putIfAbsent(key, value);
             }
         });
-        boolean isConsistent = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiff(currentState)).isConsistent();
+        boolean isConsistent = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(currentState)).isConsistent();
         if (isConsistent) {
             diff.putAll(currentState);
             approvedHashes.addAll(visitedHashes);

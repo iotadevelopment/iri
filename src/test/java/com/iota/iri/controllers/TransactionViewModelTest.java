@@ -3,7 +3,7 @@ package com.iota.iri.controllers;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManager;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.model.persistables.Transaction;
@@ -383,9 +383,9 @@ public class TransactionViewModelTest {
                 hashes.removeFirst();
             }
 
-            //log.info("{}", new String(new char[(int) ((diff/ 10000))]).replace('\0', '|'));
+            //log.info("{}", new String(new char[(int) ((balanceChanges/ 10000))]).replace('\0', '|'));
             if(i % interval1 == 0) {
-                //log.info("{}", new String(new char[(int) (diff / 50000)]).replace('\0', '-'));
+                //log.info("{}", new String(new char[(int) (balanceChanges / 50000)]).replace('\0', '-'));
                 //log.info("{}", new String(new char[(int) ((subSumDiff / interval1 / 100000))]).replace('\0', '|'));
                 sumdiff += subSumDiff;
                 subSumDiff = 0;

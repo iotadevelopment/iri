@@ -177,15 +177,15 @@ public class Transaction implements Persistable {
         try {
             int i = 0;
             if (bytes != null) {
-                address = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+            address = HashFactory.ADDRESS.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
-                bundle = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                bundle = HashFactory.BUNDLE.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
-                trunk = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                trunk = HashFactory.TRANSACTION.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
-                branch = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                branch = HashFactory.TRANSACTION.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
-                obsoleteTag = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                obsoleteTag = HashFactory.OBSOLETETAG.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
                 value = Serializer.getLong(bytes, i);
                 i += Long.BYTES;
@@ -196,7 +196,7 @@ public class Transaction implements Persistable {
                 timestamp = Serializer.getLong(bytes, i);
                 i += Long.BYTES;
 
-                tag = new Hash(bytes, i, Hash.SIZE_IN_BYTES);
+                tag = HashFactory.TAG.create(bytes, i, Hash.SIZE_IN_BYTES);
                 i += Hash.SIZE_IN_BYTES;
                 attachmentTimestamp = Serializer.getLong(bytes, i);
                 i += Long.BYTES;

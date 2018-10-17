@@ -1,7 +1,7 @@
 package com.iota.iri.controllers;
 
 import com.iota.iri.model.*;
-import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManager;
 import com.iota.iri.model.persistables.Address;
 import com.iota.iri.model.persistables.Approvee;
 import com.iota.iri.model.persistables.Bundle;
@@ -119,11 +119,11 @@ public class TransactionViewModel implements Cacheable {
             System.arraycopy(trits, 0, transaction.bytes, 0, SIZE);
         }
 
-        cache.add(this);
-
         this.hash = hash;
         weightMagnitude = this.hash.trailingZeros();
         transaction.type = FILLED_SLOT;
+
+        cache.add(this);
     }
 
     public static int getNumberOfStoredTransactions(Tangle tangle) throws Exception {

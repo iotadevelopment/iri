@@ -15,7 +15,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.Neighbor;
 import com.iota.iri.service.dto.*;
-import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.impl.Snapshot;
 import com.iota.iri.service.tipselection.impl.WalkValidatorImpl;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.IotaIOUtils;
@@ -1032,8 +1032,10 @@ public class API {
             Converter.trits(tryte, txTrits, 0);
             final TransactionViewModel transactionViewModel = instance.transactionValidator.validateTrits(txTrits, instance.transactionValidator.getMinWeightMagnitude());
             elements.add(transactionViewModel);
+            System.out.println("blub");
         }
         for (final TransactionViewModel transactionViewModel : elements) {
+            System.out.println("blab");
             //push first in line to broadcast
             transactionViewModel.weightMagnitude = Curl.HASH_LENGTH;
             instance.node.broadcast(transactionViewModel);

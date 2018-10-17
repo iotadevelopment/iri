@@ -1,10 +1,8 @@
 package com.iota.iri.service.tipselection.impl;
 
-import com.iota.iri.MilestoneTracker;
-import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManager;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.storage.Tangle;
 

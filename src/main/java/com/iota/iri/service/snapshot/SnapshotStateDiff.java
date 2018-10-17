@@ -2,39 +2,23 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Instances of this class represent a collection of balance changes that can be applied to modify the ledger state.
+ * An immutable collection of balance changes that can be used to modify the ledger state.
  */
-public class SnapshotStateDiff {
+public interface SnapshotStateDiff {
     /**
-     * Holding a map of addresses associated to their corresponding balance change.
+     * The {@link Map} returned by this method is a copy which guarantees the immutability of this object.
+     *
+     * @return the balance changes associated to their address hash
      */
-    protected final Map<Hash, Long> diff;
+    Map<Hash, Long> getBalanceChanges();
 
     /**
-     * The constructor of this class makes a copy of the provided map and stores it in its internal property.
+     * Checks if the balance changes are consistent, which means that the sum of all changes is exactly zero.
      *
-     * This allows us to work with the provided balance changes without having to worry about modifications of the
-     * passed in map that happens outside of the SnapshotStateDiff logic.
-     *
-     * @param diff map with the addresses and their balance changes
+     * @return true if the sum of all balances is zero
      */
-    public SnapshotStateDiff(Map<Hash, Long> diff) {
-        this.diff = new HashMap<>(diff);
-    }
-
-    /**
-     * This method checks if the diff is consistent.
-     *
-     * Consistent means that the sum of all changes is exactly 0, since IOTAs can only be moved from one address to
-     * another, but not created and not destroyed.
-     *
-     * @return true if the sum of all balances is 0
-     */
-    public boolean isConsistent() {
-        return diff.entrySet().stream().map(Map.Entry::getValue).reduce(Math::addExact).orElse(0L).equals(0L);
-    }
+    boolean isConsistent();
 }

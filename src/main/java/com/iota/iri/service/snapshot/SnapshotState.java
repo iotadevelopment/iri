@@ -1,218 +1,83 @@
 package com.iota.iri.service.snapshot;
 
-import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.utils.IotaIOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * This class represents the "state" of the ledger at a given time, which means how many IOTA are available on a certain
- * address.
+ * Represents the "state" of the ledger at a given time, which means how many IOTA are available on a certain address.
  *
- * It can either be a full ledger state which is used by the Snapshots or a "differential" State which carries the
- * balance changes from one State to the next one which is used when updating the ledger state between two milestones.
+ * It can either be a full ledger state which is used by the Snapshots or a differential State which carries only the
+ * resulting balances of the changed balances (see {@link #patchedState(SnapshotStateDiff)}).
  */
-public class SnapshotState {
+public interface SnapshotState {
     /**
-     * Logger for this class (used to emit debug messages).
+     * Returns the balance of a single address.
+     *
+     * @param address address that shall be retrieved
+     * @return balance of the address or {@code null} if the address is unknown.
      */
-    protected static final Logger log = LoggerFactory.getLogger(SnapshotState.class);
-
-    /**
-     * Underlying Map storing the balances of the addresses.
-     */
-    protected final Map<Hash, Long> balances;
+    Long getBalance(Hash address);
 
     /**
-     * This method reads the balances from the given file and creates the corresponding SnapshotState.
+     * The {@link Map} returned by this method is a copy of the current state which guarantees that the object is only
+     * modified through its class methods.
      *
-     * The format of the file is pairs of "<address>;<balance>" separated by newlines. It simply reads the file line by
-     * line, adding the corresponding values to the map.
-     *
-     * @param snapshotStateFilePath
-     * @return
+     * @return map with the addresses associated to their balance
      */
-    protected static SnapshotState fromFile(String snapshotStateFilePath) {
-        String line;
-        Map<Hash, Long> state = new HashMap<>();
-        BufferedReader reader = null;
-        try {
-            InputStream snapshotStream = Snapshot.class.getResourceAsStream(snapshotStateFilePath);
-            if(snapshotStream == null) {
-                snapshotStream = new FileInputStream(snapshotStateFilePath);
-            }
-
-            BufferedInputStream bufferedInputStream = new BufferedInputStream(snapshotStream);
-            reader = new BufferedReader(new InputStreamReader(bufferedInputStream));
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(";", 2);
-                if (parts.length >= 2) {
-                    String key = parts[0];
-                    String value = parts[1];
-                    state.put(new Hash(key), Long.valueOf(value));
-                }
-            }
-        } catch (IOException e) {
-            //syso is left until logback is fixed
-            System.out.println("Failed to load snapshot.");
-            log.error("Failed to load snapshot.", e);
-            System.exit(-1);
-        }
-        finally {
-            IotaIOUtils.closeQuietly(reader);
-        }
-
-        return new SnapshotState(state);
-    }
+    Map<Hash, Long> getBalances();
 
     /**
-     * The constructor of this class makes a copy of the provided map and stores it in its internal property.
+     * Checks if the state is consistent, which means that there are no addresses with a negative balance.
      *
-     * This allows us to work with the provided balances without having to worry about modifications of the passed in
-     * map that happens outside of the SnapshotState logic.
-     *
-     * While most of the other methods are public, the constructor is protected since we do not want to allow the
-     * creation of SnapshotState's outside of the snapshot logic.
-     *
-     * @param initialState map with the addresses and their balances
+     * @return true if the state is consistent and false otherwise
      */
-    protected SnapshotState(Map<Hash, Long> initialState) {
-        this.balances = new HashMap<>(initialState);
-    }
+    boolean isConsistent();
 
     /**
-     * This method creates a SnapshotState that contains the resulting balances of only the addresses that were modified
-     * by the given diff.
+     * Checks if the state of the ledger has the correct supply by adding the balances of all addresses and comparing it
+     * against the expected value.
      *
-     * It can be used to check if the modifications by a {@link SnapshotStateDiff} will result in a consistent State
-     * where all modified addresses are still positive. Even though this State can be consistent, it will most probably
-     * not return true if we call {@link #hasCorrectSupply()}, since the unmodified addresses are missing.
+     * It doesn't make sense to call this functions on differential states (returned by {@link
+     * #patchedState(SnapshotStateDiff)} that are used to check the consistency of patches.
      *
-     * @param snapshotStateDiff the balance patches that we want to apply
-     * @return a differential SnapshotState that contains the resulting balances of all modified addresses
+     * @return true if the supply is correct and false otherwise
      */
-    public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
-        return new SnapshotState(snapshotStateDiff.diff.entrySet().stream().map(
-            hashLongEntry -> new HashMap.SimpleEntry<>(
-                hashLongEntry.getKey(),
-                balances.getOrDefault(hashLongEntry.getKey(), 0L) + hashLongEntry.getValue()
-            )
-        ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-    }
+    boolean hasCorrectSupply();
+
+    /**
+     * Replaces the state of this instance with the values of another state.
+     *
+     * This can for example be used to "reset" the state after a failed modification attempt while being able to keep
+     * the same instance.
+     *
+     * @param newState the new state that shall overwrite the current one
+     */
+    void update(SnapshotState newState);
 
     /**
      * This method applies the given {@link SnapshotStateDiff} to the current balances.
      *
-     * Since this method actually changes the balances of this snapshot the passed in diff should manually be checked
-     * for consistency before.
+     * Before applying the {@link SnapshotStateDiff} we check if it is consistent.
      *
      * @param diff the balance changes that should be applied to this state.
+     * @throws SnapshotException if the {@link SnapshotStateDiff} is inconsistent (see {@link
+     *         SnapshotStateDiff#isConsistent()})
      */
-    public void applyStateDiff(SnapshotStateDiff diff) {
-        diff.diff.entrySet().stream().forEach(hashLongEntry -> {
-            if(balances.computeIfPresent(hashLongEntry.getKey(), (hash, aLong) -> hashLongEntry.getValue() + aLong) == null) {
-                balances.putIfAbsent(hashLongEntry.getKey(), hashLongEntry.getValue());
-            }
-        });
-    }
+    void applyStateDiff(SnapshotStateDiff diff) throws SnapshotException;
 
     /**
-     * This method returns all addresses that have a negative balance.
+     * This method creates a differential SnapshotState that contains the resulting balances of only the addresses
+     * that are modified by the given {@link SnapshotStateDiff}.
      *
-     * While this should never happen with the state belonging to the snapshot itself, it can still happen for the
-     * differential states that are getting created by {@link #patchedState(SnapshotStateDiff)} for the exact reason of
-     * checking their consistency.
+     * It can be used to check if the modifications by a {@link SnapshotStateDiff} will result in a consistent State
+     * where all modified addresses are still positive. Even though this State can be consistent, it will most probably
+     * not return true if we call {@link #hasCorrectSupply()} since the unmodified addresses are missing.
      *
-     * @return a map of the inconsistent addresses (negative balance) and their actual balance (empty if consistent)
+     * @param snapshotStateDiff the balance patches that we want to apply
+     * @return a differential SnapshotState that contains the resulting balances of all modified addresses
      */
-    public HashMap<Hash, Long> getInconsistentAddresses() {
-        HashMap<Hash, Long> result = new HashMap<Hash, Long>();
-
-        final Iterator<Map.Entry<Hash, Long>> stateIterator = balances.entrySet().iterator();
-        while(stateIterator.hasNext()) {
-            final Map.Entry<Hash, Long> entry = stateIterator.next();
-            if(entry.getValue() <= 0) {
-                if(entry.getValue() < 0) {
-                    log.info("skipping negative value for address " + entry.getKey() + ": " + entry.getValue());
-
-                    result.put(entry.getKey(), entry.getValue());
-                }
-
-                stateIterator.remove();
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * This method checks if the state is consistent.
-     *
-     * Consistent means that there are no addresses with a negative value.
-     *
-     * @return true if the state is consistent and false otherwise
-     */
-    public boolean isConsistent() {
-        return getInconsistentAddresses().size() == 0;
-    }
-
-    /**
-     * This method checks if the state of the ledger has the correct supply.
-     *
-     * It first calculates a sum of the balances of all addresses and then checks if that supply equals the expected
-     * value.
-     *
-     * It doesn't make sense to call this functions on "differential" states that are used to check the
-     * consistency of patches but the snapshot state itself should always stay consistent.
-     *
-     * @return true if the supply is correct and false otherwise
-     */
-    public boolean hasCorrectSupply() {
-        long supply = balances.values().stream().reduce(Math::addExact).orElse(Long.MAX_VALUE);
-
-        if(supply != TransactionViewModel.SUPPLY) {
-            log.error("the supply differs from the expected supply by: {}", TransactionViewModel.SUPPLY - supply);
-
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * This method returns the balance for an address.
-     *
-     * @param address address that shall be checked
-     * @return balance of the address or null if the address is unkown
-     */
-    public Long getBalance(Hash address) {
-        return this.balances.get(address);
-    }
-
-    protected void update(SnapshotState newState) {
-        balances.clear();
-        balances.putAll(newState.balances);
-    }
-
-    /**
-     * This method creates a deep clone of the current state.
-     *
-     * The created clone can be modified without affecting the original state.
-     *
-     * @return a deep copy of this object
-     */
-    protected SnapshotState clone() {
-        return new SnapshotState(this.balances);
-    }
+    SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff);
 
     /**
      * This method dumps the current state to a file.
@@ -220,14 +85,7 @@ public class SnapshotState {
      * It is used by local snapshots to persist the in memory states and allow IRI to resume from the local snapshot.
      *
      * @param snapshotPath location of the file that shall be written
-     * @throws IOException if anything goes wrong while writing the file
+     * @throws SnapshotException if anything goes wrong while writing the file
      */
-    protected void writeFile(String snapshotPath) throws IOException {
-        // try to write the file
-        Files.write(Paths.get(snapshotPath), () -> balances.entrySet().stream().filter(
-            entry -> entry.getValue() != 0
-        ).<CharSequence>map(
-            entry -> entry.getKey() + ";" + entry.getValue()
-        ).sorted().iterator());
-    }
+    void writeFile(String snapshotPath) throws SnapshotException;
 }
