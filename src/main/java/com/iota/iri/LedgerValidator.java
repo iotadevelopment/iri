@@ -224,6 +224,7 @@ public class LedgerValidator {
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
                 if(successfullyProcessed) {
+                    System.out.println(snapshotManager.getLatestSnapshot().getIndex());
                 System.out.println(milestoneVM.index());
                 System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("FHJPPBIPAV9DMHIUFHZCSNBNHONUQFGMHHYBXNIIZAXANQVKGPNDPIIXRADNEALAXCMGEN999HQWL9MNA")));
                     successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
