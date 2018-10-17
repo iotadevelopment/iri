@@ -142,9 +142,9 @@ public class SnapshotStateImpl implements SnapshotState {
      */
     @Override
     public void applyStateDiff(SnapshotStateDiff diff) throws SnapshotException {
-        if (!diff.isConsistent()) {
-            throw new SnapshotException("cannot apply an inconsistent SnapshotStateDiff");
-        }
+        //if (!diff.isConsistent()) {
+        //    throw new SnapshotException("cannot apply an inconsistent SnapshotStateDiff");
+        //}
 
         diff.getBalanceChanges().forEach((addressHash, balance) -> {
             if (balances.computeIfPresent(addressHash, (hash, aLong) -> balance + aLong) == null) {
