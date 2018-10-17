@@ -491,6 +491,8 @@ public class MilestoneTracker {
         nextMilestone != null
         ) {
             if(nextMilestone.index() > errorCausingMilestone) {
+                System.out.println(errorCausingMilestone + " / " + nextMilestone.index());
+
                 binaryBackoffCounter = 0;
                 errorCausingMilestone = Integer.MAX_VALUE;
             }
@@ -513,6 +515,8 @@ public class MilestoneTracker {
 
                     if(binaryBackoffCounter++ == 0) {
                         errorCausingMilestone = nextMilestone.index();
+
+                        System.out.println(errorCausingMilestone + " / " + nextMilestone.index());
                     }
                 }
 
