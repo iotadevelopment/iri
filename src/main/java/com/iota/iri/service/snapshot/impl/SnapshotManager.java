@@ -36,7 +36,7 @@ public class SnapshotManager {
      */
     private static final Logger log = LoggerFactory.getLogger(SnapshotManager.class);
 
-    private static Snapshot builtinSnapshot = null;
+    private static SnapshotImpl builtinSnapshot = null;
 
     /**
      * Maximum age in milestones since creation of solid entry points.
@@ -57,15 +57,17 @@ public class SnapshotManager {
 
     private Tangle tangle;
 
+    private TipsViewModel tipsViewModel;
+
     private TransactionPruner transactionPruner;
 
     private SnapshotConfig configuration;
 
     private DAGHelper dagHelper;
 
-    private Snapshot initialSnapshot;
+    private SnapshotImpl initialSnapshot;
 
-    private Snapshot latestSnapshot;
+    private SnapshotImpl latestSnapshot;
 
     private boolean shuttingDown;
 
@@ -81,12 +83,15 @@ public class SnapshotManager {
      * @param configuration configuration of the node
      * @throws IOException if something goes wrong while processing the snapshot files
      */
-    public SnapshotManager(Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) throws IOException {
+    public SnapshotManager(Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) {
         // save the necessary dependencies
         this.tangle = tangle;
+        this.tipsViewModel = tipsViewModel;
         this.configuration = configuration;
         this.dagHelper = DAGHelper.get(tangle);
+    }
 
+    public SnapshotManager loadSnapshot() throws SnapshotException {
         // try to load a local snapshot first
         initialSnapshot = loadLocalSnapshot();
 
@@ -96,8 +101,12 @@ public class SnapshotManager {
         }
 
         // create a working copy of the initial snapshot that keeps track of the latest state
-        latestSnapshot = initialSnapshot.clone();
+        latestSnapshot = new SnapshotImpl(initialSnapshot);
 
+        return this;
+    }
+
+    public void init(MilestoneTracker milestoneTracker) {
         // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
         transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, getInitialSnapshot(), configuration);
         try {
@@ -105,9 +114,7 @@ public class SnapshotManager {
         } catch (TransactionPruningException e) {
             log.info("could not restore the state of the TransactionPruner", e);
         }
-    }
 
-    public void init(MilestoneTracker milestoneTracker) {
         // if local snapshots are enabled we initialize the parts taking care of local snapshots
         if (configuration.getLocalSnapshotsEnabled()) {
             spawnMonitorThread(milestoneTracker);
@@ -156,7 +163,10 @@ public class SnapshotManager {
         initialSnapshot = null;
         latestSnapshot = null;
 
-        ((AsyncTransactionPruner) transactionPruner).shutdown();
+        if (transactionPruner != null) {
+            ((AsyncTransactionPruner) transactionPruner).shutdown();
+        }
+        transactionPruner = null;
     }
 
     public SnapshotConfig getConfiguration() {
@@ -170,7 +180,7 @@ public class SnapshotManager {
      *
      * @return the Snapshot that the node was initialized with
      */
-    public Snapshot getInitialSnapshot() {
+    public SnapshotImpl getInitialSnapshot() {
         return initialSnapshot;
     }
 
@@ -181,7 +191,7 @@ public class SnapshotManager {
      *
      * @return the Snapshot that represents the most recent "confirmed" state of the ledger
      */
-    public Snapshot getLatestSnapshot() {
+    public SnapshotImpl getLatestSnapshot() {
         return latestSnapshot;
     }
 
@@ -271,7 +281,7 @@ public class SnapshotManager {
         return false;
     }
 
-    private HashMap<Hash, Integer> generateSolidEntryPoints(Snapshot snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
+    private HashMap<Hash, Integer> generateSolidEntryPoints(SnapshotImpl snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
         // check the old solid entry points and copy them if they are still relevant
@@ -357,7 +367,7 @@ public class SnapshotManager {
         return seenMilestones;
     }
 
-    private Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+    private SnapshotImpl generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
         if (targetMilestone == null) {
             throw new SnapshotException("the target milestone must not be null");
         } else if (targetMilestone.index() > latestSnapshot.getIndex()) {
@@ -369,17 +379,17 @@ public class SnapshotManager {
         initialSnapshot.lockRead();
         latestSnapshot.lockRead();
 
-        Snapshot snapshot;
+        SnapshotImpl snapshot;
         try {
             int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
             int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
 
             if (distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
-                snapshot = initialSnapshot.clone();
+                snapshot = new SnapshotImpl(initialSnapshot);
 
                 snapshot.replayMilestones(targetMilestone.index(), tangle);
             } else {
-                snapshot = latestSnapshot.clone();
+                snapshot = new SnapshotImpl(latestSnapshot);
 
                 snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
             }
@@ -394,7 +404,7 @@ public class SnapshotManager {
         return snapshot;
     }
 
-    private Snapshot loadLocalSnapshot() {
+    private SnapshotImpl loadLocalSnapshot() {
         try {
             // if local snapshots are enabled
             if (configuration.getLocalSnapshotsEnabled()) {
@@ -415,7 +425,7 @@ public class SnapshotManager {
                                 localSnapshotMetadDataFile.isFile()
                         ) {
                     // retrieve the state to our local snapshot
-                    SnapshotStateImpl snapshotState = SnapshotStateImpl.fromFile(localSnapshotFile.getAbsolutePath());
+                    SnapshotState snapshotState = SnapshotStateImpl.fromFile(localSnapshotFile.getAbsolutePath());
 
                     // check the supply of the snapshot state
                     if (!snapshotState.hasCorrectSupply()) {
@@ -433,7 +443,7 @@ public class SnapshotManager {
                     log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
 
                     // return our Snapshot
-                    return new Snapshot(snapshotState, snapshotMetaData);
+                    return new SnapshotImpl(snapshotState, snapshotMetaData);
                 }
             }
         } catch (Exception e) {
@@ -444,7 +454,7 @@ public class SnapshotManager {
         return null;
     }
 
-    private Snapshot loadBuiltInSnapshot() throws SnapshotException {
+    private SnapshotImpl loadBuiltInSnapshot() throws SnapshotException {
         if (builtinSnapshot == null) {
             // read the config vars for the built in snapshot files
             boolean testnet = configuration.isTestnet();
@@ -453,14 +463,18 @@ public class SnapshotManager {
             int milestoneStartIndex = configuration.getMilestoneStartIndex();
 
             // verify the signature of the builtin snapshot file
-            if (!testnet && !SignedFiles.isFileSignatureValid(
-                    snapshotPath,
-                    snapshotSigPath,
-                    SNAPSHOT_PUBKEY,
-                    SNAPSHOT_PUBKEY_DEPTH,
-                    SNAPSHOT_INDEX
-            )) {
-                throw new SnapshotException("the snapshot signature is invalid");
+            try {
+                if (!testnet && !SignedFiles.isFileSignatureValid(
+                        snapshotPath,
+                        snapshotSigPath,
+                        SNAPSHOT_PUBKEY,
+                        SNAPSHOT_PUBKEY_DEPTH,
+                        SNAPSHOT_INDEX
+                )) {
+                    throw new SnapshotException("the snapshot signature is invalid");
+                }
+            } catch (IOException e) {
+                throw new SnapshotException("failed to validate the signature of the builtin snapshot file", e);
             }
 
             // restore the snapshot state from its file
@@ -481,7 +495,7 @@ public class SnapshotManager {
             solidEntryPoints.put(Hash.NULL_HASH, milestoneStartIndex);
 
             // return our snapshot
-            builtinSnapshot = new Snapshot(
+            builtinSnapshot = new SnapshotImpl(
                     snapshotState,
                     new SnapshotMetaDataImpl(
                             Hash.NULL_HASH,
@@ -493,7 +507,7 @@ public class SnapshotManager {
             );
         }
 
-        return builtinSnapshot.clone();
+        return new SnapshotImpl(builtinSnapshot);
     }
 
     private void takeLocalSnapshot() throws SnapshotException {
@@ -517,7 +531,7 @@ public class SnapshotManager {
             throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
         }
 
-        Snapshot targetSnapshot;
+        SnapshotImpl targetSnapshot;
         try {
             targetSnapshot = generateSnapshot(targetMilestone);
         } catch (Exception e) {
@@ -536,12 +550,7 @@ public class SnapshotManager {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }
 
-        try {
-            targetSnapshot.state.writeFile(basePath + ".snapshot.state");
-            targetSnapshot.metaData.writeFile(basePath + ".snapshot.meta");
-        } catch (IOException e) {
-            throw new SnapshotException("could not write local snapshot files", e);
-        }
+        targetSnapshot.writeToDisk(basePath);
 
         initialSnapshot.update(targetSnapshot);
     }

@@ -44,7 +44,7 @@ public class SnapshotStateImpl implements SnapshotState {
     protected static SnapshotState fromFile(String snapshotStateFilePath) throws SnapshotException {
         BufferedReader reader = null;
         try {
-            InputStream snapshotStream = Snapshot.class.getResourceAsStream(snapshotStateFilePath);
+            InputStream snapshotStream = SnapshotImpl.class.getResourceAsStream(snapshotStateFilePath);
             if (snapshotStream == null) {
                 snapshotStream = new FileInputStream(snapshotStateFilePath);
             }
@@ -172,7 +172,7 @@ public class SnapshotStateImpl implements SnapshotState {
      * {@inheritDoc}
      */
     @Override
-    public void writeFile(String snapshotPath) throws SnapshotException {
+    public void writeToDisk(String snapshotPath) throws SnapshotException {
         try {
             Files.write(
                     Paths.get(snapshotPath),

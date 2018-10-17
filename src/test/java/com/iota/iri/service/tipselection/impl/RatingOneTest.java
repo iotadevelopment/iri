@@ -41,7 +41,7 @@ public class RatingOneTest {
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
         rating = new RatingOne(tangle);
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
     }
 
     @Test

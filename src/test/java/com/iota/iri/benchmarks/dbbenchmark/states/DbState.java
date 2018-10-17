@@ -46,7 +46,7 @@ public abstract class DbState {
         dbProvider.init();
         tangle = new Tangle();
         tangle.addPersistenceProvider(dbProvider);
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
         String trytes = "";
         System.out.println("numTxsToTest = [" + numTxsToTest + "]");
         transactions = new ArrayList<>(numTxsToTest);

@@ -329,7 +329,7 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
      * {@inheritDoc}
      */
     @Override
-    public void writeFile(String filePath) throws SnapshotException {
+    public void writeToDisk(String filePath) throws SnapshotException {
         try {
             Files.write(
                     Paths.get(filePath),

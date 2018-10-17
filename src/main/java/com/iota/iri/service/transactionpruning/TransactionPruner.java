@@ -1,6 +1,5 @@
 package com.iota.iri.service.transactionpruning;
 
-import com.iota.iri.service.snapshot.impl.Snapshot;
 import com.iota.iri.service.snapshot.impl.SnapshotManager;
 
 /**

@@ -1,7 +1,7 @@
 package com.iota.iri.service.transactionpruning;
 
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.service.snapshot.impl.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.storage.Tangle;
 
 /**
@@ -81,14 +81,14 @@ public interface TransactionPrunerJob {
      *
      * @param snapshot last local or global snapshot that acts as a starting point for the state of ledger
      */
-    void setSnapshot(Snapshot snapshot);
+    void setSnapshot(SnapshotImpl snapshot);
 
     /**
      * This method returns the previously set {@link Snapshot} instance.
      *
      * @return last local or global snapshot that acts as a starting point for the state of ledger
      */
-    Snapshot getSnapshot();
+    SnapshotImpl getSnapshot();
 
     /**
      * Getter for the execution status of the job.

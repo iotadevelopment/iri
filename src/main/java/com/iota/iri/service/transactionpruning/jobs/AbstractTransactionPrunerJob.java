@@ -1,7 +1,7 @@
 package com.iota.iri.service.transactionpruning.jobs;
 
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.service.snapshot.impl.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJobStatus;
@@ -35,7 +35,7 @@ public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJ
     /**
      * Holds a reference to the last local or global snapshot that acts as a starting point for the state of ledger.
      */
-    private Snapshot snapshot;
+    private SnapshotImpl snapshot;
 
     /**
      * {@inheritDoc}
@@ -89,7 +89,7 @@ public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJ
      * {@inheritDoc}
      */
     @Override
-    public void setSnapshot(Snapshot snapshot) {
+    public void setSnapshot(SnapshotImpl snapshot) {
         this.snapshot = snapshot;
     }
 
@@ -97,7 +97,7 @@ public abstract class AbstractTransactionPrunerJob implements TransactionPrunerJ
      * {@inheritDoc}
      */
     @Override
-    public Snapshot getSnapshot() {
+    public SnapshotImpl getSnapshot() {
         return snapshot;
     }
 

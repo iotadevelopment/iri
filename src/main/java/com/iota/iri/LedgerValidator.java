@@ -3,7 +3,7 @@ package com.iota.iri;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotManager;
 import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
@@ -171,7 +171,7 @@ public class LedgerValidator {
 
                 // if we reference sth before the local snapshot -> add it to the solid entry points
                 else {
-                    Snapshot initialSnapshot = snapshotManager.getInitialSnapshot();
+                    SnapshotImpl initialSnapshot = snapshotManager.getInitialSnapshot();
 
                     if (
                         transactionViewModel2.snapshotIndex() <= initialSnapshot.getIndex() &&

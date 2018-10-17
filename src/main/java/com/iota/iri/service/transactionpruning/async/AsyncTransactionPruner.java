@@ -2,7 +2,7 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.service.snapshot.impl.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
@@ -61,7 +61,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
     /**
      * Last local or global snapshot that acts as a starting point for the state of ledger.
      */
-    private final Snapshot snapshot;
+    private final SnapshotImpl snapshot;
 
     /**
      * Configuration with important snapshot related parameters.
@@ -113,7 +113,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * @param snapshot last local or global snapshot that acts as a starting point for the state of ledger
      * @param config Configuration with important snapshot related configuration parameters
      */
-    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot, SnapshotConfig config) {
+    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, SnapshotImpl snapshot, SnapshotConfig config) {
         this.tangle = tangle;
         this.tipsViewModel = tipsViewModel;
         this.snapshot = snapshot;

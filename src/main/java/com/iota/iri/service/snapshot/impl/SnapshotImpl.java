@@ -4,35 +4,32 @@ import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.SnapshotException;
-import com.iota.iri.service.snapshot.SnapshotState;
-import com.iota.iri.service.snapshot.SnapshotStateDiff;
+import com.iota.iri.service.snapshot.*;
 import com.iota.iri.storage.Tangle;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-/**
- * This class represents a "snapshot" of the ledger at a given time.
- *
- * A complete snapshot of the ledger consists out of the current {@link SnapshotState} which holds the balances and its
- * {@link SnapshotMetaData} which holds several information about the snapshot like its timestamp, its corresponding
- * milestone index and so on.
- */
-public class Snapshot {
+public class SnapshotImpl implements Snapshot {
     /**
      * Holds a reference to the state of this snapshot.
      */
-    protected final SnapshotState state;
+    private final SnapshotState state;
 
     /**
      * Holds a reference to the metadata of this snapshot.
      */
-    protected final SnapshotMetaDataImpl metaData;
+    private final SnapshotMetaData metaData;
+
+    /**
+     * Lock object allowing to block access to this object from different threads.
+     */
+    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
     /**
      * Holds a set of milestones indexes that were skipped while advancing the Snapshot state.
@@ -42,83 +39,71 @@ public class Snapshot {
      *
      * @see #rollbackLastMilestone(Tangle)
      */
-    private HashSet<Integer> skippedMilestones = new HashSet<>();
+    private Set<Integer> skippedMilestones = new HashSet<>();
 
     /**
-     * Lock object allowing to block access to this object from different threads.
-     */
-    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-
-    // SNAPSHOT SPECIFIC METHODS ///////////////////////////////////////////////////////////////////////////////////////
-
     /**
-     * Constructor of the Snapshot class.
+     * Creates a snapshot object with the given information.
      *
-     * It simply saves the passed parameters in its protected properties.
+     * It simply stores the passed in parameters in the internal properties.
      *
-     * @param state the state of the Snapshot containing all its balances
-     * @param metaData the metadata of the Snapshot containing its milestone index and other properties
+     * @param state state of the snapshot with the balances of all addresses
+     * @param metaData meta data of the snapshot with the additional information of this snapshot
      */
-    public Snapshot(SnapshotState state, SnapshotMetaDataImpl metaData) {
+    public SnapshotImpl(SnapshotState state, SnapshotMetaDataImpl metaData) {
         this.state = state;
         this.metaData = metaData;
     }
 
     /**
-     * Locks the complete Snapshot object for read access.
+     * Creates a deep clone of the passed in {@link Snapshot}.
      *
-     * This is used to synchronize the access from different Threads.
+     * @param snapshot object that shall be cloned
      */
+    public SnapshotImpl(SnapshotImpl snapshot) {
+        this(new SnapshotStateImpl(snapshot.state), new SnapshotMetaDataImpl(snapshot.metaData));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void lockRead() {
         readWriteLock.readLock().lock();
     }
 
     /**
-     * Unlocks the complete Snapshot object from read blocks.
-     *
-     * This is used to synchronize the access from different Threads.
+     * {@inheritDoc}
      */
+    @Override
     public void unlockRead() {
         readWriteLock.readLock().unlock();
     }
 
     /**
-     * Locks the complete Snapshot object for write access.
-     *
-     * This is used to synchronize the access from different Threads.
+     * {@inheritDoc}
      */
+    @Override
     public void lockWrite() {
         readWriteLock.writeLock().lock();
     }
 
     /**
-     * Unlocks the complete Snapshot object from write blocks.
-     *
-     * This is used to synchronize the access from different Threads.
+     * {@inheritDoc}
      */
+    @Override
     public void unlockWrite() {
         readWriteLock.writeLock().unlock();
     }
 
     /**
-     * This method applies the balance changes that are introduced by future milestones to the current Snapshot.
-     *
-     * It iterates over the milestone indexes starting from the current index to the target index and applies all found
-     * milestone balances. If it can not find a milestone for a certain index it keeps track of this by adding it to
-     * the {@link #skippedMilestones}, which allows us to revert the changes even if the missing milestone was received
-     * and processed in the mean time. If the application of changes fails, we restore the state of the snapshot to the
-     * one it had before the application attempt so this method only modifies the Snapshot if it succeeds.
-     *
-     * Note: the changes done by this method can be reverted by using {@link #rollBackMilestones(int, Tangle)}
-     *
-     * @param targetMilestoneIndex the index of the milestone that should be applied
-     * @param tangle Tangle object which acts as a database interface
+     * {@inheritDoc}
      */
+    @Override
     public void replayMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         lockWrite();
 
-        SnapshotMetaDataImpl metaDataBeforeChanges = metaData.clone();
-        SnapshotStateImpl stateBeforeChanges = new SnapshotStateImpl(state);
+        Snapshot snapshotBeforeChanges = new SnapshotImpl(this);
 
         try {
             for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
@@ -140,8 +125,7 @@ public class Snapshot {
                 }
             }
         } catch (Exception e) {
-            state.update(stateBeforeChanges);
-            metaData.update(metaDataBeforeChanges);
+            update(snapshotBeforeChanges);
 
             throw new SnapshotException("failed to replay the the state of the ledger", e);
         } finally {
@@ -150,19 +134,9 @@ public class Snapshot {
     }
 
     /**
-     * This method rolls back the latest milestones until it reaches the state that the snapshot had before applying
-     * the milestone indicated by the given parameter.
-     *
-     * After checking the validity of the parameters we simply call {@link #rollbackLastMilestone(Tangle)} multiple
-     * times until we are done. If the rollback fails, we restore the state of the snapshot to the one it had before
-     * the rollback attempt so this method only modifies the Snapshot if it succeeds.
-     *
-     * Note: this method is used to reverse the changes introduced by {@link #replayMilestones(int, Tangle)}
-     *
-     * @param targetMilestoneIndex the index of the milestone that should be rolled back (including all following
-     *                             milestones that were applied)
-     * @param tangle Tangle object which acts as a database interface
+     * {@inheritDoc}
      */
+    @Override
     public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         if(targetMilestoneIndex <= getInitialIndex()) {
             throw new SnapshotException("the target milestone index is lower than the initial snapshot index - cannot revert back to an unknown milestone");
@@ -174,7 +148,7 @@ public class Snapshot {
 
         lockWrite();
 
-        Snapshot snapshotBeforeChanges = this.clone();
+        Snapshot snapshotBeforeChanges = new SnapshotImpl(this);
 
         try {
             boolean rollbackSuccessful = true;
@@ -194,30 +168,31 @@ public class Snapshot {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void update(Snapshot snapshot) {
         lockWrite();
 
         try {
-            state.update(snapshot.state);
-            metaData.update(snapshot.metaData);
+            state.update(((SnapshotImpl) snapshot).state);
+            metaData.update(((SnapshotImpl) snapshot).metaData);
         } finally {
             unlockWrite();
         }
     }
 
     /**
-     * This method creates a deep clone of the Snapshot object.
-     *
-     * It can be used to make a copy of the object, that can be modified without affecting the original object.
-     *
-     * @return deep copy of the original object
+     * {@inheritDoc}
      */
     @Override
-    public Snapshot clone() {
+    public void writeToDisk(String basePath) throws SnapshotException {
         lockRead();
 
         try {
-            return new Snapshot(new SnapshotStateImpl(state), new SnapshotMetaDataImpl(metaData));
+            state.writeToDisk(basePath + ".snapshot.state");
+            metaData.writeToDisk(basePath + ".snapshot.meta");
         } finally {
             unlockRead();
         }
@@ -293,98 +268,14 @@ public class Snapshot {
         }
     }
 
-    // THREAD-SAFE SNAPSHOTSTATE METHODS ///////////////////////////////////////////////////////////////////////////////
+    //region [THREAD-SAFE METADATA METHODS] ////////////////////////////////////////////////////////////////////////////
 
     /**
-     * This method does the same as {@link SnapshotState#getBalance(Hash)} but automatically manages the locks necessary
-     * for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public long getBalance(Hash hash) {
-        lockRead();
-
-        try {
-            return state.getBalance(hash);
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotState#hasCorrectSupply()} but automatically manages the locks
-     * necessary for making this method thread-safe.
-     */
-    public boolean hasCorrectSupply() {
-        lockRead();
-
-        try {
-            return state.hasCorrectSupply();
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotState#isConsistent()} but automatically manages the locks necessary
-     * for making this method thread-safe.
-     */
-    public boolean isConsistent() {
-        lockRead();
-
-        try {
-            return state.isConsistent();
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotState#patchedState(SnapshotStateDiff)} but automatically manages the
-     * locks necessary for making this method thread-safe.
-     */
-    public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
-        lockRead();
-
-        try {
-            return state.patchedState(snapshotStateDiff);
-        } finally {
-            unlockRead();
-        }
-    }
-
-    // THREAD-SAFE SNAPSHOTMETADATA METHODS ////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#setHash(Hash)} but automatically manages the locks necessary
-     * for making this method thread-safe.
-     */
-    public void setHash(Hash hash) {
-        lockWrite();
-
-        try {
-            metaData.setHash(hash);
-        } finally {
-            unlockWrite();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#getHash()} but automatically manages the locks necessary for
-     * making this method thread-safe.
-     */
-    public Hash getHash() {
-        lockRead();
-
-        try {
-            return this.metaData.getHash();
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#getInitialHash()} but automatically manages the locks
-     * necessary for making this method thread-safe.
-     */
+    @Override
     public Hash getInitialHash() {
         lockRead();
 
@@ -396,37 +287,11 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#setIndex(int)} but automatically manages the locks necessary
-     * for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public void setIndex(int index) {
-        lockWrite();
-
-        try {
-            metaData.setIndex(index);
-        } finally {
-            unlockWrite();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#getIndex()} but automatically manages the locks necessary
-     * for making this method thread-safe.
-     */
-    public int getIndex() {
-        lockRead();
-
-        try {
-            return metaData.getIndex();
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#getInitialIndex()} but automatically manages the locks
-     * necessary for making this method thread-safe.
-     */
+    @Override
     public int getInitialIndex() {
         lockRead();
 
@@ -438,23 +303,91 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#setTimestamp(long)} but automatically manages the locks
-     * necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public void setTimestamp(long timestamp) {
+    @Override
+    public long getInitialTimestamp() {
+        lockRead();
+
+        try {
+            return metaData.getInitialTimestamp();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public Hash getHash() {
+        lockRead();
+
+        try {
+            return this.metaData.getHash();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public void setHash(Hash hash) {
         lockWrite();
 
         try {
-            metaData.setTimestamp(timestamp);
+            metaData.setHash(hash);
         } finally {
             unlockWrite();
         }
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#getTimestamp()}} but automatically manages the locks
-     * necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
+    @Override
+    public int getIndex() {
+        lockRead();
+
+        try {
+            return metaData.getIndex();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public void setIndex(int index) {
+        lockWrite();
+
+        try {
+            metaData.setIndex(index);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
     public long getTimestamp() {
         lockRead();
 
@@ -466,38 +399,28 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#getInitialTimestamp()} but automatically manages the locks
-     * necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    private long getInitialTimestamp() {
-        lockRead();
-
-        try {
-            return metaData.getInitialTimestamp();
-        } finally {
-            unlockRead();
-        }
-    }
-
-    /**
-     * This method does the same as {@link SnapshotMetaData#setSolidEntryPoints(HashMap)} but automatically manages the
-     * locks necessary for making this method thread-safe.
-     */
-    public void setSolidEntryPoints(HashMap<Hash, Integer> solidEntryPoints) {
+    @Override
+    public void setTimestamp(long timestamp) {
         lockWrite();
 
         try {
-            metaData.setSolidEntryPoints(solidEntryPoints);
+            metaData.setTimestamp(timestamp);
         } finally {
             unlockWrite();
         }
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#getSolidEntryPoints()}} but automatically manages the locks
-     * necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public HashMap<Hash, Integer> getSolidEntryPoints() {
+    @Override
+    public Map<Hash, Integer> getSolidEntryPoints() {
         lockRead();
 
         try {
@@ -508,23 +431,43 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#hasSolidEntryPoint(Hash)} but automatically manages the
-     * locks necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public boolean hasSolidEntryPoint(Hash transactionHash) {
+    @Override
+    public void setSolidEntryPoints(Map<Hash, Integer> solidEntryPoints) {
+        lockWrite();
+
+        try {
+            metaData.setSolidEntryPoints(solidEntryPoints);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public boolean hasSolidEntryPoint(Hash solidEntrypoint) {
         lockRead();
 
         try {
-            return metaData.hasSolidEntryPoint(transactionHash);
+            return metaData.hasSolidEntryPoint(solidEntrypoint);
         } finally {
             unlockRead();
         }
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#getSolidEntryPointIndex(Hash)} but automatically manages the
-     * locks necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
+    @Override
     public int getSolidEntryPointIndex(Hash solidEntrypoint) {
         lockRead();
 
@@ -536,10 +479,28 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#setSeenMilestones(HashMap)} but automatically manages the
-     * locks necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public void setSeenMilestones(HashMap<Hash, Integer> seenMilestones) {
+    @Override
+    public Map<Hash, Integer> getSeenMilestones() {
+        lockRead();
+
+        try {
+            return metaData.getSeenMilestones();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public void setSeenMilestones(Map<Hash, Integer> seenMilestones) {
         lockWrite();
 
         try {
@@ -550,17 +511,136 @@ public class Snapshot {
     }
 
     /**
-     * This method does the same as {@link SnapshotMetaData#getSeenMilestones()} but automatically manages the locks
-     * necessary for making this method thread-safe.
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
-    public HashMap<Hash, Integer> getSeenMilestones() {
+    @Override
+    public void update(SnapshotMetaData newMetaData) {
+        lockWrite();
+
+        try {
+            metaData.update(newMetaData);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //region [THREAD-SAFE STATE METHODS] ///////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public Long getBalance(Hash address) {
         lockRead();
 
         try {
-            return metaData.getSeenMilestones();
+            return state.getBalance(address);
         } finally {
             unlockRead();
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public Map<Hash, Long> getBalances() {
+        lockRead();
+
+        try {
+            return state.getBalances();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public boolean isConsistent() {
+        lockRead();
+
+        try {
+            return state.isConsistent();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public boolean hasCorrectSupply() {
+        lockRead();
+
+        try {
+            return state.hasCorrectSupply();
+        } finally {
+            unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public void update(SnapshotState newState) {
+        lockWrite();
+
+        try {
+            state.update(newState);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public void applyStateDiff(SnapshotStateDiff diff) throws SnapshotException {
+        lockWrite();
+
+        try {
+            state.applyStateDiff(diff);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotState} method.
+     */
+    @Override
+    public SnapshotState patchedState(SnapshotStateDiff snapshotStateDiff) {
+        lockRead();
+
+        try {
+            return state.patchedState(snapshotStateDiff);
+        } finally {
+            unlockRead();
+        }
+    }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
 }

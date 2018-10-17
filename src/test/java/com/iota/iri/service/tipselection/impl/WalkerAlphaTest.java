@@ -50,7 +50,7 @@ public class WalkerAlphaTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig());
+        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
         walker = new WalkerAlpha((Optional::of), tangle, messageQ, new Random(1), new MainnetConfig());

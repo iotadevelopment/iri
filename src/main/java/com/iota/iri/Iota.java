@@ -56,22 +56,31 @@ public class Iota {
     public final MessageQ messageQ;
     public final TipSelector tipsSelector;
 
-    public Iota(IotaConfig configuration) throws IOException {
-        this.configuration = configuration;
-        tangle = new Tangle();
-        messageQ = MessageQ.createWith(configuration);
-        tipsViewModel = new TipsViewModel();
-        snapshotManager = new SnapshotManager(tangle, tipsViewModel, configuration);
-        transactionRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
-        transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester);
-        milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, transactionRequester, messageQ, configuration);
-        node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
-                configuration);
-        replicator = new Replicator(node, configuration);
-        udpReceiver = new UDPReceiver(node, configuration);
-        ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestoneTracker, transactionRequester, messageQ);
-        tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
-        tipsSelector = createTipSelector(configuration);
+    public Iota(IotaConfig configuration) {
+            this.configuration = configuration;
+            tangle = new Tangle();
+            messageQ = MessageQ.createWith(configuration);
+            tipsViewModel = new TipsViewModel();
+
+            snapshotManager = new SnapshotManager(tangle, tipsViewModel, configuration);
+            try {
+                snapshotManager.loadSnapshot();
+            } catch (Exception e) {
+                log.error("a critical error occured while trying to start the node", e);
+
+                System.exit(1);
+            }
+
+            transactionRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
+            transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester);
+            milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, transactionRequester, messageQ, configuration);
+            node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
+                    configuration);
+            replicator = new Replicator(node, configuration);
+            udpReceiver = new UDPReceiver(node, configuration);
+            ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestoneTracker, transactionRequester, messageQ);
+            tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
+            tipsSelector = createTipSelector(configuration);
     }
 
     public void init() throws Exception {

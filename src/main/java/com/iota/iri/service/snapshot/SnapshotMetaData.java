@@ -161,7 +161,7 @@ public interface SnapshotMetaData {
     void setSeenMilestones(Map<Hash, Integer> seenMilestones);
 
     /**
-     * Replaces the meta data of this instance with the values of another meta data object.
+     * Replaces the meta data values of this instance with the values of another meta data object.
      *
      * This can for example be used to "reset" the meta data after a failed modification attempt (while being able to
      * keep the same instance).
@@ -176,8 +176,8 @@ public interface SnapshotMetaData {
      * It can be used to store the current values and read them on a later point in time. It is used by the local
      * snapshot manager to generate and maintain the snapshot files.
      *
-     * @param filePath File handle to the snapshot metadata file
-     * @throws SnapshotException if something goes wrong while writing to the file
+     * @param filePath location of the file that shall be written
+     * @throws SnapshotException if anything goes wrong while writing the file
      */
-    void writeFile(String filePath) throws SnapshotException;
+    void writeToDisk(String filePath) throws SnapshotException;
 }

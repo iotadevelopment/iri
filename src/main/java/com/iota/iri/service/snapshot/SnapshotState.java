@@ -87,5 +87,5 @@ public interface SnapshotState {
      * @param snapshotPath location of the file that shall be written
      * @throws SnapshotException if anything goes wrong while writing the file
      */
-    void writeFile(String snapshotPath) throws SnapshotException;
+    void writeToDisk(String snapshotPath) throws SnapshotException;
 }
