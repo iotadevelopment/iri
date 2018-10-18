@@ -2,6 +2,7 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
+import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotManager;
@@ -192,8 +193,12 @@ public class LedgerValidator {
     }
 
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
+        System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
+
         if(updateMilestoneTransaction(milestone)) {
+            System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
             snapshotManager.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
+            System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
 
             return true;
         }
