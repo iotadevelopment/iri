@@ -6,7 +6,8 @@ import com.iota.iri.conf.NodeConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.TransactionHash;
@@ -56,7 +57,7 @@ public class Node {
     private final ExecutorService executor = Executors.newFixedThreadPool(6);
     private final NodeConfig configuration;
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
+    private final Snapshot initialSnapshot;
     private final TipsViewModel tipsViewModel;
     private final TransactionValidator transactionValidator;
     private final MilestoneTracker milestoneTracker;
@@ -78,11 +79,11 @@ public class Node {
     public static final ConcurrentSkipListSet<String> rejectedAddresses = new ConcurrentSkipListSet<String>();
     private DatagramSocket udpSocket;
 
-    public Node(final Tangle tangle, SnapshotManager snapshotManager, final TransactionValidator transactionValidator, final TransactionRequester transactionRequester, final TipsViewModel tipsViewModel, final MilestoneTracker milestoneTracker, final MessageQ messageQ, final NodeConfig configuration
+    public Node(final Tangle tangle, Snapshot initialSnapshot, final TransactionValidator transactionValidator, final TransactionRequester transactionRequester, final TipsViewModel tipsViewModel, final MilestoneTracker milestoneTracker, final MessageQ messageQ, final NodeConfig configuration
     ) {
         this.configuration = configuration;
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
+        this.initialSnapshot = initialSnapshot;
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.tipsViewModel = tipsViewModel;
@@ -370,7 +371,7 @@ public class Node {
 
         //store new transaction
         try {
-            stored = receivedTransactionViewModel.store(tangle, snapshotManager);
+            stored = receivedTransactionViewModel.store(tangle, initialSnapshot);
         } catch (Exception e) {
             log.error("Error accessing persistence store.", e);
             neighbor.incInvalidTransactions();
@@ -382,7 +383,7 @@ public class Node {
             try {
                 transactionValidator.updateStatus(receivedTransactionViewModel);
                 receivedTransactionViewModel.updateSender(neighbor.getAddress().toString());
-                receivedTransactionViewModel.update(tangle, snapshotManager, "arrivalTime|sender");
+                receivedTransactionViewModel.update(tangle, initialSnapshot, "arrivalTime|sender");
             } catch (Exception e) {
                 log.error("Error updating transactions.", e);
             }

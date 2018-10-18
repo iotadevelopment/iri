@@ -133,7 +133,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
     @Override
     public void processJobs() throws TransactionPruningException {
         MilestonePrunerJob currentJob;
-        while (!Thread.interrupted() && (currentJob = (MilestonePrunerJob) jobs.peek()) != null) {
+        while (!Thread.currentThread().isInterrupted() && (currentJob = (MilestonePrunerJob) jobs.peek()) != null) {
             try {
                 currentJob.process();
 

@@ -122,7 +122,7 @@ public class ThreadUtils {
      * @return true if the sleep was successful and false if it got interrupted
      */
     public static boolean sleep(int timeoutInMS) {
-        if(Thread.interrupted()) {
+        if(Thread.currentThread().isInterrupted()) {
             return false;
         }
 

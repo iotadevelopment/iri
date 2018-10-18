@@ -3,7 +3,7 @@ package com.iota.iri.controllers;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
 import org.junit.After;
@@ -17,12 +17,12 @@ import static org.junit.Assert.*;
  */
 public class TransactionRequesterTest {
     private static Tangle tangle = new Tangle();
-    private static SnapshotManager snapshotManager;
+    private static SnapshotManagerImpl snapshotManager;
     private MessageQ mq;
 
     @Before
     public void setUp() throws Exception {
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
     }
 
     @After

@@ -8,7 +8,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -28,7 +28,7 @@ public class MilestoneTrackerTest {
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
     private static MilestoneTracker milestoneTracker;
-    private static SnapshotManager snapshotManager;
+    private static SnapshotManagerImpl snapshotManager;
 
 
     @AfterClass
@@ -46,7 +46,7 @@ public class MilestoneTrackerTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
     }
 
     private static void initializeMilestoneTracker(String coordinator, int keys, int MWM) throws IOException {

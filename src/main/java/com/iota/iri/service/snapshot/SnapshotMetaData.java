@@ -2,7 +2,6 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.model.Hash;
 
-import java.io.File;
 import java.util.Map;
 
 /**
@@ -121,6 +120,10 @@ public interface SnapshotMetaData {
      * It simply performs a member check on the value returned by {@link #getSolidEntryPoints()} and therefore is a
      * utility method that makes it easier to check a single transaction.
      *
+     * A solid entry point is a confirmed transaction that had non-orphaned approvers during the time of the snapshot
+     * creation and therefore a connection to the most recent part of the tangle. The solid entry points allow us to
+     * stop the solidification process without having to go all the way back to the genesis.
+     *
      * @param solidEntrypoint transaction hash that shall be checked
      * @return true if the hash is a solid entry point and false otherwise
      */
@@ -129,6 +132,10 @@ public interface SnapshotMetaData {
     /**
      * Returns the index of the milestone that was responsible for confirming the transaction that is now a solid
      * entry point.
+     *
+     * A solid entry point is a confirmed transaction that had non-orphaned approvers during the time of the snapshot
+     * creation and therefore a connection to the most recent part of the tangle. The solid entry points allow us to
+     * stop the solidification process without having to go all the way back to the genesis.
      *
      * @param solidEntrypoint transaction hash of the solid entry point
      * @return index of the milestone that once confirmed the solid entry point or null if the given transaction is no

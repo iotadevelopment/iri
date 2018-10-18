@@ -9,7 +9,7 @@ import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.service.tipselection.TailFinder;
@@ -31,7 +31,6 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.List;
 
@@ -44,7 +43,7 @@ public class Iota {
     public final LedgerValidator ledgerValidator;
     public final MilestoneTracker milestoneTracker;
     public final Tangle tangle;
-    public final SnapshotManager snapshotManager;
+    public final SnapshotManagerImpl snapshotManager;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -62,19 +61,19 @@ public class Iota {
             messageQ = MessageQ.createWith(configuration);
             tipsViewModel = new TipsViewModel();
 
-            snapshotManager = new SnapshotManager(tangle, tipsViewModel, configuration);
+            snapshotManager = new SnapshotManagerImpl(tangle, tipsViewModel, configuration);
             try {
-                snapshotManager.loadSnapshot();
+                snapshotManager.initSnapshots();
             } catch (Exception e) {
                 log.error("a critical error occured while trying to start the node", e);
 
                 System.exit(1);
             }
 
-            transactionRequester = new TransactionRequester(tangle, snapshotManager, messageQ);
-            transactionValidator = new TransactionValidator(tangle, snapshotManager, tipsViewModel, transactionRequester);
+            transactionRequester = new TransactionRequester(tangle, snapshotManager.getInitialSnapshot(), messageQ);
+            transactionValidator = new TransactionValidator(tangle, snapshotManager.getInitialSnapshot(), tipsViewModel, transactionRequester);
             milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, transactionRequester, messageQ, configuration);
-            node = new Node(tangle, snapshotManager, transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
+            node = new Node(tangle, snapshotManager.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
                     configuration);
             replicator = new Replicator(node, configuration);
             udpReceiver = new UDPReceiver(node, configuration);

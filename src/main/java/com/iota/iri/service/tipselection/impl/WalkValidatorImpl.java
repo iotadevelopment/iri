@@ -4,7 +4,7 @@ import com.iota.iri.LedgerValidator;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.WalkValidator;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -29,7 +29,7 @@ public class WalkValidatorImpl implements WalkValidator {
     private final Tangle tangle;
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
     private final LedgerValidator ledgerValidator;
-    private final SnapshotManager snapshotManager;
+    private final SnapshotManagerImpl snapshotManager;
     private final TipSelConfig config;
 
 
@@ -37,7 +37,7 @@ public class WalkValidatorImpl implements WalkValidator {
     private Map<Hash, Long> myDiff;
     private Set<Hash> myApprovedHashes;
 
-    public WalkValidatorImpl(Tangle tangle, SnapshotManager snapshotManager, LedgerValidator ledgerValidator, TipSelConfig config) {
+    public WalkValidatorImpl(Tangle tangle, SnapshotManagerImpl snapshotManager, LedgerValidator ledgerValidator, TipSelConfig config) {
         this.tangle = tangle;
         this.ledgerValidator = ledgerValidator;
         this.snapshotManager = snapshotManager;

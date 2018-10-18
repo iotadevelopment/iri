@@ -1,7 +1,7 @@
 package com.iota.iri.controllers;
 
 import com.iota.iri.model.*;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.model.persistables.Address;
 import com.iota.iri.model.persistables.Approvee;
 import com.iota.iri.model.persistables.Bundle;
@@ -130,7 +130,7 @@ public class TransactionViewModel implements Cacheable {
         return tangle.getCount(Transaction.class).intValue();
     }
 
-    public boolean update(Tangle tangle, SnapshotManager snapshotManager, String item) throws Exception {
+    public boolean update(Tangle tangle, Snapshot initialSnapshot, String item) throws Exception {
         getAddressHash();
         getTrunkTransactionHash();
         getBranchTransactionHash();
@@ -139,7 +139,7 @@ public class TransactionViewModel implements Cacheable {
         getObsoleteTagValue();
         setAttachmentData();
         setMetadata();
-        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hash)) {
+        if(initialSnapshot.hasSolidEntryPoint(hash)) {
             return false;
         }
         return tangle.update(transaction, hash, item);
@@ -214,8 +214,8 @@ public class TransactionViewModel implements Cacheable {
         return null;
     }
 
-    public boolean store(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
-        if (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hash) || exists(tangle, hash)) {
+    public boolean store(Tangle tangle, Snapshot initialSnapshot) throws Exception {
+        if (initialSnapshot.hasSolidEntryPoint(hash) || exists(tangle, hash)) {
             return false;
         }
 
@@ -330,10 +330,10 @@ public class TransactionViewModel implements Cacheable {
         return transaction.value;
     }
 
-    public void setValidity(Tangle tangle, SnapshotManager snapshotManager, int validity) throws Exception {
+    public void setValidity(Tangle tangle, Snapshot initialSnapshot, int validity) throws Exception {
         if(transaction.validity != validity) {
             transaction.validity = validity;
-            update(tangle, snapshotManager, "validity");
+            update(tangle, initialSnapshot, "validity");
         }
     }
 
@@ -387,20 +387,20 @@ public class TransactionViewModel implements Cacheable {
         return tangle.keysWithMissingReferences(Approvee.class, Transaction.class);
     }
 
-    public static void updateSolidTransactions(Tangle tangle, SnapshotManager snapshotManager, final Set<Hash> analyzedHashes) throws Exception {
+    public static void updateSolidTransactions(Tangle tangle, Snapshot initialSnapshot, final Set<Hash> analyzedHashes) throws Exception {
         Iterator<Hash> hashIterator = analyzedHashes.iterator();
         TransactionViewModel transactionViewModel;
         while(hashIterator.hasNext()) {
             transactionViewModel = TransactionViewModel.fromHash(tangle, hashIterator.next());
 
-            transactionViewModel.updateHeights(tangle, snapshotManager);
+            transactionViewModel.updateHeights(tangle, initialSnapshot);
 
             // recursively update the referenced snapshots field of the transaction
-            transactionViewModel.updateReferencedSnapshot(tangle, snapshotManager);
+            transactionViewModel.updateReferencedSnapshot(tangle, initialSnapshot);
 
             if(!transactionViewModel.isSolid()) {
                 transactionViewModel.updateSolid(true);
-                transactionViewModel.update(tangle, snapshotManager, "solid|height");
+                transactionViewModel.update(tangle, initialSnapshot, "solid|height");
             }
         }
     }
@@ -420,17 +420,17 @@ public class TransactionViewModel implements Cacheable {
      * @param tangle Tangle object which acts as a database interface
      * @throws Exception if something goes wrong while loading or storing transactions
      */
-    public void updateReferencedSnapshot(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
+    public void updateReferencedSnapshot(Tangle tangle, Snapshot initialSnapshot) throws Exception {
         // make sure we don't calculate the referencedSnapshot if we know it already
         if(referencedSnapshot() == -1) {
             try {
                 // cover the trivial case first -> for faster bottom up propagation
                 if(
-                    (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle))) &&
-                    (snapshotManager.getInitialSnapshot().hasSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle)))
+                    (initialSnapshot.hasSolidEntryPoint(this.getBranchTransactionHash()) || isReferencedSnapshotLeaf(this.getBranchTransaction(tangle))) &&
+                    (initialSnapshot.hasSolidEntryPoint(this.getTrunkTransactionHash()) || isReferencedSnapshotLeaf(this.getTrunkTransaction(tangle)))
                 ) {
                     // calculate the correct value ...
-                    updateReferencedSnapshotOfLeaf(tangle, snapshotManager, this);
+                    updateReferencedSnapshotOfLeaf(tangle, initialSnapshot, this);
 
                     // ... and return
                     return;
@@ -453,7 +453,7 @@ public class TransactionViewModel implements Cacheable {
 
                     // create a set of seen transactions that we do not want to traverse anymore (NULL HASH by default)
                     HashSet<Hash> seenTransactions = new HashSet<>();
-                    snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+                    initialSnapshot.getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
                         seenTransactions.add(solidEntryPointHash);
                     });
 
@@ -500,7 +500,7 @@ public class TransactionViewModel implements Cacheable {
                             else {
                                 stack.pop();
 
-                                updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
+                                updateReferencedSnapshotOfLeaf(tangle, initialSnapshot, currentTransaction);
 
                                 currentTransaction.cleanupReferencedTransactions();
                             }
@@ -517,7 +517,7 @@ public class TransactionViewModel implements Cacheable {
                             else {
                                 stack.pop();
 
-                                updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
+                                updateReferencedSnapshotOfLeaf(tangle, initialSnapshot, currentTransaction);
 
                                 currentTransaction.cleanupReferencedTransactions();
                             }
@@ -527,7 +527,7 @@ public class TransactionViewModel implements Cacheable {
                         else if(currentTransaction.getTrunkTransaction(tangle) == previousTransaction) {
                             stack.pop();
 
-                            updateReferencedSnapshotOfLeaf(tangle, snapshotManager, currentTransaction);
+                            updateReferencedSnapshotOfLeaf(tangle, initialSnapshot, currentTransaction);
 
                             currentTransaction.cleanupReferencedTransactions();
                         }
@@ -555,11 +555,11 @@ public class TransactionViewModel implements Cacheable {
      * @throws Exception if something goes wrong while loading or storing transactions or if we face a snapshot
      *                   that doesn't know it's own snapshotIndex
      */
-    private void updateReferencedSnapshotOfLeaf(Tangle tangle, SnapshotManager snapshotManager, TransactionViewModel transaction) throws Exception {
+    private void updateReferencedSnapshotOfLeaf(Tangle tangle, Snapshot initialSnapshot, TransactionViewModel transaction) throws Exception {
         // retrieve the snapshotIndex of the branch
         int referencedSnapshotOfBranch;
-        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transaction.getBranchTransactionHash())) {
-            referencedSnapshotOfBranch = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getBranchTransactionHash());
+        if(initialSnapshot.hasSolidEntryPoint(transaction.getBranchTransactionHash())) {
+            referencedSnapshotOfBranch = initialSnapshot.getSolidEntryPointIndex(transaction.getBranchTransactionHash());
         } else {
             TransactionViewModel branchTransaction = transaction.getBranchTransaction(tangle);
 
@@ -576,8 +576,8 @@ public class TransactionViewModel implements Cacheable {
 
         // retrieve the snapshotIndex of the trunk
         int referencedSnapshotOfTrunk;
-        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transaction.getTrunkTransactionHash())) {
-            referencedSnapshotOfTrunk = snapshotManager.getInitialSnapshot().getSolidEntryPointIndex(transaction.getTrunkTransactionHash());
+        if(initialSnapshot.hasSolidEntryPoint(transaction.getTrunkTransactionHash())) {
+            referencedSnapshotOfTrunk = initialSnapshot.getSolidEntryPointIndex(transaction.getTrunkTransactionHash());
         } else {
             TransactionViewModel trunkTransaction = transaction.getBranchTransaction(tangle);
 
@@ -593,7 +593,7 @@ public class TransactionViewModel implements Cacheable {
         }
 
         // update the referencedSnapshot of the transaction to the bigger one of both
-        transaction.referencedSnapshot(tangle, snapshotManager, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
+        transaction.referencedSnapshot(tangle, initialSnapshot, Math.max(referencedSnapshotOfBranch, referencedSnapshotOfTrunk));
     }
 
     /**
@@ -620,10 +620,10 @@ public class TransactionViewModel implements Cacheable {
      */
     private class ReferencedSnapshotNotProcessedYetException extends Exception {}
 
-    public void referencedSnapshot(Tangle tangle, SnapshotManager snapshotManager, final int referencedSnapshot) throws Exception {
+    public void referencedSnapshot(Tangle tangle, Snapshot initialSnapshot, final int referencedSnapshot) throws Exception {
         if ( referencedSnapshot != transaction.referencedSnapshot ) {
             transaction.referencedSnapshot = referencedSnapshot;
-            update(tangle, snapshotManager, "referencedSnapshot");
+            update(tangle, initialSnapshot, "referencedSnapshot");
         }
     }
 
@@ -647,10 +647,10 @@ public class TransactionViewModel implements Cacheable {
         return transaction.snapshot;
     }
 
-    public void setSnapshot(Tangle tangle, SnapshotManager snapshotManager, final int index) throws Exception {
+    public void setSnapshot(Tangle tangle, Snapshot initialSnapshot, final int index) throws Exception {
         if ( index != transaction.snapshot ) {
             transaction.snapshot = index;
-            update(tangle, snapshotManager, "snapshot");
+            update(tangle, initialSnapshot, "snapshot");
         }
     }
 
@@ -664,10 +664,10 @@ public class TransactionViewModel implements Cacheable {
      * @param isSnapshot true if the transaction is a snapshot and false otherwise
      * @throws Exception if something goes wrong while saving the changes to the database
      */
-    public void isSnapshot(Tangle tangle, SnapshotManager snapshotManager, final boolean isSnapshot) throws Exception {
+    public void isSnapshot(Tangle tangle, Snapshot initialSnapshot, final boolean isSnapshot) throws Exception {
         if ( isSnapshot != transaction.isSnapshot ) {
             transaction.isSnapshot = isSnapshot;
-            update(tangle, snapshotManager, "isSnapshot");
+            update(tangle, initialSnapshot, "isSnapshot");
         }
     }
 
@@ -693,11 +693,11 @@ public class TransactionViewModel implements Cacheable {
         transaction.height = height;
     }
 
-    public void updateHeights(Tangle tangle, SnapshotManager snapshotManager) throws Exception {
+    public void updateHeights(Tangle tangle, Snapshot initialSnapshot) throws Exception {
         TransactionViewModel transactionVM = this, trunk = this.getTrunkTransaction(tangle);
         Stack<Hash> transactionViewModels = new Stack<>();
         transactionViewModels.push(transactionVM.getHash());
-        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(trunk.getHash())) {
+        while(trunk.getHeight() == 0 && trunk.getType() != PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(trunk.getHash())) {
             transactionVM = trunk;
             trunk = transactionVM.getTrunkTransaction(tangle);
             transactionViewModels.push(transactionVM.getHash());
@@ -705,17 +705,17 @@ public class TransactionViewModel implements Cacheable {
         while(transactionViewModels.size() != 0) {
             transactionVM = TransactionViewModel.fromHash(tangle, transactionViewModels.pop());
             long currentHeight = transactionVM.getHeight();
-            if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(trunk.getHash()) && trunk.getHeight() == 0
-                    && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionVM.getHash())) {
+            if(initialSnapshot.hasSolidEntryPoint(trunk.getHash()) && trunk.getHeight() == 0
+                    && !initialSnapshot.hasSolidEntryPoint(transactionVM.getHash())) {
                 if(currentHeight != 1L ){
                     transactionVM.updateHeight(1L);
-                    transactionVM.update(tangle, snapshotManager, "height");
+                    transactionVM.update(tangle, initialSnapshot, "height");
                 }
             } else if ( trunk.getType() != PREFILLED_SLOT && transactionVM.getHeight() == 0){
                 long newHeight = 1L + trunk.getHeight();
                 if(currentHeight != newHeight) {
                     transactionVM.updateHeight(newHeight);
-                    transactionVM.update(tangle, snapshotManager, "height");
+                    transactionVM.update(tangle, initialSnapshot, "height");
                 }
             } else {
                 break;

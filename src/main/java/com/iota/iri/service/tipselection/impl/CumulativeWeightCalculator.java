@@ -5,7 +5,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
 import com.iota.iri.model.HashPrefix;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.utils.collections.impl.TransformingBoundedHashSet;
 import com.iota.iri.storage.Tangle;
@@ -31,9 +31,9 @@ public class CumulativeWeightCalculator implements RatingCalculator{
     public static final int MAX_FUTURE_SET_SIZE = 5000;
 
     public final Tangle tangle;
-    private final SnapshotManager snapshotManager;
+    private final SnapshotManagerImpl snapshotManager;
 
-    public CumulativeWeightCalculator(Tangle tangle, SnapshotManager snapshotManager) {
+    public CumulativeWeightCalculator(Tangle tangle, SnapshotManagerImpl snapshotManager) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
     }

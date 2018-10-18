@@ -15,6 +15,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+/**
+ * Implements the basic contract of the {@link Snapshot} interface.
+ */
 public class SnapshotImpl implements Snapshot {
     /**
      * Holds a reference to the state of this snapshot.
@@ -60,8 +63,11 @@ public class SnapshotImpl implements Snapshot {
      *
      * @param snapshot object that shall be cloned
      */
-    public SnapshotImpl(SnapshotImpl snapshot) {
-        this(new SnapshotStateImpl(snapshot.state), new SnapshotMetaDataImpl(snapshot.metaData));
+    public SnapshotImpl(Snapshot snapshot) {
+        this(
+            new SnapshotStateImpl(((SnapshotImpl) snapshot).state),
+            new SnapshotMetaDataImpl(((SnapshotImpl) snapshot).metaData)
+        );
     }
 
     /**

@@ -4,7 +4,7 @@ import com.iota.iri.LedgerValidator;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
@@ -28,11 +28,11 @@ public class TipSelectorImpl implements TipSelector {
 
     private final LedgerValidator ledgerValidator;
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
+    private final SnapshotManagerImpl snapshotManager;
     private final TipSelConfig config;
 
     public TipSelectorImpl(Tangle tangle,
-                           SnapshotManager snapshotManager,
+                           SnapshotManagerImpl snapshotManager,
                            LedgerValidator ledgerValidator,
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,

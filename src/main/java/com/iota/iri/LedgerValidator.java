@@ -2,10 +2,9 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
-import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.SnapshotImpl;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -16,7 +15,7 @@ import java.util.*;
 
 public class LedgerValidator {
 
-    private final SnapshotManager snapshotManager;
+    private final SnapshotManagerImpl snapshotManager;
     private final Logger log = LoggerFactory.getLogger(LedgerValidator.class);
     private final Tangle tangle;
     private final MilestoneTracker milestoneTracker;
@@ -24,7 +23,7 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, SnapshotManager snapshotManager, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotManagerImpl snapshotManager, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.milestoneTracker = milestoneTracker;
         this.snapshotManager = snapshotManager;
@@ -83,7 +82,7 @@ public class LedgerValidator {
 
                             boolean validBundle = false;
 
-                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash());
+                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager.getInitialSnapshot(), transactionViewModel.getHash());
                             /*
                             for(List<TransactionViewModel> transactions: bundleTransactions) {
                                 if (transactions.size() > 0) {
@@ -119,7 +118,7 @@ public class LedgerValidator {
                             }
                             if (!validBundle) {
                                 System.out.println(2);
-                                System.out.println(BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash(), true).size());
+                                System.out.println(BundleValidator.validate(tangle, snapshotManager.getInitialSnapshot(), transactionViewModel.getHash(), true).size());
                                 return null;
                             }
                         }
@@ -159,7 +158,7 @@ public class LedgerValidator {
                     if(transactionViewModel2.snapshotIndex() > index) {
                         resettedMilestones.add(transactionViewModel2.snapshotIndex());
                     }
-                    transactionViewModel2.setSnapshot(tangle, snapshotManager, index);
+                    transactionViewModel2.setSnapshot(tangle, snapshotManager.getInitialSnapshot(), index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
                     messageQ.publish("sn %d %s %s %s %s %s", index, transactionViewModel2.getHash(),
                             transactionViewModel2.getAddressHash(),
@@ -172,7 +171,7 @@ public class LedgerValidator {
 
                 // if we reference sth before the local snapshot -> add it to the solid entry points
                 else {
-                    SnapshotImpl initialSnapshot = snapshotManager.getInitialSnapshot();
+                    Snapshot initialSnapshot = snapshotManager.getInitialSnapshot();
 
                     if (
                         transactionViewModel2.snapshotIndex() <= initialSnapshot.getIndex() &&

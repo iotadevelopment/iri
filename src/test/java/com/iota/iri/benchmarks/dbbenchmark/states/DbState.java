@@ -5,7 +5,8 @@ import com.iota.iri.conf.BaseIotaConfig;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.model.persistables.Transaction;
 import com.iota.iri.storage.PersistenceProvider;
 import com.iota.iri.storage.Tangle;
@@ -46,7 +47,7 @@ public abstract class DbState {
         dbProvider.init();
         tangle = new Tangle();
         tangle.addPersistenceProvider(dbProvider);
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
         String trytes = "";
         System.out.println("numTxsToTest = [" + numTxsToTest + "]");
         transactions = new ArrayList<>(numTxsToTest);
@@ -75,7 +76,7 @@ public abstract class DbState {
         return tangle;
     }
 
-    public SnapshotManager getSnapshotManager() {
+    public SnapshotManagerImpl getSnapshotManager() {
         return snapshotManager;
     }
 

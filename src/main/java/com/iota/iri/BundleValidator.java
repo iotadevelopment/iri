@@ -3,7 +3,8 @@ package com.iota.iri;
 import com.iota.iri.hash.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Converter;
 
@@ -11,11 +12,11 @@ import java.util.*;
 
 public class BundleValidator {
 
-    public static List<List<TransactionViewModel>> validate(Tangle tangle, SnapshotManager snapshotManager, Hash tailHash) throws Exception {
-        return validate(tangle, snapshotManager, tailHash, false);
+    public static List<List<TransactionViewModel>> validate(Tangle tangle, Snapshot initialSnapshot, Hash tailHash) throws Exception {
+        return validate(tangle, initialSnapshot, tailHash, false);
     }
 
-    public static List<List<TransactionViewModel>> validate(Tangle tangle, SnapshotManager snapshotManager, Hash tailHash, boolean debug) throws Exception {
+    public static List<List<TransactionViewModel>> validate(Tangle tangle, Snapshot initialSnapshot, Hash tailHash, boolean debug) throws Exception {
         if (debug) {
             System.out.println("u");
         }
@@ -60,12 +61,12 @@ public class BundleValidator {
                             || ((bundleValue = Math.addExact(bundleValue, transactionViewModel.value())) < -TransactionViewModel.SUPPLY
                             || bundleValue > TransactionViewModel.SUPPLY)
                             ) {
-                        instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, -1);
+                        instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, -1);
                         break;
                     }
 
                     if (transactionViewModel.value() != 0 && transactionViewModel.getAddressHash().trits()[Curl.HASH_LENGTH - 1] != 0) {
-                        instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, -1);
+                        instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, -1);
                         break;
                     }
 
@@ -106,7 +107,7 @@ public class BundleValidator {
                                             addressInstance.squeeze(addressTrits, 0, addressTrits.length);
                                             //if (!Arrays.equals(Converter.bytes(addressTrits, 0, TransactionViewModel.ADDRESS_TRINARY_SIZE), transactionViewModel.getAddress().getHash().bytes())) {
                                             if (! Arrays.equals(transactionViewModel.getAddressHash().trits(), addressTrits)) {
-                                                instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, -1);
+                                                instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, -1);
                                                 break MAIN_LOOP;
                                             }
                                         } else {
@@ -114,16 +115,16 @@ public class BundleValidator {
                                         }
                                     }
 
-                                    instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, 1);
+                                    instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, 1);
                                     transactions.add(instanceTransactionViewModels);
                                 } else {
-                                    instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, -1);
+                                    instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, -1);
                                 }
                             } else {
                                 transactions.add(instanceTransactionViewModels);
                             }
                         } else {
-                            instanceTransactionViewModels.get(0).setValidity(tangle, snapshotManager, -1);
+                            instanceTransactionViewModels.get(0).setValidity(tangle, initialSnapshot, -1);
                         }
                         break;
 

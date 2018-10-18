@@ -74,7 +74,7 @@ public class SimpleJobQueue implements JobQueue {
     @Override
     public void processJobs() throws TransactionPruningException {
         TransactionPrunerJob currentJob;
-        while (!Thread.interrupted() && (currentJob = jobs.peek()) != null) {
+        while (!Thread.currentThread().isInterrupted() && (currentJob = jobs.peek()) != null) {
             try {
                 currentJob.process();
 

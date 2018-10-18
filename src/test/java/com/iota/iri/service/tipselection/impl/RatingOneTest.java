@@ -4,7 +4,7 @@ import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -24,7 +24,7 @@ public class RatingOneTest {
             "tx%d cumulative weight is not as expected";
     private static Tangle tangle;
     private static RatingCalculator rating;
-    private static SnapshotManager snapshotManager;
+    private static SnapshotManagerImpl snapshotManager;
 
     @AfterClass
     public static void tearDown() throws Exception {
@@ -41,7 +41,7 @@ public class RatingOneTest {
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
         rating = new RatingOne(tangle);
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
     }
 
     @Test

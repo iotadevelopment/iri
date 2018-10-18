@@ -3,7 +3,7 @@ package com.iota.iri;
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.hash.SpongeFactory;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 
 public class BundleValidatorTest {
     private static Tangle tangle = new Tangle();
-    private static SnapshotManager snapshotManager;
+    private static SnapshotManagerImpl snapshotManager;
 
     @BeforeClass
     public static void setUp() throws Exception {
@@ -30,7 +30,7 @@ public class BundleValidatorTest {
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
         tangle.init();
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
     }
 
     @AfterClass

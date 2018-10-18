@@ -2,7 +2,7 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.storage.Tangle;
 
@@ -14,9 +14,9 @@ import com.iota.iri.storage.Tangle;
 public class EntryPointSelectorImpl implements EntryPointSelector {
 
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
+    private final SnapshotManagerImpl snapshotManager;
 
-    public EntryPointSelectorImpl(Tangle tangle, SnapshotManager snapshotManager) {
+    public EntryPointSelectorImpl(Tangle tangle, SnapshotManagerImpl snapshotManager) {
         this.tangle = tangle;
         this.snapshotManager = snapshotManager;
     }

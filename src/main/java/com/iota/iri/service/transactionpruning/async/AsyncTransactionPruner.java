@@ -2,6 +2,7 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
@@ -61,7 +62,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
     /**
      * Last local or global snapshot that acts as a starting point for the state of ledger.
      */
-    private final SnapshotImpl snapshot;
+    private final Snapshot snapshot;
 
     /**
      * Configuration with important snapshot related parameters.
@@ -113,7 +114,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * @param snapshot last local or global snapshot that acts as a starting point for the state of ledger
      * @param config Configuration with important snapshot related configuration parameters
      */
-    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, SnapshotImpl snapshot, SnapshotConfig config) {
+    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot, SnapshotConfig config) {
         this.tangle = tangle;
         this.tipsViewModel = tipsViewModel;
         this.snapshot = snapshot;
@@ -153,7 +154,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
     @Override
     public void processJobs() throws TransactionPruningException {
         for(JobQueue jobQueue : jobQueues.values()) {
-            if(Thread.interrupted()) {
+            if(Thread.currentThread().isInterrupted()) {
                 return;
             }
 
@@ -193,7 +194,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(";", 2);
                 if (parts.length >= 2) {
-                    JobParser jobParser = this.jobParsers.get(parts[0]);
+                    JobParser jobParser = jobParsers.get(parts[0]);
                     if (jobParser == null) {
                         throw new TransactionPruningException("could not determine a parser for cleanup job of type " + parts[0]);
                     }
@@ -201,8 +202,8 @@ public class AsyncTransactionPruner implements TransactionPruner {
                     addJob(jobParser.parse(parts[1]));
                 }
             }
-        } catch(IOException e) {
-            if(getStateFile().exists()) {
+        } catch (IOException e) {
+            if (getStateFile().exists()) {
                 throw new TransactionPruningException("could not read the state file", e);
             }
         }
@@ -249,7 +250,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * It repeatedly calls {@link #processJobs()} until the TransactionPruner is shutting down.
      */
     private void processJobsThread() {
-        while(!Thread.interrupted()) {
+        while(!Thread.currentThread().isInterrupted()) {
             try {
                 processJobs();
             } catch(TransactionPruningException e) {
@@ -267,7 +268,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * {@link AsyncTransactionPruner} is shutting down.
      */
     private void persistThread() {
-        while(!Thread.interrupted()) {
+        while(!Thread.currentThread().isInterrupted()) {
             try {
                 if (persistRequested) {
                     saveStateNow();

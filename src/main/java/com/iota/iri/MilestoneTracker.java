@@ -14,7 +14,7 @@ import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.snapshot.SnapshotException;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.ProgressLogger;
@@ -111,7 +111,7 @@ public class MilestoneTracker {
         this.snapshotManager = snapshotManager;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
-        this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager, transactionValidator, transactionRequester);
+        this.milestoneSolidifier = new MilestoneSolidifier(snapshotManager.getInitialSnapshot(), transactionValidator, transactionRequester);
         this.dagHelper = DAGHelper.get(tangle);
 
         //configure
@@ -313,14 +313,14 @@ public class MilestoneTracker {
                         milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     }
 
-                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
+                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager.getInitialSnapshot(), true);
 
                     return VALID;
 
                 case INCOMPLETE:
                     milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
 
-                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager, true);
+                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotManager.getInitialSnapshot(), true);
 
                     return INCOMPLETE;
             }
@@ -399,7 +399,7 @@ public class MilestoneTracker {
                 resettedMilestones.add(currentTransaction.snapshotIndex());
             }
 
-            currentTransaction.setSnapshot(tangle, snapshotManager, 0);
+            currentTransaction.setSnapshot(tangle, snapshotManager.getInitialSnapshot(), 0);
         } catch(Exception e) {
             log.error("failed to reset the snapshotIndex of " + currentTransaction + " while trying to repair " + currentMilestone, e);
         }
@@ -414,7 +414,7 @@ public class MilestoneTracker {
             // Already validated.
             return VALID;
         }
-        final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager, transactionViewModel.getHash());
+        final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager.getInitialSnapshot(), transactionViewModel.getHash());
         if (bundleTransactions.size() == 0) {
             return INCOMPLETE;
         }

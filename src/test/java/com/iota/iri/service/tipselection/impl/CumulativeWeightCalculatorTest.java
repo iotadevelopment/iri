@@ -8,7 +8,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
@@ -32,7 +32,7 @@ public class CumulativeWeightCalculatorTest {
     private static Tangle tangle;
     private static CumulativeWeightCalculator cumulativeWeightCalculator;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
-    private static SnapshotManager snapshotManager;
+    private static SnapshotManagerImpl snapshotManager;
 
     @AfterClass
     public static void tearDown() throws Exception {
@@ -50,7 +50,7 @@ public class CumulativeWeightCalculatorTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManager(tangle, new TipsViewModel(), new MainnetConfig()).loadSnapshot();
+        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
         cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
     }
 

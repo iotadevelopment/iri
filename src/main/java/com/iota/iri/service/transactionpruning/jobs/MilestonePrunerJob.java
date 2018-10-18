@@ -5,7 +5,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.persistables.Milestone;
 import com.iota.iri.model.persistables.Transaction;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
 import com.iota.iri.service.transactionpruning.*;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
@@ -18,7 +18,7 @@ import java.util.*;
  * Represents a cleanup job for the {@link TransactionPruner} that removes milestones and all of their directly and
  * indirectly referenced transactions (and the orphaned subtangles branching off of the deleted transactions).
  *
- * It is used by the {@link SnapshotManager} to clean up milestones prior to a snapshot.
+ * It is used by the {@link SnapshotManagerImpl} to clean up milestones prior to a snapshot.
  * Even though it defines a range of milestones that shall be deleted, it gets processed one milestone at a time,
  * persisting the progress after each step.
  */
@@ -60,9 +60,9 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     }
 
     /**
-     * Does same as {@link #MilestonePrunerJob(int, int)} but defaults to the {@link #currentIndex} being the same as
-     * the {@link #startingIndex}. This is usually the case when we create a NEW job programmatically that does not get
-     * restored from a state file, because we start cleaning up at the {@link #startingIndex}.
+     * Does same as {@link #MilestonePrunerJob(int, int, int)} but defaults to the {@link #currentIndex} being the same
+     * as the {@link #startingIndex}. This is usually the case when we create a NEW job programmatically that does not
+     * get restored from a state file, because we start cleaning up at the {@link #startingIndex}.
      *
      * @param startingIndex milestone index that defines where to start cleaning up
      */
@@ -107,7 +107,7 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
             setStatus(TransactionPrunerJobStatus.RUNNING);
 
             try {
-                while (!Thread.interrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
+                while (!Thread.currentThread().isInterrupted() && getStatus() != TransactionPrunerJobStatus.DONE) {
                     cleanupMilestoneTransactions();
 
                     setCurrentIndex(getCurrentIndex() + 1);

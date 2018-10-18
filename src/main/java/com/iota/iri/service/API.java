@@ -418,7 +418,6 @@ public class API {
      * Check if a list of addresses was ever spent from, in the current epoch, or in previous epochs.
      *
      * @param addresses List of addresses to check if they were ever spent from.
-     * @return {@link com.iota.iri.service.dto.wereAddressesSpentFrom}
      **/
     private AbstractResponse wereAddressesSpentFromStatement(List<String> addresses) throws Exception {
         final List<Hash> addressesHash = addresses.stream().map(HashFactory.ADDRESS::create).collect(Collectors.toList());
@@ -447,7 +446,7 @@ public class API {
                 }
                 //pending
                 Hash tail = findTail(hash);
-                if (tail != null && BundleValidator.validate(instance.tangle, instance.snapshotManager, tail).size() != 0) {
+                if (tail != null && BundleValidator.validate(instance.tangle, instance.snapshotManager.getInitialSnapshot(), tail).size() != 0) {
                     return true;
                 }
             }
@@ -513,7 +512,7 @@ public class API {
                 state = false;
                 info = "tails are not solid (missing a referenced tx): " + transaction;
                 break;
-            } else if (BundleValidator.validate(instance.tangle, instance.snapshotManager, txVM.getHash()).size() == 0) {
+            } else if (BundleValidator.validate(instance.tangle, instance.snapshotManager.getInitialSnapshot(), txVM.getHash()).size() == 0) {
                 state = false;
                 info = "tails are not consistent (bundle is invalid): " + transaction;
                 break;
@@ -753,11 +752,11 @@ public class API {
         }
         for (final TransactionViewModel transactionViewModel : elements) {
             //store transactions
-            if(transactionViewModel.store(instance.tangle, instance.snapshotManager)) {
+            if(transactionViewModel.store(instance.tangle, instance.snapshotManager.getInitialSnapshot())) {
                 transactionViewModel.setArrivalTime(System.currentTimeMillis() / 1000L);
                 instance.transactionValidator.updateStatus(transactionViewModel);
                 transactionViewModel.updateSender("local");
-                transactionViewModel.update(instance.tangle, instance.snapshotManager, "sender");
+                transactionViewModel.update(instance.tangle, instance.snapshotManager.getInitialSnapshot(), "sender");
             }
         }
     }

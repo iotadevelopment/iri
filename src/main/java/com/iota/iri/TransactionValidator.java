@@ -2,13 +2,13 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.hash.Curl;
 import com.iota.iri.hash.Sponge;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +21,7 @@ import static com.iota.iri.controllers.TransactionViewModel.*;
 public class TransactionValidator {
     private static final Logger log = LoggerFactory.getLogger(TransactionValidator.class);
     private final Tangle tangle;
-    private final SnapshotManager snapshotManager;
+    private final Snapshot initialSnapshot;
     private final TipsViewModel tipsViewModel;
     private final TransactionRequester transactionRequester;
     private int minWeightMagnitude = 81;
@@ -37,9 +37,9 @@ public class TransactionValidator {
     private final Set<Hash> newSolidTransactionsOne = new LinkedHashSet<>();
     private final Set<Hash> newSolidTransactionsTwo = new LinkedHashSet<>();
 
-    public TransactionValidator(Tangle tangle, SnapshotManager snapshotManager, TipsViewModel tipsViewModel, TransactionRequester transactionRequester) {
+    public TransactionValidator(Tangle tangle, Snapshot initialSnapshot, TipsViewModel tipsViewModel, TransactionRequester transactionRequester) {
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
+        this.initialSnapshot = initialSnapshot;
         this.tipsViewModel = tipsViewModel;
         this.transactionRequester = transactionRequester;
     }
@@ -78,10 +78,10 @@ public class TransactionValidator {
         }
 
         if (transactionViewModel.getAttachmentTimestamp() == 0) {
-            return transactionViewModel.getTimestamp() < snapshotManager.getInitialSnapshot().getTimestamp() && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(transactionViewModel.getHash())
+            return transactionViewModel.getTimestamp() < initialSnapshot.getTimestamp() && !initialSnapshot.hasSolidEntryPoint(transactionViewModel.getHash())
                     || transactionViewModel.getTimestamp() > (System.currentTimeMillis() / 1000) + MAX_TIMESTAMP_FUTURE;
         }
-        return transactionViewModel.getAttachmentTimestamp() < (snapshotManager.getInitialSnapshot().getTimestamp() * 1000L)
+        return transactionViewModel.getAttachmentTimestamp() < (initialSnapshot.getTimestamp() * 1000L)
                 || transactionViewModel.getAttachmentTimestamp() > System.currentTimeMillis() + MAX_TIMESTAMP_FUTURE_MS;
     }
 
@@ -163,7 +163,7 @@ public class TransactionValidator {
             return true;
         }
 
-        Set<Hash> analyzedHashes = new HashSet<>(snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet());
+        Set<Hash> analyzedHashes = new HashSet<>(initialSnapshot.getSolidEntryPoints().keySet());
         if(maxProcessedTransactions != Integer.MAX_VALUE) {
             maxProcessedTransactions += analyzedHashes.size();
         }
@@ -186,7 +186,7 @@ public class TransactionValidator {
                         System.out.println(" => " + hashPointer.toString());
                         txCount++;
                     }
-                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !snapshotManager.getInitialSnapshot().hasSolidEntryPoint(hashPointer)) {
+                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(hashPointer)) {
                         solid = false;
 
                         if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
@@ -204,7 +204,7 @@ public class TransactionValidator {
             }
         }
         if (solid) {
-            updateSolidTransactions(tangle, snapshotManager, analyzedHashes);
+            updateSolidTransactions(tangle, initialSnapshot, analyzedHashes);
         }
         analyzedHashes.clear();
         return solid;
@@ -256,7 +256,7 @@ public class TransactionValidator {
                 for(Hash h: approvers) {
                     TransactionViewModel tx = fromHash(tangle, h);
                     if(quietQuickSetSolid(tx)) {
-                        tx.update(tangle, snapshotManager, "solid|height");
+                        tx.update(tangle, initialSnapshot, "solid|height");
                         tipsViewModel.setSolid(h);
                         addSolidTransaction(h);
                     }
@@ -276,7 +276,7 @@ public class TransactionValidator {
         tipsViewModel.removeTipHash(transactionViewModel.getBranchTransactionHash());
 
         if(quickSetSolid(transactionViewModel)) {
-            transactionViewModel.update(tangle, snapshotManager, "solid|height");
+            transactionViewModel.update(tangle, initialSnapshot, "solid|height");
             tipsViewModel.setSolid(transactionViewModel.getHash());
             addSolidTransaction(transactionViewModel.getHash());
         }
@@ -302,7 +302,7 @@ public class TransactionValidator {
             }
             if(solid) {
                 transactionViewModel.updateSolid(true);
-                transactionViewModel.updateHeights(tangle, snapshotManager);
+                transactionViewModel.updateHeights(tangle, initialSnapshot);
 
                 if(milestone.analyzeMilestoneCandidate(transactionViewModel) == MilestoneTracker.Validity.VALID) {
                     // do some other milestone specific updates (check for latestSolidMilestone)
@@ -319,7 +319,7 @@ public class TransactionValidator {
             transactionRequester.requestTransaction(approovee.getHash(), false);
             return false;
         }
-        if(snapshotManager.getInitialSnapshot().hasSolidEntryPoint(approovee.getHash())) {
+        if(initialSnapshot.hasSolidEntryPoint(approovee.getHash())) {
             return true;
         }
         return approovee.isSolid();

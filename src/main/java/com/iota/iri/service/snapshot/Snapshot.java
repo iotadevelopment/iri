@@ -2,6 +2,17 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.storage.Tangle;
 
+/**
+ * Represents a complete Snapshot of the ledger state.
+ *
+ * The Snapshot is a container for the {@link SnapshotMetaData} and the {@link SnapshotState} and therefore fulfills
+ * both of these contracts while offering some additional utility methods to manipulate them.
+ *
+ * Important: Since we are only dealing with Snapshots outside of the snapshot package (the underlying meta data and
+ *            state objects are not exposed via getters) this class takes care of making the exposed methods thread
+ *            safe. The logic of the underlying objects is not thread-safe (for performance and simplicity reasons) but
+ *            we don't need to worry about this since we do not have access to them.
+ */
 public interface Snapshot extends SnapshotMetaData, SnapshotState {
     /**
      * Locks the complete Snapshot object for read access.

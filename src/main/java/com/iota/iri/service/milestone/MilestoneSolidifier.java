@@ -3,7 +3,7 @@ package com.iota.iri.service.milestone;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.impl.SnapshotManager;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
 import com.iota.iri.utils.log.StatusLogger;
@@ -47,9 +47,9 @@ public class MilestoneSolidifier {
     private final StatusLogger statusLogger = new StatusLogger(LoggerFactory.getLogger(MilestoneSolidifier.class));
 
     /**
-     * Holds a reference to the SnapshotManager which allows us to check if milestones are still relevant.
+     * Holds a reference to the initial Snapshot which allows us to check if milestones are still relevant.
      */
-    private SnapshotManager snapshotManager;
+    private Snapshot initialSnapshot;
 
     /**
      * Holds a reference to the TransactionValidator which allows us to issue solidity checks.
@@ -97,12 +97,12 @@ public class MilestoneSolidifier {
      *
      * It simply stores the passed in parameters to be able to access them later on.
      *
-     * @param snapshotManager SnapshotManager instance that is used by the node
+     * @param initialSnapshot initial Snapshot instance that is used by the node
      * @param transactionValidator TransactionValidator instance that is used by the node
      */
-    public MilestoneSolidifier(SnapshotManager snapshotManager, TransactionValidator transactionValidator,
+    public MilestoneSolidifier(Snapshot initialSnapshot, TransactionValidator transactionValidator,
                                TransactionRequester transactionRequester) {
-        this.snapshotManager = snapshotManager;
+        this.initialSnapshot = initialSnapshot;
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
     }
@@ -123,7 +123,7 @@ public class MilestoneSolidifier {
         if (
             !unsolidMilestonesPool.containsKey(milestoneHash) &&
             !newlyAddedMilestones.containsKey(milestoneHash) &&
-            milestoneIndex > snapshotManager.getInitialSnapshot().getIndex()
+            milestoneIndex > initialSnapshot.getIndex()
         ) {
             newlyAddedMilestones.put(milestoneHash, milestoneIndex);
         }
@@ -188,7 +188,7 @@ public class MilestoneSolidifier {
      * answer to the issued transaction requests.
      */
     private void milestoneSolidificationThread() {
-        while(!Thread.interrupted()) {
+        while(!Thread.currentThread().isInterrupted()) {
             processNewlyAddedMilestones();
             processSolidificationQueue();
             refillSolidificationQueue();
@@ -209,7 +209,7 @@ public class MilestoneSolidifier {
     private void processNewlyAddedMilestones() {
         for (
             Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator();
-            !Thread.interrupted() && iterator.hasNext();
+            !Thread.currentThread().isInterrupted() && iterator.hasNext();
         ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
@@ -233,11 +233,11 @@ public class MilestoneSolidifier {
     private void processSolidificationQueue() {
         for (
             Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator();
-            !Thread.interrupted() && iterator.hasNext();
+            !Thread.currentThread().isInterrupted() && iterator.hasNext();
         ) {
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
-            if (currentEntry.getValue() <= snapshotManager.getInitialSnapshot().getIndex() || isSolid(currentEntry)) {
+            if (currentEntry.getValue() <= initialSnapshot.getIndex() || isSolid(currentEntry)) {
                 unsolidMilestonesPool.remove(currentEntry.getKey());
                 iterator.remove();
 
@@ -262,7 +262,7 @@ public class MilestoneSolidifier {
 
         Map.Entry<Hash, Integer> nextSolidificationCandidate;
         while (
-            !Thread.interrupted() &&
+            !Thread.currentThread().isInterrupted() &&
             milestonesToSolidify.size() < SOLIDIFICATION_QUEUE_SIZE &&
             (nextSolidificationCandidate = getNextSolidificationCandidate()) != null
         ) {
