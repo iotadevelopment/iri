@@ -155,6 +155,7 @@ public class SnapshotStateImpl implements SnapshotState {
             }
         });
 
+        System.out.println("result");
         System.out.println(balances.get(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
     }
 
