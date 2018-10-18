@@ -227,6 +227,7 @@ public class LedgerValidator {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
+                System.out.println(balanceChanges);
                 if(successfullyProcessed) {
                     successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
