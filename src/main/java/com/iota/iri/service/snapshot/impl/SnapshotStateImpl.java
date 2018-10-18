@@ -150,6 +150,7 @@ public class SnapshotStateImpl implements SnapshotState {
             System.out.println(addressHash);
             System.out.println(balance);
             if (balances.computeIfPresent(addressHash, (hash, aLong) -> balance + aLong) == null) {
+                System.out.println("put");
                 balances.putIfAbsent(addressHash, balance);
             }
         });
