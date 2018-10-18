@@ -193,12 +193,8 @@ public class LedgerValidator {
     }
 
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
-        System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
-
         if(updateMilestoneTransaction(milestone)) {
-            System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
             snapshotManager.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
-            System.out.println(snapshotManager.getLatestSnapshot().getBalance(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
 
             return true;
         }
@@ -227,20 +223,12 @@ public class LedgerValidator {
                 Hash tail = transactionViewModel.getHash();
                 Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
-                            System.out.println("a");
-                                            System.out.println(balanceChanges);
                 if(successfullyProcessed) {
-                            System.out.println("o");
-                                            System.out.println(balanceChanges);
                     successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
-                            System.out.println("q");
-                                            System.out.println(balanceChanges);
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
 
                         if(balanceChanges.size() != 0) {
-                            System.out.println("u");
-                                            System.out.println(balanceChanges);
                             new StateDiffViewModel(balanceChanges, milestoneVM.getHash()).store(tangle);
                         }
                     }
