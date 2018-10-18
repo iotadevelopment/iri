@@ -154,6 +154,8 @@ public class SnapshotStateImpl implements SnapshotState {
                 balances.putIfAbsent(addressHash, balance);
             }
         });
+
+        System.out.println(balances.get(HashFactory.ADDRESS.create("NPWEYELYMJZRLJSVLHPTOZDERNSQD9ASONVQWIRVNVTVATQUWNHDAOVBDVDKRXSMJDROAGEDRHEZONPPW")));
     }
 
     /**
