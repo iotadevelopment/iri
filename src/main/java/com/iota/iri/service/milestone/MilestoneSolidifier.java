@@ -2,7 +2,6 @@ package com.iota.iri.service.milestone;
 
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
-import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
@@ -56,8 +55,6 @@ public class MilestoneSolidifier {
      */
     private TransactionValidator transactionValidator;
 
-    private TransactionRequester transactionRequester;
-
     /**
      * Holds the milestones that were newly added, but not examined yet.
      *
@@ -100,11 +97,9 @@ public class MilestoneSolidifier {
      * @param initialSnapshot initial Snapshot instance that is used by the node
      * @param transactionValidator TransactionValidator instance that is used by the node
      */
-    public MilestoneSolidifier(Snapshot initialSnapshot, TransactionValidator transactionValidator,
-                               TransactionRequester transactionRequester) {
+    public MilestoneSolidifier(Snapshot initialSnapshot, TransactionValidator transactionValidator) {
         this.initialSnapshot = initialSnapshot;
         this.transactionValidator = transactionValidator;
-        this.transactionRequester = transactionRequester;
     }
 
     /**

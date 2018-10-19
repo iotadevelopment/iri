@@ -10,9 +10,9 @@ import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
 import com.iota.iri.service.snapshot.SnapshotException;
-import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotProvider;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.impl.LocalSnapshotManagerImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.service.tipselection.RatingCalculator;
@@ -24,6 +24,9 @@ import com.iota.iri.service.tipselection.impl.EntryPointSelectorImpl;
 import com.iota.iri.service.tipselection.impl.TailFinderImpl;
 import com.iota.iri.service.tipselection.impl.TipSelectorImpl;
 import com.iota.iri.service.tipselection.impl.WalkerAlpha;
+import com.iota.iri.service.transactionpruning.TransactionPruner;
+import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.service.transactionpruning.async.AsyncTransactionPruner;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
@@ -48,7 +51,8 @@ public class Iota {
     public final MilestoneTracker milestoneTracker;
     public final Tangle tangle;
     public final SnapshotProvider snapshotProvider;
-    public final SnapshotManager snapshotManager;
+    public final TransactionPruner transactionPruner;
+    public final LocalSnapshotManager localSnapshotManager;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -60,13 +64,15 @@ public class Iota {
     public final MessageQ messageQ;
     public final TipSelector tipsSelector;
 
-    public Iota(IotaConfig configuration) throws SnapshotException {
+    public Iota(IotaConfig configuration) throws SnapshotException, TransactionPruningException {
             this.configuration = configuration;
             tangle = new Tangle();
             messageQ = MessageQ.createWith(configuration);
             tipsViewModel = new TipsViewModel();
             snapshotProvider = new SnapshotProviderImpl(configuration);
-            snapshotManager = new SnapshotManagerImpl(snapshotProvider, tangle, tipsViewModel, configuration);
+            transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
+            transactionPruner.restoreState();
+            localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, transactionPruner, tangle, configuration);
             transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
             transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
             milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, transactionRequester, messageQ, configuration);
@@ -99,7 +105,13 @@ public class Iota {
         udpReceiver.init();
         replicator.init();
         node.init();
-        snapshotManager.init(milestoneTracker);
+        if (configuration.getLocalSnapshotsEnabled()) {
+            localSnapshotManager.start(milestoneTracker);
+
+            if (configuration.getLocalSnapshotsPruningEnabled()) {
+                 ((AsyncTransactionPruner) transactionPruner).start();
+            }
+        }
     }
 
     private void rescanDb() throws Exception {
@@ -137,7 +149,14 @@ public class Iota {
         tangle.shutdown();
         messageQ.shutdown();
         snapshotProvider.shutdown();
-        snapshotManager.shutDown();
+
+        if (configuration.getLocalSnapshotsEnabled()) {
+            localSnapshotManager.shutdown();
+
+            if (configuration.getLocalSnapshotsPruningEnabled()) {
+                ((AsyncTransactionPruner) transactionPruner).shutdown();
+            }
+        }
     }
 
     private void initializeTangle() {

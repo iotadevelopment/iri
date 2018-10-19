@@ -39,7 +39,7 @@ public class SnapshotProviderImpl implements SnapshotProvider {
      * Holds a cached version of the builtin snapshot.
      *
      * Note: The builtin snapshot is embedded in the iri.jar and will not change. To speed up tests that need the
-     *       snapshot multiple times while creating their own version of the SnapshotManager, we cache the instance here
+     *       snapshot multiple times while creating their own version of the LocalSnapshotManager, we cache the instance here
      *       so they don't have to rebuild it from the scratch every time (massively speeds up the unit tests).
      */
     private static SnapshotImpl builtinSnapshot = null;

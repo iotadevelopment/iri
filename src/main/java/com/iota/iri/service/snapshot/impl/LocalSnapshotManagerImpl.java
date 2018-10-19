@@ -4,13 +4,12 @@ import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotException;
-import com.iota.iri.service.snapshot.SnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
-import com.iota.iri.service.transactionpruning.async.AsyncTransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.service.transactionpruning.jobs.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
@@ -18,25 +17,29 @@ import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.utils.dag.TraversalException;
 
+import com.iota.iri.utils.thread.ThreadIdentifier;
+import com.iota.iri.utils.thread.ThreadUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 
-public class SnapshotManagerImpl implements SnapshotManager {
+/**
+ * Implements the basic contract of the {@link LocalSnapshotManager}.
+ */
+public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     /**
-     * Time in seconds that we wait for orphaned transactions to consider them orphaned.
+     * The interval (in milliseconds) in which we check if a new local {@link Snapshot} is due.
      */
-    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
+    private static final int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
 
     /**
-     * Logger for this class allowing us to dump debug and status messages.
+     * If transactions got orphaned we wait this additional time (in seconds) until we consider them orphaned.
      */
-    private static final Logger log = LoggerFactory.getLogger(SnapshotManagerImpl.class);
+    private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
 
     /**
      * Maximum age in milestones since creation of solid entry points.
@@ -47,110 +50,100 @@ public class SnapshotManagerImpl implements SnapshotManager {
      */
     private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
 
-    private final SnapshotProvider snapshotProvider;
-
-    private Tangle tangle;
-
-    private TipsViewModel tipsViewModel;
-
-    private TransactionPruner transactionPruner;
-
-    private SnapshotConfig configuration;
-
-    private DAGHelper dagHelper;
-
-    private Snapshot initialSnapshot;
-
-    private Snapshot latestSnapshot;
-
-    private boolean shuttingDown;
-
-    private static final int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
+    /**
+     * Logger for this class allowing us to dump debug and status messages.
+     */
+    private static final Logger log = LoggerFactory.getLogger(LocalSnapshotManagerImpl.class);
 
     /**
-     * This method is the constructor of the SnapshotManagerImpl.
-     *
-     * It stores the instances that this class depends on and tries to load the initial Snapshot, by first checking if
-     * local snapshots are enabled and available and then falling back to the builtin Snapshot of the IRI.jar
-     *
-     * @param tangle wrapper for the database interface
-     * @param configuration configuration of the node
-     * @throws IOException if something goes wrong while processing the snapshot files
+     * Data provider for the relevant {@link Snapshot} instances.
      */
-    public SnapshotManagerImpl(SnapshotProvider snapshotProvider, Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) {
-        // save the necessary dependencies
+    private final SnapshotProvider snapshotProvider;
+
+    /**
+     * Manager for the pruning jobs that allows us to clean up old transactions.
+     */
+    private final TransactionPruner transactionPruner;
+
+    /**
+     * Tangle object which acts as a database interface.
+     */
+    private final Tangle tangle;
+
+    /**
+     * Configuration with important snapshot related parameters.
+     */
+    private final SnapshotConfig configuration;
+
+    /**
+     * Holds a reference to the {@link ThreadIdentifier} for the monitor thread.
+     *
+     * Using a {@link ThreadIdentifier} for spawning the thread allows the {@link ThreadUtils} to spawn exactly one
+     * thread for this instance even when we call the {@link #start(MilestoneTracker)} method multiple times.
+     */
+    private ThreadIdentifier monitorThreadIdentifier = new ThreadIdentifier("Local Snapshots Monitor");
+
+    /**
+     * Creates the {@link LocalSnapshotManager} that takes care of .
+     *
+     * It simply stores the passed in parameters in their private properties.
+     *
+     * @param snapshotProvider data provider for the relevant {@link Snapshot} instances
+     * @param transactionPruner manager for the pruning jobs that allows us to clean up old transactions
+     * @param tangle object which acts as a database interface
+     * @param configuration configuration with important snapshot related parameters
+     */
+    public LocalSnapshotManagerImpl(SnapshotProvider snapshotProvider, TransactionPruner transactionPruner, Tangle tangle, SnapshotConfig configuration) {
         this.snapshotProvider = snapshotProvider;
+        this.transactionPruner = transactionPruner;
         this.tangle = tangle;
-        this.tipsViewModel = tipsViewModel;
         this.configuration = configuration;
-        this.dagHelper = DAGHelper.get(tangle);
     }
 
-    public void init(MilestoneTracker milestoneTracker) {
-        // if local snapshots are enabled we initialize the parts taking care of local snapshots
-        if (configuration.getLocalSnapshotsEnabled()) {
-            spawnMonitorThread(milestoneTracker);
-
-            if (configuration.getLocalSnapshotsPruningEnabled()) {
-                // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-                transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
-                try {
-                    transactionPruner.restoreState();
-                } catch (TransactionPruningException e) {
-                    log.info("could not restore the state of the TransactionPruner", e);
-                }
-
-                ((AsyncTransactionPruner) transactionPruner).start();
-            }
-        }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void start(MilestoneTracker milestoneTracker) {
+        ThreadUtils.spawnThread(() -> monitorThread(milestoneTracker), monitorThreadIdentifier);
     }
 
-    private void spawnMonitorThread(MilestoneTracker milestoneTracker) {
-        (new Thread(() -> {
-            log.info("Local Snapshot Monitor started ...");
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void shutdown() {
+        ThreadUtils.stopThread(monitorThreadIdentifier);
+    }
 
-            // load necessary configuration parameters
-            int snapshotDepth = configuration.getLocalSnapshotsDepth();
+    /**
+     * This method contains the logic for the monitoring Thread.
+     *
+     * It periodically checks if a new {@link Snapshot} has to be taken until the {@link Thread} is terminated. If it
+     * detects that a {@link Snapshot} is due it triggers the creation of the {@link Snapshot} by calling
+     * {@link #takeLocalSnapshot()}.
+     *
+     * @param milestoneTracker tracker for the milestones to determine when a new local snapshot is due
+     */
+    private void monitorThread(MilestoneTracker milestoneTracker) {
+        while (!Thread.currentThread().isInterrupted()) {
+            int localSnapshotInterval = milestoneTracker.getStatus() == INITIALIZED &&
+                    snapshotProvider.getLatestSnapshot().getIndex() == milestoneTracker.latestMilestoneIndex
+                    ? configuration.getLocalSnapshotsIntervalSynced()
+                    : configuration.getLocalSnapshotsIntervalUnsynced();
 
-            while (!shuttingDown) {
-                long scanStart = System.currentTimeMillis();
-
-                int localSnapshotInterval = milestoneTracker.getStatus() == INITIALIZED && latestSnapshot.getIndex() == milestoneTracker.latestMilestoneIndex
-                        ? configuration.getLocalSnapshotsIntervalSynced()
-                        : configuration.getLocalSnapshotsIntervalUnsynced();
-
-                if (latestSnapshot.getIndex() - initialSnapshot.getIndex() > snapshotDepth + localSnapshotInterval) {
-                    try {
-                        takeLocalSnapshot();
-                    } catch (SnapshotException e) {
-                        log.error("error while taking local snapshot", e);
-                    }
-                }
+            if (snapshotProvider.getLatestSnapshot().getIndex() - snapshotProvider.getLatestSnapshot().getIndex() >
+                    configuration.getLocalSnapshotsDepth() + localSnapshotInterval) {
 
                 try {
-                    Thread.sleep(Math.max(1, LOCAL_SNAPSHOT_RESCAN_INTERVAL - (System.currentTimeMillis() - scanStart)));
-                } catch (InterruptedException e) {
-                    log.info("Local Snapshot Monitor stopped ...");
-
-                    shuttingDown = true;
+                    takeLocalSnapshot();
+                } catch (SnapshotException e) {
+                    log.error("error while taking local snapshot", e);
                 }
             }
-        }, "Local Snapshot Monitor")).start();
-    }
 
-    public void shutDown() {
-        shuttingDown = true;
-        initialSnapshot = null;
-        latestSnapshot = null;
-
-        if (transactionPruner != null) {
-            ((AsyncTransactionPruner) transactionPruner).shutdown();
+            ThreadUtils.sleep(LOCAL_SNAPSHOT_RESCAN_INTERVAL);
         }
-        transactionPruner = null;
-    }
-
-    public SnapshotConfig getConfiguration() {
-        return configuration;
     }
 
     /**
@@ -166,9 +159,9 @@ public class SnapshotManagerImpl implements SnapshotManager {
      * @param transaction transaction that shall be checked
      * @param referenceTransaction transaction that acts as a judge to the other transaction
      * @return true if the transaction got orphaned and false otherwise
-     * @throws TraversalException if anything goes wrong while traversing the graph
+     * @throws SnapshotException if anything goes wrong while determining the orphaned status
      */
-    private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction, HashSet<Hash> processedTransactions) throws TraversalException {
+    private boolean isOrphaned(TransactionViewModel transaction, TransactionViewModel referenceTransaction, HashSet<Hash> processedTransactions) throws SnapshotException {
         long timeDiff = (referenceTransaction.getArrivalTime() / 1000L) - referenceTransaction.getTimestamp();
 
         if (((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
@@ -176,16 +169,20 @@ public class SnapshotManagerImpl implements SnapshotManager {
         }
 
         AtomicBoolean nonOrphanedTransactionFound = new AtomicBoolean(false);
-        dagHelper.traverseApprovers(
-                transaction.getHash(),
-                currentTransaction -> !nonOrphanedTransactionFound.get(),
-                currentTransaction -> {
-                    if (((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
-                        nonOrphanedTransactionFound.set(true);
-                    }
-                },
-                processedTransactions
-        );
+        try {
+            DAGHelper.get(tangle).traverseApprovers(
+                    transaction.getHash(),
+                    currentTransaction -> !nonOrphanedTransactionFound.get(),
+                    currentTransaction -> {
+                        if (((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
+                            nonOrphanedTransactionFound.set(true);
+                        }
+                    },
+                    processedTransactions
+            );
+        } catch (TraversalException e) {
+            throw new SnapshotException("failed to determine orphaned status of " + transaction, e);
+        }
 
         return !nonOrphanedTransactionFound.get();
     }
@@ -239,30 +236,27 @@ public class SnapshotManagerImpl implements SnapshotManager {
         return false;
     }
 
-    private HashMap<Hash, Integer> generateSolidEntryPoints(SnapshotImpl snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
+    private Map<Hash, Integer> generateSolidEntryPoints(Snapshot snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
         // check the old solid entry points and copy them if they are still relevant
         ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger("Taking local snapshot [2/4 analyzing old solid entry points]", log).start(snapshot.getSolidEntryPoints().size());
         snapshot.getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash)) {
-                if (
-                        targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME &&
-                                isSolidEntryPoint(hash, targetMilestone)
-                        ) {
+                if (targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME &&
+                        isSolidEntryPoint(hash, targetMilestone)) {
+
                     solidEntryPoints.put(hash, milestoneIndex);
                 } else {
                     try {
                         // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise let the MilestonePrunerJob do this
-                        if (
-                                TransactionViewModel.fromHash(tangle, hash).getType() == TransactionViewModel.PREFILLED_SLOT
+                        if (TransactionViewModel.fromHash(tangle, hash).getType() == TransactionViewModel.PREFILLED_SLOT
                                 ) {
+
                             transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(hash));
                         }
-                    } catch (TransactionPruningException e) {
-                        log.error("could not add cleanup job to garbage collector", e);
                     } catch (Exception e) {
-
+                        log.error("failed to add cleanup job to garbage collector", e);
                     }
                 }
             }
@@ -273,11 +267,11 @@ public class SnapshotManagerImpl implements SnapshotManager {
         ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [3/4 generating solid entry points]", log);
         try {
             // add new solid entry points
-            progressLogger.start(targetMilestone.index() - initialSnapshot.getIndex());
+            progressLogger.start(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex());
             MilestoneViewModel nextMilestone = targetMilestone;
-            while (nextMilestone != null && nextMilestone.index() > initialSnapshot.getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
+            while (nextMilestone != null && nextMilestone.index() > snapshotProvider.getInitialSnapshot().getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
                 MilestoneViewModel currentMilestone = nextMilestone;
-                dagHelper.traverseApprovees(
+                DAGHelper.get(tangle).traverseApprovees(
                         currentMilestone.getHash(),
                         currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index(),
                         currentTransaction -> {
@@ -304,7 +298,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
         return solidEntryPoints;
     }
 
-    private HashMap<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
+    private Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
         ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
         HashMap<Hash, Integer> seenMilestones = new HashMap<>();
 
@@ -325,35 +319,35 @@ public class SnapshotManagerImpl implements SnapshotManager {
         return seenMilestones;
     }
 
-    private SnapshotImpl generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+    private Snapshot generateLocalSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
         if (targetMilestone == null) {
             throw new SnapshotException("the target milestone must not be null");
-        } else if (targetMilestone.index() > latestSnapshot.getIndex()) {
+        } else if (targetMilestone.index() > snapshotProvider.getLatestSnapshot().getIndex()) {
             throw new SnapshotException("the snapshot target " + targetMilestone + " was not solidified yet");
-        } else if (targetMilestone.index() < initialSnapshot.getIndex()) {
+        } else if (targetMilestone.index() < snapshotProvider.getInitialSnapshot().getIndex()) {
             throw new SnapshotException("the snapshot target " + targetMilestone + " is too old");
         }
 
-        initialSnapshot.lockRead();
-        latestSnapshot.lockRead();
+        snapshotProvider.getInitialSnapshot().lockRead();
+        snapshotProvider.getLatestSnapshot().lockRead();
 
         SnapshotImpl snapshot;
         try {
-            int distanceFromInitialSnapshot = Math.abs(initialSnapshot.getIndex() - targetMilestone.index());
-            int distanceFromLatestSnapshot = Math.abs(latestSnapshot.getIndex() - targetMilestone.index());
+            int distanceFromInitialSnapshot = Math.abs(snapshotProvider.getInitialSnapshot().getIndex() - targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(snapshotProvider.getLatestSnapshot().getIndex() - targetMilestone.index());
 
             if (distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
-                snapshot = new SnapshotImpl(initialSnapshot);
+                snapshot = new SnapshotImpl(snapshotProvider.getInitialSnapshot());
 
                 snapshot.replayMilestones(targetMilestone.index(), tangle);
             } else {
-                snapshot = new SnapshotImpl(latestSnapshot);
+                snapshot = new SnapshotImpl(snapshotProvider.getLatestSnapshot());
 
                 snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
             }
         } finally {
-            initialSnapshot.unlockRead();
-            latestSnapshot.unlockRead();
+            snapshotProvider.getInitialSnapshot().unlockRead();
+            snapshotProvider.getLatestSnapshot().unlockRead();
         }
 
         snapshot.setSolidEntryPoints(generateSolidEntryPoints(snapshot, targetMilestone));
@@ -368,7 +362,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
         int snapshotDepth = configuration.getLocalSnapshotsDepth();
 
         // determine our target milestone
-        int targetMilestoneIndex = latestSnapshot.getIndex() - snapshotDepth;
+        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
 
         // try to load the milestone
         MilestoneViewModel targetMilestone;
@@ -383,9 +377,9 @@ public class SnapshotManagerImpl implements SnapshotManager {
             throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
         }
 
-        SnapshotImpl targetSnapshot;
+        Snapshot targetSnapshot;
         try {
-            targetSnapshot = generateSnapshot(targetMilestone);
+            targetSnapshot = generateLocalSnapshot(targetMilestone);
         } catch (Exception e) {
             throw new SnapshotException("could not generate the snapshot", e);
         }
@@ -404,6 +398,6 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
         targetSnapshot.writeToDisk(basePath);
 
-        initialSnapshot.update(targetSnapshot);
+        snapshotProvider.getInitialSnapshot().update(targetSnapshot);
     }
 }
