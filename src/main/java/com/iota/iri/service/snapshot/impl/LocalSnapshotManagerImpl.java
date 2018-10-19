@@ -117,6 +117,136 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Snapshot generateLocalSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
+        if (targetMilestone == null) {
+            throw new SnapshotException("the target milestone must not be null");
+        } else if (targetMilestone.index() > snapshotProvider.getLatestSnapshot().getIndex()) {
+            throw new SnapshotException("the snapshot target " + targetMilestone + " was not solidified yet");
+        } else if (targetMilestone.index() < snapshotProvider.getInitialSnapshot().getIndex()) {
+            throw new SnapshotException("the snapshot target " + targetMilestone + " is too old");
+        }
+
+        snapshotProvider.getInitialSnapshot().lockRead();
+        snapshotProvider.getLatestSnapshot().lockRead();
+
+        SnapshotImpl snapshot;
+        try {
+            int distanceFromInitialSnapshot = Math.abs(snapshotProvider.getInitialSnapshot().getIndex() - targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(snapshotProvider.getLatestSnapshot().getIndex() - targetMilestone.index());
+
+            if (distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
+                snapshot = new SnapshotImpl(snapshotProvider.getInitialSnapshot());
+
+                snapshot.replayMilestones(targetMilestone.index(), tangle);
+            } else {
+                snapshot = new SnapshotImpl(snapshotProvider.getLatestSnapshot());
+
+                snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
+            }
+        } finally {
+            snapshotProvider.getInitialSnapshot().unlockRead();
+            snapshotProvider.getLatestSnapshot().unlockRead();
+        }
+
+        snapshot.setSolidEntryPoints(generateSolidEntryPoints(targetMilestone));
+        snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
+
+        return snapshot;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void takeLocalSnapshot() throws SnapshotException {
+        // load necessary configuration parameters
+        String basePath = configuration.getLocalSnapshotsBasePath();
+        int snapshotDepth = configuration.getLocalSnapshotsDepth();
+
+        // determine our target milestone
+        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
+
+        // try to load the milestone
+        MilestoneViewModel targetMilestone;
+        try {
+            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
+        } catch (Exception e) {
+            throw new SnapshotException("could not load the target milestone", e);
+        }
+
+        // if we couldn't find a milestone with the given index -> abort
+        if (targetMilestone == null) {
+            throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
+        }
+
+        Snapshot targetSnapshot;
+        try {
+            targetSnapshot = generateLocalSnapshot(targetMilestone);
+        } catch (Exception e) {
+            throw new SnapshotException("could not generate the snapshot", e);
+        }
+
+        try {
+            int targetIndex = targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay();
+            int startingIndex = configuration.getMilestoneStartIndex() + 1;
+
+            if (targetIndex >= startingIndex) {
+                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
+            }
+
+        } catch (TransactionPruningException e) {
+            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
+        }
+
+        targetSnapshot.writeToDisk(basePath);
+
+        snapshotProvider.getInitialSnapshot().update(targetSnapshot);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Map<Hash, Integer> generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
+        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+
+        processOldSolidEntryPoints(targetMilestone, solidEntryPoints);
+        processNewSolidEntryPoints(targetMilestone, solidEntryPoints);
+
+        solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
+
+        return solidEntryPoints;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
+        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+
+        seenMilestonesProgressLogger.start(configuration.getLocalSnapshotsDepth());
+        try {
+            MilestoneViewModel seenMilestone = targetMilestone;
+            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index())) != null) {
+                seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
+                seenMilestonesProgressLogger.progress();
+            }
+        } catch (Exception e) {
+            seenMilestonesProgressLogger.abort(e);
+
+            throw new SnapshotException("could not generate the set of seen milestones", e);
+        }
+        seenMilestonesProgressLogger.finish();
+
+        return seenMilestones;
+    }
+
+    /**
      * This method contains the logic for the monitoring Thread.
      *
      * It periodically checks if a new {@link Snapshot} has to be taken until the {@link Thread} is terminated. If it
@@ -132,7 +262,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
                     ? configuration.getLocalSnapshotsIntervalSynced()
                     : configuration.getLocalSnapshotsIntervalUnsynced();
 
-            if (snapshotProvider.getLatestSnapshot().getIndex() - snapshotProvider.getLatestSnapshot().getIndex() >
+            if (snapshotProvider.getLatestSnapshot().getIndex() - snapshotProvider.getInitialSnapshot().getIndex() >
                     configuration.getLocalSnapshotsDepth() + localSnapshotInterval) {
 
                 try {
@@ -236,12 +366,12 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
         return false;
     }
 
-    private Map<Hash, Integer> generateSolidEntryPoints(Snapshot snapshot, MilestoneViewModel targetMilestone) throws SnapshotException {
-        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+    private void processOldSolidEntryPoints(MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
+        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger(
+                "Taking local snapshot [2/4 analyzing old solid entry points]", log
+        ).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
 
-        // check the old solid entry points and copy them if they are still relevant
-        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger("Taking local snapshot [2/4 analyzing old solid entry points]", log).start(snapshot.getSolidEntryPoints().size());
-        snapshot.getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
+        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash)) {
                 if (targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME &&
                         isSolidEntryPoint(hash, targetMilestone)) {
@@ -264,6 +394,10 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
             oldSolidEntryPointsProgressLogger.progress();
         });
 
+        oldSolidEntryPointsProgressLogger.finish();
+    }
+
+    private void processNewSolidEntryPoints(MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
         ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [3/4 generating solid entry points]", log);
         try {
             // add new solid entry points
@@ -292,112 +426,5 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
 
             throw new SnapshotException("could not generate the solid entry points for " + targetMilestone, e);
         }
-
-        solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
-
-        return solidEntryPoints;
-    }
-
-    private Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
-        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
-        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
-
-        seenMilestonesProgressLogger.start(configuration.getLocalSnapshotsDepth());
-        try {
-            MilestoneViewModel seenMilestone = targetMilestone;
-            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index())) != null) {
-                seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
-                seenMilestonesProgressLogger.progress();
-            }
-        } catch (Exception e) {
-            seenMilestonesProgressLogger.abort(e);
-
-            throw new SnapshotException("could not generate the set of seen milestones", e);
-        }
-        seenMilestonesProgressLogger.finish();
-
-        return seenMilestones;
-    }
-
-    private Snapshot generateLocalSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
-        if (targetMilestone == null) {
-            throw new SnapshotException("the target milestone must not be null");
-        } else if (targetMilestone.index() > snapshotProvider.getLatestSnapshot().getIndex()) {
-            throw new SnapshotException("the snapshot target " + targetMilestone + " was not solidified yet");
-        } else if (targetMilestone.index() < snapshotProvider.getInitialSnapshot().getIndex()) {
-            throw new SnapshotException("the snapshot target " + targetMilestone + " is too old");
-        }
-
-        snapshotProvider.getInitialSnapshot().lockRead();
-        snapshotProvider.getLatestSnapshot().lockRead();
-
-        SnapshotImpl snapshot;
-        try {
-            int distanceFromInitialSnapshot = Math.abs(snapshotProvider.getInitialSnapshot().getIndex() - targetMilestone.index());
-            int distanceFromLatestSnapshot = Math.abs(snapshotProvider.getLatestSnapshot().getIndex() - targetMilestone.index());
-
-            if (distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
-                snapshot = new SnapshotImpl(snapshotProvider.getInitialSnapshot());
-
-                snapshot.replayMilestones(targetMilestone.index(), tangle);
-            } else {
-                snapshot = new SnapshotImpl(snapshotProvider.getLatestSnapshot());
-
-                snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
-            }
-        } finally {
-            snapshotProvider.getInitialSnapshot().unlockRead();
-            snapshotProvider.getLatestSnapshot().unlockRead();
-        }
-
-        snapshot.setSolidEntryPoints(generateSolidEntryPoints(snapshot, targetMilestone));
-        snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
-
-        return snapshot;
-    }
-
-    private void takeLocalSnapshot() throws SnapshotException {
-        // load necessary configuration parameters
-        String basePath = configuration.getLocalSnapshotsBasePath();
-        int snapshotDepth = configuration.getLocalSnapshotsDepth();
-
-        // determine our target milestone
-        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
-
-        // try to load the milestone
-        MilestoneViewModel targetMilestone;
-        try {
-            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
-        } catch (Exception e) {
-            throw new SnapshotException("could not load the target milestone", e);
-        }
-
-        // if we couldn't find a milestone with the given index -> abort
-        if (targetMilestone == null) {
-            throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
-        }
-
-        Snapshot targetSnapshot;
-        try {
-            targetSnapshot = generateLocalSnapshot(targetMilestone);
-        } catch (Exception e) {
-            throw new SnapshotException("could not generate the snapshot", e);
-        }
-
-        try {
-            int targetIndex = targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay();
-            int startingIndex = configuration.getMilestoneStartIndex() + 1;
-
-            if (targetIndex >= startingIndex) {
-                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - configuration.getLocalSnapshotsPruningDelay()));
-            }
-
-        } catch (TransactionPruningException e) {
-            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
-        }
-
-        targetSnapshot.writeToDisk(basePath);
-
-        snapshotProvider.getInitialSnapshot().update(targetSnapshot);
     }
 }
