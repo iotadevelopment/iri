@@ -69,12 +69,12 @@ public class IRI {
             IotaConfig config = createConfiguration(args);
             log.info("Welcome to {} {}", config.isTestnet() ? TESTNET_NAME : MAINNET_NAME, VERSION);
 
-            iota = new Iota(config);
-            ixi = new IXI(iota);
-            api = new API(iota, ixi);
-            shutdownHook();
-
             try {
+                iota = new Iota(config);
+                ixi = new IXI(iota);
+                api = new API(iota, ixi);
+                shutdownHook();
+
                 iota.init();
                 api.init();
                 //TODO redundant parameter but we will touch this when we refactor IXI

@@ -7,6 +7,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 import com.iota.iri.service.transactionpruning.async.AsyncTransactionPruner;
@@ -16,10 +17,10 @@ import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.ProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.utils.dag.TraversalException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +46,8 @@ public class SnapshotManagerImpl implements SnapshotManager {
      * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
      */
     private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
+
+    private final SnapshotProvider snapshotProvider;
 
     private Tangle tangle;
 
@@ -74,8 +77,9 @@ public class SnapshotManagerImpl implements SnapshotManager {
      * @param configuration configuration of the node
      * @throws IOException if something goes wrong while processing the snapshot files
      */
-    public SnapshotManagerImpl(Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) {
+    public SnapshotManagerImpl(SnapshotProvider snapshotProvider, Tangle tangle, TipsViewModel tipsViewModel, SnapshotConfig configuration) {
         // save the necessary dependencies
+        this.snapshotProvider = snapshotProvider;
         this.tangle = tangle;
         this.tipsViewModel = tipsViewModel;
         this.configuration = configuration;
@@ -89,7 +93,7 @@ public class SnapshotManagerImpl implements SnapshotManager {
 
             if (configuration.getLocalSnapshotsPruningEnabled()) {
                 // initialize the snapshot garbage collector that takes care of cleaning up old transaction data
-                transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, getInitialSnapshot(), configuration);
+                transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
                 try {
                     transactionPruner.restoreState();
                 } catch (TransactionPruningException e) {

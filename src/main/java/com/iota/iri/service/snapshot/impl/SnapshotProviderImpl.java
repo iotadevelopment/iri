@@ -71,7 +71,7 @@ public class SnapshotProviderImpl implements SnapshotProvider {
      * @param config Snapshot related configuration parameters
      * @throws SnapshotException if anything goes wrong while trying to read the snapshots
      */
-    SnapshotProviderImpl(SnapshotConfig config) throws SnapshotException {
+    public SnapshotProviderImpl(SnapshotConfig config) throws SnapshotException {
         this.config = config;
 
         loadSnapshots();
@@ -94,14 +94,23 @@ public class SnapshotProviderImpl implements SnapshotProvider {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void shutdown() {
+        initialSnapshot = null;
+        latestSnapshot = null;
+    }
+
+    /**
      * Loads the snapshots that are provided by this data provider.
      *
      * We first check if a valid local {@link Snapshot} exists by trying to load it. If we fail to load the local
      * {@link Snapshot}, we fall back to the builtin one.
      *
      * After the {@link #initialSnapshot} was successfully loaded we create a copy of it that will act as the "working
-     * copy" that will keep track of the latest changes that get applied while the node operates and sees new confirmed
-     * transactions.
+     * copy" that will keep track of the latest changes that get applied while the node operates and processes the new
+     * confirmed transactions.
      *
      * @throws SnapshotException if anything goes wrong while loading the snapshots
      */
@@ -114,56 +123,53 @@ public class SnapshotProviderImpl implements SnapshotProvider {
         latestSnapshot = new SnapshotImpl(initialSnapshot);
     }
 
-    private SnapshotImpl loadLocalSnapshot() {
-        try {
-            // if local snapshots are enabled
-            if (config.getLocalSnapshotsEnabled()) {
-                // load the remaining configuration parameters
-                String basePath = config.getLocalSnapshotsBasePath();
+    /**
+     * Loads the last local snapshot from the disk.
+     *
+     * This method checks if local snapshot files are available on the hard disk of the node and tries to load them. If
+     * no local snapshot files exist or local snapshots are not enabled we simply return null.
+     *
+     * @return local snapshot of the node
+     * @throws SnapshotException if local snapshot files exist but are malformed
+     */
+    private SnapshotImpl loadLocalSnapshot() throws SnapshotException {
+        if (config.getLocalSnapshotsEnabled()) {
+            File localSnapshotFile = new File(config.getLocalSnapshotsBasePath() + ".snapshot.state");
+            File localSnapshotMetadDataFile = new File(config.getLocalSnapshotsBasePath() + ".snapshot.meta");
 
-                // create a file handle for our snapshot file
-                File localSnapshotFile = new File(basePath + ".snapshot.state");
+            if (localSnapshotFile.exists() && localSnapshotFile.isFile() && localSnapshotMetadDataFile.exists() &&
+                    localSnapshotMetadDataFile.isFile()) {
 
-                // create a file handle for our snapshot metadata file
-                File localSnapshotMetadDataFile = new File(basePath + ".snapshot.meta");
-
-                // if the local snapshot files exists -> load them
-                if (
-                        localSnapshotFile.exists() &&
-                                localSnapshotFile.isFile() &&
-                                localSnapshotMetadDataFile.exists() &&
-                                localSnapshotMetadDataFile.isFile()
-                        ) {
-                    // retrieve the state to our local snapshot
-                    SnapshotState snapshotState = SnapshotStateImpl.fromFile(localSnapshotFile.getAbsolutePath());
-
-                    // check the supply of the snapshot state
-                    if (!snapshotState.hasCorrectSupply()) {
-                        throw new IllegalStateException("the snapshot state file has an invalid supply");
-                    }
-
-                    // check the consistency of the snapshot state
-                    if (!snapshotState.isConsistent()) {
-                        throw new IllegalStateException("the snapshot state file is not consistent");
-                    }
-
-                    // retrieve the meta data to our local snapshot
-                    SnapshotMetaDataImpl snapshotMetaData = SnapshotMetaDataImpl.fromFile(localSnapshotMetadDataFile);
-
-                    log.info("Resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
-
-                    // return our Snapshot
-                    return new SnapshotImpl(snapshotState, snapshotMetaData);
+                SnapshotState snapshotState = SnapshotStateImpl.fromFile(localSnapshotFile.getAbsolutePath());
+                if (!snapshotState.hasCorrectSupply()) {
+                    throw new SnapshotException("the snapshot state file has an invalid supply");
                 }
+                if (!snapshotState.isConsistent()) {
+                    throw new SnapshotException("the snapshot state file is not consistent");
+                }
+
+                SnapshotMetaDataImpl snapshotMetaData = SnapshotMetaDataImpl.fromFile(localSnapshotMetadDataFile);
+
+                log.info("resumed from local snapshot #" + snapshotMetaData.getIndex() + " ...");
+
+                return new SnapshotImpl(snapshotState, snapshotMetaData);
             }
-        } catch (Exception e) {
-            log.error("No valid Local Snapshot file found", e);
         }
 
-        // otherwise just return null
         return null;
     }
 
+    /**
+     * Loads the builtin snapshot (last global snapshot) that is embedded in the jar.
+     *
+     * We first verify the integrity of the snapshot files by checking the signature of the files and then construct
+     * a {@link Snapshot} from the retrieved information.
+     *
+     * We add the NULL_HASH as the only solid entry point and an empty list of seen milestones.
+     *
+     * @return
+     * @throws SnapshotException
+     */
     private SnapshotImpl loadBuiltInSnapshot() throws SnapshotException {
         if (builtinSnapshot == null) {
             try {

@@ -9,7 +9,11 @@ import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
+import com.iota.iri.service.snapshot.SnapshotException;
+import com.iota.iri.service.snapshot.SnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.service.tipselection.TailFinder;
@@ -43,7 +47,8 @@ public class Iota {
     public final LedgerValidator ledgerValidator;
     public final MilestoneTracker milestoneTracker;
     public final Tangle tangle;
-    public final SnapshotManagerImpl snapshotManager;
+    public final SnapshotProvider snapshotProvider;
+    public final SnapshotManager snapshotManager;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -55,29 +60,21 @@ public class Iota {
     public final MessageQ messageQ;
     public final TipSelector tipsSelector;
 
-    public Iota(IotaConfig configuration) {
+    public Iota(IotaConfig configuration) throws SnapshotException {
             this.configuration = configuration;
             tangle = new Tangle();
             messageQ = MessageQ.createWith(configuration);
             tipsViewModel = new TipsViewModel();
-
-            snapshotManager = new SnapshotManagerImpl(tangle, tipsViewModel, configuration);
-            try {
-                snapshotManager.initSnapshots();
-            } catch (Exception e) {
-                log.error("a critical error occured while trying to start the node", e);
-
-                System.exit(1);
-            }
-
-            transactionRequester = new TransactionRequester(tangle, snapshotManager.getInitialSnapshot(), messageQ);
-            transactionValidator = new TransactionValidator(tangle, snapshotManager.getInitialSnapshot(), tipsViewModel, transactionRequester);
-            milestoneTracker = new MilestoneTracker(tangle, snapshotManager, transactionValidator, transactionRequester, messageQ, configuration);
-            node = new Node(tangle, snapshotManager.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
+            snapshotProvider = new SnapshotProviderImpl(configuration);
+            snapshotManager = new SnapshotManagerImpl(snapshotProvider, tangle, tipsViewModel, configuration);
+            transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
+            transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
+            milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, transactionRequester, messageQ, configuration);
+            node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
                     configuration);
             replicator = new Replicator(node, configuration);
             udpReceiver = new UDPReceiver(node, configuration);
-            ledgerValidator = new LedgerValidator(tangle, snapshotManager, milestoneTracker, transactionRequester, messageQ);
+            ledgerValidator = new LedgerValidator(tangle, snapshotProvider, milestoneTracker, transactionRequester, messageQ);
             tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
             tipsSelector = createTipSelector(configuration);
     }
@@ -139,6 +136,7 @@ public class Iota {
         transactionValidator.shutdown();
         tangle.shutdown();
         messageQ.shutdown();
+        snapshotProvider.shutdown();
         snapshotManager.shutDown();
     }
 
@@ -161,11 +159,11 @@ public class Iota {
     }
 
     private TipSelector createTipSelector(TipSelConfig config) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager);
-        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider.getLatestSnapshot());
+        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
-        return new TipSelectorImpl(tangle, snapshotManager, ledgerValidator, entryPointSelector, ratingCalculator,
+        return new TipSelectorImpl(tangle, snapshotProvider, ledgerValidator, entryPointSelector, ratingCalculator,
                 walker, config);
     }
 }

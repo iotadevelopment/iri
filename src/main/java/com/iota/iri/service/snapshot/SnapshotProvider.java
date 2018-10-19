@@ -21,4 +21,12 @@ public interface SnapshotProvider {
      * @return the Snapshot that represents the most recent "confirmed" state of the ledger
      */
     Snapshot getLatestSnapshot();
+
+    /**
+     * Frees the resources of the {@link SnapshotProvider}.
+     *
+     * Snapshots require quite a bit of memory and should be cleaned up when they are not required anymore. This is
+     * particularly important for unit tests, that create a separate instance of the {@link SnapshotProvider}.
+     */
+    void shutdown();
 }

@@ -4,7 +4,7 @@ import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.Snapshot;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -15,7 +15,7 @@ import java.util.*;
 
 public class LedgerValidator {
 
-    private final SnapshotManagerImpl snapshotManager;
+    private final SnapshotProvider snapshotProvider;
     private final Logger log = LoggerFactory.getLogger(LedgerValidator.class);
     private final Tangle tangle;
     private final MilestoneTracker milestoneTracker;
@@ -23,10 +23,10 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, SnapshotManagerImpl snapshotManager, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.milestoneTracker = milestoneTracker;
-        this.snapshotManager = snapshotManager;
+        this.snapshotProvider = snapshotProvider;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
     }
@@ -57,7 +57,7 @@ public class LedgerValidator {
         int numberOfAnalyzedTransactions = 0;
         Set<Hash> countedTx = new HashSet<>();
 
-        snapshotManager.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
             visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);
             countedTx.add(solidEntryPointHash);
         });
@@ -82,7 +82,7 @@ public class LedgerValidator {
 
                             boolean validBundle = false;
 
-                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotManager.getInitialSnapshot(), transactionViewModel.getHash());
+                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash());
                             /*
                             for(List<TransactionViewModel> transactions: bundleTransactions) {
                                 if (transactions.size() > 0) {
@@ -118,7 +118,7 @@ public class LedgerValidator {
                             }
                             if (!validBundle) {
                                 System.out.println(2);
-                                System.out.println(BundleValidator.validate(tangle, snapshotManager.getInitialSnapshot(), transactionViewModel.getHash(), true).size());
+                                System.out.println(BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash(), true).size());
                                 return null;
                             }
                         }
@@ -158,7 +158,7 @@ public class LedgerValidator {
                     if(transactionViewModel2.snapshotIndex() > index) {
                         resettedMilestones.add(transactionViewModel2.snapshotIndex());
                     }
-                    transactionViewModel2.setSnapshot(tangle, snapshotManager.getInitialSnapshot(), index);
+                    transactionViewModel2.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
                     messageQ.publish("sn %d %s %s %s %s %s", index, transactionViewModel2.getHash(),
                             transactionViewModel2.getAddressHash(),
@@ -171,13 +171,13 @@ public class LedgerValidator {
 
                 // if we reference sth before the local snapshot -> add it to the solid entry points
                 else {
-                    Snapshot initialSnapshot = snapshotManager.getInitialSnapshot();
+                    Snapshot initialSnapshot = snapshotProvider.getInitialSnapshot();
 
                     if (
                         transactionViewModel2.snapshotIndex() <= initialSnapshot.getIndex() &&
                         !initialSnapshot.hasSolidEntryPoint(transactionViewModel2.getHash())
                     ) {
-                        snapshotManager.getInitialSnapshot().getSolidEntryPoints().put(
+                        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().put(
                             transactionViewModel2.getHash(),
                             initialSnapshot.getIndex()
                         );
@@ -193,7 +193,7 @@ public class LedgerValidator {
 
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
         if(updateMilestoneTransaction(milestone)) {
-            snapshotManager.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
+            snapshotProvider.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
 
             return true;
         }
@@ -217,13 +217,13 @@ public class LedgerValidator {
                 milestoneTracker.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
             }
 
-            snapshotManager.getLatestSnapshot().lockRead();
+            snapshotProvider.getLatestSnapshot().lockRead();
             try {
                 Hash tail = transactionViewModel.getHash();
-                Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotManager.getLatestSnapshot().getIndex(), true);
+                Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotProvider.getLatestSnapshot().getIndex(), true);
                 successfullyProcessed = balanceChanges != null;
                 if(successfullyProcessed) {
-                    successfullyProcessed = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
+                    successfullyProcessed = snapshotProvider.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
                     if(successfullyProcessed) {
                         updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
 
@@ -233,7 +233,7 @@ public class LedgerValidator {
                     }
                 }
             } finally {
-                snapshotManager.getLatestSnapshot().unlockRead();
+                snapshotProvider.getLatestSnapshot().unlockRead();
             }
         }
 
@@ -259,7 +259,7 @@ public class LedgerValidator {
             return true;
         }
         Set<Hash> visitedHashes = new HashSet<>(approvedHashes);
-        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, snapshotManager.getLatestSnapshot().getIndex(), false);
+        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, snapshotProvider.getLatestSnapshot().getIndex(), false);
         if (currentState == null) {
             return false;
         }
@@ -268,7 +268,7 @@ public class LedgerValidator {
                 currentState.putIfAbsent(key, value);
             }
         });
-        boolean isConsistent = snapshotManager.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(currentState)).isConsistent();
+        boolean isConsistent = snapshotProvider.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(currentState)).isConsistent();
         if (isConsistent) {
             diff.putAll(currentState);
             approvedHashes.addAll(visitedHashes);

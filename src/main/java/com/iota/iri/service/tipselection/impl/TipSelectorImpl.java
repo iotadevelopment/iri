@@ -4,7 +4,7 @@ import com.iota.iri.LedgerValidator;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.tipselection.*;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
@@ -28,11 +28,11 @@ public class TipSelectorImpl implements TipSelector {
 
     private final LedgerValidator ledgerValidator;
     private final Tangle tangle;
-    private final SnapshotManagerImpl snapshotManager;
+    private final SnapshotProvider snapshotProvider;
     private final TipSelConfig config;
 
     public TipSelectorImpl(Tangle tangle,
-                           SnapshotManagerImpl snapshotManager,
+                           SnapshotProvider snapshotProvider,
                            LedgerValidator ledgerValidator,
                            EntryPointSelector entryPointSelector,
                            RatingCalculator ratingCalculator,
@@ -47,7 +47,7 @@ public class TipSelectorImpl implements TipSelector {
         //used by walkValidator
         this.ledgerValidator = ledgerValidator;
         this.tangle = tangle;
-        this.snapshotManager = snapshotManager;
+        this.snapshotProvider = snapshotProvider;
         this.config = config;
     }
 
@@ -70,7 +70,7 @@ public class TipSelectorImpl implements TipSelector {
     @Override
     public List<Hash> getTransactionsToApprove(int depth, Optional<Hash> reference) throws Exception {
         try {
-            snapshotManager.getLatestSnapshot().lockRead();
+            snapshotProvider.getLatestSnapshot().lockRead();
 
             //preparation
             Hash entryPoint = entryPointSelector.getEntryPoint(depth);
@@ -78,7 +78,7 @@ public class TipSelectorImpl implements TipSelector {
 
             //random walk
             List<Hash> tips = new LinkedList<>();
-            WalkValidator walkValidator = new WalkValidatorImpl(tangle, snapshotManager, ledgerValidator, config);
+            WalkValidator walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerValidator, config);
             Hash tip = walker.walk(entryPoint, rating, walkValidator);
             tips.add(tip);
 
@@ -98,7 +98,7 @@ public class TipSelectorImpl implements TipSelector {
 
             return tips;
         } finally {
-            snapshotManager.getLatestSnapshot().unlockRead();
+            snapshotProvider.getLatestSnapshot().unlockRead();
         }
     }
 

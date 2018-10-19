@@ -3,12 +3,12 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.ApproveeViewModel;
-import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
@@ -32,12 +32,12 @@ public class CumulativeWeightCalculatorTest {
     private static Tangle tangle;
     private static CumulativeWeightCalculator cumulativeWeightCalculator;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
-    private static SnapshotManagerImpl snapshotManager;
+    private static SnapshotProvider snapshotProvider;
 
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
-        snapshotManager.shutDown();
+        snapshotProvider.shutdown();
         dbFolder.delete();
         logFolder.delete();
     }
@@ -50,8 +50,8 @@ public class CumulativeWeightCalculatorTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
-        cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotManager);
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
+        cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
     }
 
     @Test
@@ -66,11 +66,11 @@ public class CumulativeWeightCalculatorTest {
                 transaction1.getHash()), getRandomTransactionHash());
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction2.getHash(),
                 transaction3.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
-        transaction4.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
         UnIterableMap<HashId, Integer> txToCw = cumulativeWeightCalculator.calculate(transaction.getHash());
 
         Assert.assertEquals(String.format(TX_CUMULATIVE_WEIGHT_IS_NOT_AS_EXPECTED_FORMAT, 4),
@@ -95,10 +95,10 @@ public class CumulativeWeightCalculatorTest {
                 transaction.getHash()), getRandomTransactionHash());
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction1.getHash(),
                 transaction2.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         log.debug("printing transaction in diamond shape \n                      {} \n{}  {}\n                      {}",
                 transaction.getHash(), transaction1.getHash(), transaction2.getHash(), transaction3.getHash());
@@ -129,11 +129,11 @@ public class CumulativeWeightCalculatorTest {
                 transaction2.getHash(), transaction2.getHash()), getRandomTransactionHash());
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 transaction3.getHash(), transaction3.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
-        transaction4.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
 
         log.info(String.format("Linear ordered hashes from tip %.4s, %.4s, %.4s, %.4s, %.4s", transaction4.getHash(),
                 transaction3.getHash(), transaction2.getHash(), transaction1.getHash(), transaction.getHash()));
@@ -171,13 +171,13 @@ public class CumulativeWeightCalculatorTest {
         transaction6 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 transaction4.getHash(), transaction5.getHash()), getRandomTransactionHash());
 
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
-        transaction4.store(tangle, snapshotManager);
-        transaction5.store(tangle, snapshotManager);
-        transaction6.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction5.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction6.store(tangle, snapshotProvider.getInitialSnapshot());
 
         log.debug("printing transactions in order \n{}\n{}\n{}\n{}\n{}\n{}\n{}",
                 transaction.getHash(), transaction1.getHash(), transaction2.getHash(), transaction3.getHash(),
@@ -206,7 +206,7 @@ public class CumulativeWeightCalculatorTest {
         Hash[] hashes = new Hash[100];
         hashes[0] = getRandomTransactionHash();
         TransactionViewModel transactionViewModel1 = new TransactionViewModel(getRandomTransactionTrits(), hashes[0]);
-        transactionViewModel1.store(tangle, snapshotManager);
+        transactionViewModel1.store(tangle, snapshotProvider.getInitialSnapshot());
         //constant seed for consistent results
         Random random = new Random(181783497276652981L);
         for (int i = 1; i < hashes.length; i++) {
@@ -214,7 +214,7 @@ public class CumulativeWeightCalculatorTest {
             TransactionViewModel transactionViewModel = new TransactionViewModel(
                     getRandomTransactionWithTrunkAndBranch(hashes[i - random.nextInt(i) - 1],
                             hashes[i - random.nextInt(i) - 1]), hashes[i]);
-            transactionViewModel.store(tangle, snapshotManager);
+            transactionViewModel.store(tangle, snapshotProvider.getInitialSnapshot());
             log.debug(String.format("current transaction %.4s \n with trunk %.4s \n and branch %.4s", hashes[i],
                     transactionViewModel.getTrunkTransactionHash(),
                     transactionViewModel.getBranchTransactionHash()));
@@ -239,7 +239,7 @@ public class CumulativeWeightCalculatorTest {
         Hash randomTransactionHash = getRandomTransactionHash();
         transaction = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(randomTransactionHash, randomTransactionHash), randomTransactionHash);
 
-        transaction.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
 
         UnIterableMap<HashId, Integer> txToCw = cumulativeWeightCalculator.calculate(transaction.getHash());
         Assert.assertEquals("There should be only one tx in the map", 1, txToCw.size());
@@ -248,7 +248,7 @@ public class CumulativeWeightCalculatorTest {
 
     @Test
     public void testTangleWithCircle2() throws Exception {
-        TransactionViewModel transaction, transaction1, transaction2, transaction3, transaction4;
+        TransactionViewModel transaction, transaction1, transaction2, transaction3;
         Hash randomTransactionHash2 = getRandomTransactionHash();
         transaction = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 randomTransactionHash2, randomTransactionHash2), getRandomTransactionHash());
@@ -259,10 +259,10 @@ public class CumulativeWeightCalculatorTest {
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 transaction.getHash(), transaction.getHash()), getRandomTransactionHash());
 
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         cumulativeWeightCalculator.calculate(transaction.getHash());
         //No infinite loop (which will probably result in an overflow exception) means test has passed
@@ -279,10 +279,10 @@ public class CumulativeWeightCalculatorTest {
                 transaction.getHash()), transactionHash2);
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction1.getHash(),
                 transaction2.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         log.debug("printing transaction in diamond shape \n                      {} \n{}  {}\n                      {}",
                 transaction.getHash(), transaction1.getHash(), transaction2.getHash(), transaction3.getHash());
@@ -324,12 +324,12 @@ public class CumulativeWeightCalculatorTest {
     private long ratingTime(int size) throws Exception {
         Hash[] hashes = new Hash[size];
         hashes[0] = getRandomTransactionHash();
-        new TransactionViewModel(getRandomTransactionTrits(), hashes[0]).store(tangle, snapshotManager);
+        new TransactionViewModel(getRandomTransactionTrits(), hashes[0]).store(tangle, snapshotProvider.getInitialSnapshot());
         Random random = new Random();
         for (int i = 1; i < hashes.length; i++) {
             hashes[i] = getRandomTransactionHash();
             new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(hashes[i - random.nextInt(i) - 1],
-                    hashes[i - random.nextInt(i) - 1]), hashes[i]).store(tangle, snapshotManager);
+                    hashes[i - random.nextInt(i) - 1]), hashes[i]).store(tangle, snapshotProvider.getInitialSnapshot());
         }
         long start = System.currentTimeMillis();
 

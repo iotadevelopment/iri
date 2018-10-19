@@ -6,9 +6,8 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.Snapshot;
-import com.iota.iri.service.snapshot.SnapshotManager;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -29,8 +28,7 @@ public class TransactionValidatorTest {
   private static final TemporaryFolder dbFolder = new TemporaryFolder();
   private static final TemporaryFolder logFolder = new TemporaryFolder();
   private static Tangle tangle;
-  private static SnapshotManager snapshotManager;
-  private static Snapshot initialSnapshot;
+  private static SnapshotProvider snapshotProvider;
   private static MilestoneTracker milestoneTracker;
   private static TransactionValidator txValidator;
 
@@ -39,18 +37,17 @@ public class TransactionValidatorTest {
     dbFolder.create();
     logFolder.create();
     tangle = new Tangle();
-    snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
-    initialSnapshot = snapshotManager.getInitialSnapshot();
+    snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
     tangle.addPersistenceProvider(
         new RocksDBPersistenceProvider(
             dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
     tangle.init();
     TipsViewModel tipsViewModel = new TipsViewModel();
     MessageQ messageQ = Mockito.mock(MessageQ.class);
-    TransactionRequester txRequester = new TransactionRequester(tangle, initialSnapshot, messageQ);
-    txValidator = new TransactionValidator(tangle, initialSnapshot, tipsViewModel, txRequester);
+    TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
+    txValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, txRequester);
     txValidator.setMwm(false, MAINNET_MWM);
-    milestoneTracker = new MilestoneTracker(tangle, snapshotManager, txValidator, Mockito.mock(TransactionRequester.class), messageQ, new MainnetConfig());
+    milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, txValidator, Mockito.mock(TransactionRequester.class), messageQ, new MainnetConfig());
     txValidator.init(false, MAINNET_MWM, milestoneTracker);
   }
 
@@ -83,7 +80,7 @@ public class TransactionValidatorTest {
   }
 
   @Test
-  public void validateBytesWithNewCurl() throws Exception {
+  public void validateBytesWithNewCurl() {
     byte[] trits = getRandomTransactionTrits();
     Converter.copyTrits(0, trits, 0, trits.length);
     byte[] bytes = Converter.allocateBytesForTrits(trits.length);
@@ -126,9 +123,9 @@ public class TransactionValidatorTest {
     System.arraycopy(branchTx.getHash().trits(), 0, childTx, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_OFFSET, TransactionViewModel.BRANCH_TRANSACTION_TRINARY_SIZE);
     tx = new TransactionViewModel(childTx, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, childTx));
 
-    trunkTx.store(tangle, initialSnapshot);
-    branchTx.store(tangle, initialSnapshot);
-    tx.store(tangle, initialSnapshot);
+    trunkTx.store(tangle, snapshotProvider.getInitialSnapshot());
+    branchTx.store(tangle, snapshotProvider.getInitialSnapshot());
+    tx.store(tangle, snapshotProvider.getInitialSnapshot());
 
     return tx;
   }
@@ -137,25 +134,25 @@ public class TransactionValidatorTest {
     public void testTransactionPropagation() throws Exception {
         TransactionViewModel leftChildLeaf = TransactionTestUtils.createTransactionWithTrytes("CHILDTX");
         leftChildLeaf.updateSolid(true);
-        leftChildLeaf.store(tangle, initialSnapshot);
+        leftChildLeaf.store(tangle, snapshotProvider.getInitialSnapshot());
 
         TransactionViewModel rightChildLeaf = TransactionTestUtils.createTransactionWithTrytes("CHILDTWOTX");
         rightChildLeaf.updateSolid(true);
-        rightChildLeaf.store(tangle, initialSnapshot);
+        rightChildLeaf.store(tangle, snapshotProvider.getInitialSnapshot());
 
         TransactionViewModel parent = TransactionTestUtils.createTransactionWithTrunkAndBranch("PARENT",
                 leftChildLeaf.getHash(), rightChildLeaf.getHash());
         parent.updateSolid(false);
-        parent.store(tangle, initialSnapshot);
+        parent.store(tangle, snapshotProvider.getInitialSnapshot());
 
         TransactionViewModel parentSibling = TransactionTestUtils.createTransactionWithTrytes("PARENTLEAF");
         parentSibling.updateSolid(true);
-        parentSibling.store(tangle, initialSnapshot);
+        parentSibling.store(tangle, snapshotProvider.getInitialSnapshot());
 
         TransactionViewModel grandParent = TransactionTestUtils.createTransactionWithTrunkAndBranch("GRANDPARENT", parent.getHash(),
                         parentSibling.getHash());
         grandParent.updateSolid(false);
-        grandParent.store(tangle, initialSnapshot);
+        grandParent.store(tangle, snapshotProvider.getInitialSnapshot());
 
         txValidator.addSolidTransaction(leftChildLeaf.getHash());
         while (!txValidator.isNewSolidTxSetsEmpty()) {
@@ -172,25 +169,25 @@ public class TransactionValidatorTest {
   public void testTransactionPropagationFailure() throws Exception {
     TransactionViewModel leftChildLeaf = new TransactionViewModel(getRandomTransactionTrits(), getRandomTransactionHash());
     leftChildLeaf.updateSolid(true);
-    leftChildLeaf.store(tangle, initialSnapshot);
+    leftChildLeaf.store(tangle, snapshotProvider.getInitialSnapshot());
 
     TransactionViewModel rightChildLeaf = new TransactionViewModel(getRandomTransactionTrits(), getRandomTransactionHash());
     rightChildLeaf.updateSolid(true);
-    rightChildLeaf.store(tangle, initialSnapshot);
+    rightChildLeaf.store(tangle, snapshotProvider.getInitialSnapshot());
 
     TransactionViewModel parent = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(leftChildLeaf.getHash(),
             rightChildLeaf.getHash()), getRandomTransactionHash());
     parent.updateSolid(false);
-    parent.store(tangle, initialSnapshot);
+    parent.store(tangle, snapshotProvider.getInitialSnapshot());
 
     TransactionViewModel parentSibling = new TransactionViewModel(getRandomTransactionTrits(), getRandomTransactionHash());
     parentSibling.updateSolid(false);
-    parentSibling.store(tangle, initialSnapshot);
+    parentSibling.store(tangle, snapshotProvider.getInitialSnapshot());
 
     TransactionViewModel grandParent = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(parent.getHash(),
             parentSibling.getHash()), getRandomTransactionHash());
     grandParent.updateSolid(false);
-    grandParent.store(tangle, initialSnapshot);
+    grandParent.store(tangle, snapshotProvider.getInitialSnapshot());
 
     txValidator.milestone = milestoneTracker;
     txValidator.addSolidTransaction(leftChildLeaf.getHash());
@@ -208,7 +205,7 @@ public class TransactionValidatorTest {
     byte[] trits = getRandomTransactionTrits();
     TransactionViewModel tx = new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
 
-    tx.store(tangle, initialSnapshot);
+    tx.store(tangle, snapshotProvider.getInitialSnapshot());
 
     return tx;
   }

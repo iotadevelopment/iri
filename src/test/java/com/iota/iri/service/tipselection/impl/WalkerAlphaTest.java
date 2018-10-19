@@ -1,11 +1,11 @@
 package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.conf.MainnetConfig;
-import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -31,15 +31,15 @@ public class WalkerAlphaTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static SnapshotManagerImpl snapshotManager;
+    private static SnapshotProvider snapshotProvider;
     private static WalkerAlpha walker;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
-        snapshotManager.shutDown();
         dbFolder.delete();
+        snapshotProvider.shutdown();
     }
 
     @BeforeClass
@@ -50,7 +50,7 @@ public class WalkerAlphaTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
         walker = new WalkerAlpha((Optional::of), tangle, messageQ, new Random(1), new MainnetConfig());
@@ -69,10 +69,10 @@ public class WalkerAlphaTest {
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction.getHash(),
                 transaction.getHash()), getRandomTransactionHash());
 
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);
@@ -81,7 +81,7 @@ public class WalkerAlphaTest {
         //add 4 after the rating was calculated
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction.getHash(),
                 transaction.getHash()), getRandomTransactionHash());
-        transaction4.store(tangle, snapshotManager);
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
 
         for (int i=0; i < 100; i++) {
             //select
@@ -106,10 +106,10 @@ public class WalkerAlphaTest {
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction.getHash(),
                 transaction.getHash()), getRandomTransactionHash());
 
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);
@@ -149,10 +149,10 @@ public class WalkerAlphaTest {
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction.getHash(),
                 transaction.getHash()), getRandomTransactionHash());
 
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);
@@ -163,7 +163,7 @@ public class WalkerAlphaTest {
         //add 4 after the rating was calculated
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction.getHash(),
                 transaction.getHash()), getRandomTransactionHash());
-        transaction4.store(tangle, snapshotManager);
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
 
         Map<Hash, Integer> counters = new HashMap<>(rating.size());
         int iterations = 100;
@@ -197,11 +197,11 @@ public class WalkerAlphaTest {
                 transaction1.getHash()), getRandomTransactionHash());
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction2.getHash(),
                 transaction3.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
-        transaction4.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);
@@ -225,10 +225,10 @@ public class WalkerAlphaTest {
                 transaction.getHash()), getRandomTransactionHash());
         transaction3 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(transaction1.getHash(),
                 transaction2.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);
@@ -254,11 +254,11 @@ public class WalkerAlphaTest {
                 transaction2.getHash(), transaction2.getHash()), getRandomTransactionHash());
         transaction4 = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 transaction3.getHash(), transaction3.getHash()), getRandomTransactionHash());
-        transaction.store(tangle, snapshotManager);
-        transaction1.store(tangle, snapshotManager);
-        transaction2.store(tangle, snapshotManager);
-        transaction3.store(tangle, snapshotManager);
-        transaction4.store(tangle, snapshotManager);
+        transaction.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction2.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
+        transaction4.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //calculate rating
         RatingCalculator ratingCalculator = new RatingOne(tangle);

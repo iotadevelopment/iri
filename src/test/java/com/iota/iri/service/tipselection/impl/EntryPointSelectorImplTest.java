@@ -2,12 +2,12 @@ package com.iota.iri.service.tipselection.impl;
 
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.conf.MainnetConfig;
-import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
-import com.iota.iri.service.snapshot.impl.SnapshotManagerImpl;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.model.TransactionHash;
+import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -25,12 +25,12 @@ public class EntryPointSelectorImplTest {
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
 
-    private static SnapshotManagerImpl snapshotManager;
+    private static SnapshotProvider snapshotProvider;
 
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
-        snapshotManager = new SnapshotManagerImpl(tangle, new TipsViewModel(), new MainnetConfig()).initSnapshots();
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
@@ -42,6 +42,7 @@ public class EntryPointSelectorImplTest {
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
+        snapshotProvider.shutdown();
         dbFolder.delete();
         logFolder.delete();
     }
@@ -50,7 +51,7 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointAWithoutTangleData() throws Exception {
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider.getLatestSnapshot());
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
@@ -62,15 +63,15 @@ public class EntryPointSelectorImplTest {
         mockTangleBehavior(milestoneHash);
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotManager);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider.getLatestSnapshot());
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);
     }
 
     private void mockMilestoneTrackerBehavior(int latestSolidSubtangleMilestoneIndex, Hash latestSolidSubtangleMilestone) {
-        snapshotManager.getLatestSnapshot().setIndex(latestSolidSubtangleMilestoneIndex);
-        snapshotManager.getLatestSnapshot().setHash(latestSolidSubtangleMilestone);
+        snapshotProvider.getLatestSnapshot().setIndex(latestSolidSubtangleMilestoneIndex);
+        snapshotProvider.getLatestSnapshot().setHash(latestSolidSubtangleMilestone);
     }
 
     private void mockTangleBehavior(Hash milestoneModelHash) throws Exception {
