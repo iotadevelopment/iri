@@ -14,14 +14,6 @@ import java.util.Map;
  * After the local snapshot was taken it also triggers the pruning of old transactions to clean up the database.
  */
 public interface LocalSnapshotManager {
-    Snapshot generateLocalSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException;
-
-    void takeLocalSnapshot() throws SnapshotException;
-
-    Map<Hash, Integer> generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException;
-
-    Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException;
-
     /**
      * Starts the automatic creation of local {@link Snapshot}s by spawning a background {@link Thread}, that
      * periodically checks if the last snapshot is older than {@link SnapshotConfig#getLocalSnapshotsIntervalSynced()}.
