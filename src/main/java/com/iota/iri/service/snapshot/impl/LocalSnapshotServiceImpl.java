@@ -82,6 +82,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
                 if (!newSolidEntryPoints.containsKey(transactionHash)) {
                     try {
+                        System.out.println("CLEANUP SOLID ENTRY POINT1: " + transactionHash);
                         // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise
                         // let the MilestonePrunerJob do this
                         if (TransactionViewModel.fromHash(tangle, transactionHash).getType() ==
