@@ -79,6 +79,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
             Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
 
+            System.out.println(oldSolidEntryPoints.size() + " / " + newSolidEntryPoints.size());
+
             // clean up the deleted solid entry points
             oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
                 if (!newSolidEntryPoints.containsKey(transactionHash)) {
