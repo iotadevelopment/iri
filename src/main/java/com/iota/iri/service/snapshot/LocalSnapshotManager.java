@@ -2,10 +2,6 @@ package com.iota.iri.service.snapshot;
 
 import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.SnapshotConfig;
-import com.iota.iri.controllers.MilestoneViewModel;
-import com.iota.iri.model.Hash;
-
-import java.util.Map;
 
 /**
  * Represents the manager for local {@link Snapshot}s that takes care of periodically creating a new {@link Snapshot}

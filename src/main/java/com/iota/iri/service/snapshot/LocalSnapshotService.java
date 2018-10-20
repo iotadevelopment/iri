@@ -9,6 +9,9 @@ import com.iota.iri.storage.Tangle;
 import java.util.Map;
 
 public interface LocalSnapshotService {
+    void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
+            TransactionPruner transactionPruner) throws SnapshotException;
+
     Snapshot generateLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
             MilestoneViewModel targetMilestone) throws SnapshotException;
 
@@ -17,7 +20,4 @@ public interface LocalSnapshotService {
 
     Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config, MilestoneViewModel targetMilestone)
             throws SnapshotException;
-
-    void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
-            TransactionPruner transactionPruner) throws SnapshotException;
 }

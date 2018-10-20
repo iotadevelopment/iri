@@ -50,6 +50,75 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
+    public void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config, TransactionPruner transactionPruner) throws SnapshotException {
+        // load necessary configuration parameters
+        String basePath = config.getLocalSnapshotsBasePath();
+        int snapshotDepth = config.getLocalSnapshotsDepth();
+
+        // determine our target milestone
+        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
+
+        // try to load the milestone
+        MilestoneViewModel targetMilestone;
+        try {
+            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
+        } catch (Exception e) {
+            throw new SnapshotException("could not load the target milestone", e);
+        }
+
+        // if we couldn't find a milestone with the given index -> abort
+        if (targetMilestone == null) {
+            throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
+        }
+
+        Snapshot newSnapshot;
+        try {
+            newSnapshot = generateLocalSnapshot(tangle, snapshotProvider, config, targetMilestone);
+
+            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
+            Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
+
+            // clean up the deleted solid entry points
+            oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
+                if (!newSolidEntryPoints.containsKey(transactionHash)) {
+                    try {
+                        // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise
+                        // let the MilestonePrunerJob do this
+                        if (TransactionViewModel.fromHash(tangle, transactionHash).getType() ==
+                                TransactionViewModel.PREFILLED_SLOT) {
+                            System.out.println("CLEANUP SOLID ENTRY POINT: " + transactionHash);
+                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(transactionHash));
+                        }
+                    } catch (Exception e) {
+                        log.error("failed to add cleanup job to garbage collector", e);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            throw new SnapshotException("could not generate the snapshot", e);
+        }
+
+        try {
+            int targetIndex = targetMilestone.index() - config.getLocalSnapshotsPruningDelay();
+            int startingIndex = config.getMilestoneStartIndex() + 1;
+
+            if (targetIndex >= startingIndex) {
+                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - config.getLocalSnapshotsPruningDelay()));
+            }
+
+        } catch (TransactionPruningException e) {
+            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
+        }
+
+        newSnapshot.writeToDisk(basePath);
+
+        snapshotProvider.getInitialSnapshot().update(newSnapshot);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public Snapshot generateLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
             MilestoneViewModel targetMilestone) throws SnapshotException {
 
@@ -93,80 +162,11 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config, TransactionPruner transactionPruner) throws SnapshotException {
-        // load necessary configuration parameters
-        String basePath = config.getLocalSnapshotsBasePath();
-        int snapshotDepth = config.getLocalSnapshotsDepth();
-
-        // determine our target milestone
-        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
-
-        // try to load the milestone
-        MilestoneViewModel targetMilestone;
-        try {
-            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
-        } catch (Exception e) {
-            throw new SnapshotException("could not load the target milestone", e);
-        }
-
-        // if we couldn't find a milestone with the given index -> abort
-        if (targetMilestone == null) {
-            throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
-        }
-
-        Snapshot newSnapshot;
-        try {
-            newSnapshot = generateLocalSnapshot(tangle, snapshotProvider, config, targetMilestone);
-
-            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
-            Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
-
-            // clean up the deleted solid entry points
-            oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
-                if (!newSolidEntryPoints.containsKey(transactionHash)) {
-                    try {
-                        // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise
-                        // let the MilestonePrunerJob do this
-                        if (TransactionViewModel.fromHash(tangle, transactionHash).getType() ==
-                                TransactionViewModel.PREFILLED_SLOT) {
-
-                            transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(transactionHash));
-                        }
-                    } catch (Exception e) {
-                        log.error("failed to add cleanup job to garbage collector", e);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            throw new SnapshotException("could not generate the snapshot", e);
-        }
-
-        try {
-            int targetIndex = targetMilestone.index() - config.getLocalSnapshotsPruningDelay();
-            int startingIndex = config.getMilestoneStartIndex() + 1;
-
-            if (targetIndex >= startingIndex) {
-                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - config.getLocalSnapshotsPruningDelay()));
-            }
-
-        } catch (TransactionPruningException e) {
-            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
-        }
-
-        newSnapshot.writeToDisk(basePath);
-
-        snapshotProvider.getInitialSnapshot().update(newSnapshot);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
     public Map<Hash, Integer> generateSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone) throws SnapshotException {
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
-        processOldSolidEntryPoints(snapshotProvider, tangle, targetMilestone, solidEntryPoints);
-        processNewSolidEntryPoints(snapshotProvider, tangle, targetMilestone, solidEntryPoints);
+        processOldSolidEntryPoints(tangle, snapshotProvider, targetMilestone, solidEntryPoints);
+        processNewSolidEntryPoints(tangle, snapshotProvider, targetMilestone, solidEntryPoints);
 
         solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
@@ -291,7 +291,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         return false;
     }
 
-    private void processOldSolidEntryPoints(SnapshotProvider snapshotProvider, Tangle tangle, MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
+    private void processOldSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
         ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger(
                 "Taking local snapshot [2/4 analyzing old solid entry points]", log
         ).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
@@ -309,7 +309,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         oldSolidEntryPointsProgressLogger.finish();
     }
 
-    private void processNewSolidEntryPoints(SnapshotProvider snapshotProvider, Tangle tangle, MilestoneViewModel targetMilestone,
+    private void processNewSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone,
             Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
 
         ProgressLogger progressLogger = new ProgressLogger(
