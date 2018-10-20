@@ -73,9 +73,10 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
         Snapshot newSnapshot;
         try {
+            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
+
             newSnapshot = generateLocalSnapshot(tangle, snapshotProvider, config, targetMilestone);
 
-            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
             Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
 
             // clean up the deleted solid entry points
