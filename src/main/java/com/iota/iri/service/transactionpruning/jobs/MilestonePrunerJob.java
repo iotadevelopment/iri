@@ -5,8 +5,8 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.IntegerIndex;
 import com.iota.iri.model.persistables.Milestone;
 import com.iota.iri.model.persistables.Transaction;
-import com.iota.iri.service.snapshot.LocalSnapshotManager;
-import com.iota.iri.service.transactionpruning.*;
+import com.iota.iri.service.transactionpruning.TransactionPrunerJobStatus;
+import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.storage.Indexable;
 import com.iota.iri.storage.Persistable;
 import com.iota.iri.utils.Pair;
@@ -15,12 +15,13 @@ import com.iota.iri.utils.dag.DAGHelper;
 import java.util.*;
 
 /**
- * Represents a cleanup job for the {@link TransactionPruner} that removes milestones and all of their directly and
- * indirectly referenced transactions (and the orphaned subtangles branching off of the deleted transactions).
+ * Represents a cleanup job for {@link com.iota.iri.service.transactionpruning.TransactionPruner}s that removes
+ * milestones and all of their directly and indirectly referenced transactions (and the orphaned subtangles branching
+ * off of the deleted transactions).
  *
- * It is used by the {@link LocalSnapshotManager} to clean up milestones prior to a snapshot.
- * Even though it defines a range of milestones that shall be deleted, it gets processed one milestone at a time,
- * persisting the progress after each step.
+ * It is used by the {@link com.iota.iri.service.snapshot.LocalSnapshotManager} to clean up milestones prior to a
+ * snapshot. Even though it defines a range of milestones that shall be deleted, it gets processed one milestone at a
+ * time, persisting the progress after each step.
  */
 public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     /**
@@ -53,7 +54,8 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
     public static MilestonePrunerJob parse(String input) throws TransactionPruningException {
         String[] parts = input.split(";");
         if(parts.length == 3) {
-            return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]), Integer.valueOf(parts[2]));
+            return new MilestonePrunerJob(Integer.valueOf(parts[0]), Integer.valueOf(parts[1]),
+                    Integer.valueOf(parts[2]));
         }
 
         throw new TransactionPruningException("failed to parse TransactionPruner file - invalid input: " + input);
@@ -74,9 +76,10 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * Creates a job that cleans all milestones prior (and including) the {@code startingIndex} and that is set to have
      * progressed already to the given {@code currentIndex}.
      *
-     * Since cleanup jobs can be consolidated (to reduce the size of the {@link TransactionPruner} state file) and
-     * restored (after IRI restarts), we need to be able provide both parameters even tho the job usually always
-     * "starts" with its {@code currentIndex} being equal to the {@code startingIndex}.
+     * Since cleanup jobs can be consolidated (to reduce the size of the
+     * {@link com.iota.iri.service.transactionpruning.TransactionPruner} state file) and restored (after IRI restarts),
+     * we need to be able provide both parameters even tho the job usually always "starts" with its {@code currentIndex}
+     * being equal to the {@code startingIndex}.
      *
      * If the {@link #currentIndex} is bigger than the {@link #targetIndex} we set the state to DONE (necessary when
      * restoring the job from the state file).
@@ -243,7 +246,9 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * @return list of elements that shall be deleted from the database
      * @throws TransactionPruningException if anything goes wrong while collecting the elements
      */
-    private List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws TransactionPruningException {
+    private List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws
+            TransactionPruningException {
+
         try {
             List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
 
