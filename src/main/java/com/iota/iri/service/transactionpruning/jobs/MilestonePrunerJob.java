@@ -119,10 +119,7 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
                         }
                     }
 
-                    // persist changes if the job was executed by a TransactionPruner (tests might run it standalone)
-                    if (getTransactionPruner() != null) {
-                        getTransactionPruner().saveState();
-                    }
+                    getTransactionPruner().saveState();
                 }
             } catch (TransactionPruningException e) {
                 setStatus(TransactionPrunerJobStatus.FAILED);
@@ -201,63 +198,72 @@ public class MilestonePrunerJob extends AbstractTransactionPrunerJob {
      * This method takes care of cleaning up a single milestone and all of its transactions and performs the actual
      * database operations.
      *
-     * This method performs the deletions in an atomic way, which means that either the full processing succeeds or
-     * fails. It does that by iterating through all the transactions that belong to the current milestone and first
-     * collecting them in a List of items to delete. Once all transactions where found we issue a batchDelete.
+     * It performs the deletions in an atomic way, which means that either the full processing succeeds or fails.
      *
-     * While processing the transactions that are directly or indirectly referenced by the chosen milestone, we also
-     * issue additional {@link UnconfirmedSubtanglePrunerJob}s that remove the orphaned parts of the tangle that branch
-     * off the deleted transactions because they would otherwise loose their connection to the rest of the tangle unless
-     * they are branching off a solid entry point (in which case we wait with the deletion until the solid entry point
-     * becomes irrelevant).
-     *
-     * After removing the entries from the database it also removes the entries from the relevant runtime caches.
-     *
-     * Note: We do not delete unconfirmed subtangles while they are still part of the solid entry points.
+     * We first retrieve the elements that shall be deleted and then analyze them before removing them from the
+     * database. While processing them, we issue additional {@link UnconfirmedSubtanglePrunerJob}s that remove the
+     * orphaned parts of the tangle that branch off the deleted transactions because they would otherwise loose their
+     * connection to the rest of the tangle unless they are branching off a solid entry point (in which case we wait
+     * with the deletion until the solid entry point expires).
      *
      * @throws TransactionPruningException if something goes wrong while cleaning up the milestone
      */
     private void cleanupMilestoneTransactions() throws TransactionPruningException {
         try {
-            // collect elements to delete
-            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
-            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(getTangle(), getCurrentIndex());
-            if (milestoneViewModel != null) {
-                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
-                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
-                if (!getSnapshot().hasSolidEntryPoint(milestoneViewModel.getHash())) {
-                    getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(milestoneViewModel.getHash()));
-                }
-                DAGHelper.get(getTangle()).traverseApprovees(
-                milestoneViewModel.getHash(),
-                approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
-                approvedTransaction -> {
-                    elementsToDelete.add(new Pair<>(approvedTransaction.getHash(), Transaction.class));
+            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = getElementsToDelete();
 
-                    if (!getSnapshot().hasSolidEntryPoint(approvedTransaction.getHash())) {
-                        try {
-                            getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob(approvedTransaction.getHash()));
-                        } catch(TransactionPruningException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }
-                );
-            }
-
-            // clean database entries
-            getTangle().deleteBatch(elementsToDelete);
-
-            // clean runtime caches
             elementsToDelete.forEach(element -> {
                 if(Transaction.class.equals(element.hi)) {
                     getTipsViewModel().removeTipHash((Hash) element.low);
+
+                    if (!getSnapshot().hasSolidEntryPoint((Hash) element.low)) {
+                        try {
+                            getTransactionPruner().addJob(new UnconfirmedSubtanglePrunerJob((Hash) element.low));
+                        } catch (TransactionPruningException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
                 } else if(Milestone.class.equals(element.hi)) {
                     MilestoneViewModel.clear(((IntegerIndex) element.low).getValue());
                 }
             });
+
+            getTangle().deleteBatch(elementsToDelete);
         } catch(Exception e) {
             throw new TransactionPruningException("failed to cleanup milestone #" + getCurrentIndex(), e);
+        }
+    }
+
+    /**
+     * Collects all database items that belong to the current milestone and that shall be deleted.
+     *
+     * It does that by iterating through all the transactions that belong to the current milestone (that are directly or
+     * indirectly referenced by the chosen milestone) and collecting them in a List of items to delete.
+     *
+     * @return list of elements that shall be deleted from the database
+     * @throws TransactionPruningException if anything goes wrong while collecting the elements
+     */
+    private List<Pair<Indexable, ? extends Class<? extends Persistable>>> getElementsToDelete() throws TransactionPruningException {
+        try {
+            List<Pair<Indexable, ? extends Class<? extends Persistable>>> elementsToDelete = new ArrayList<>();
+
+            MilestoneViewModel milestoneViewModel = MilestoneViewModel.get(getTangle(), getCurrentIndex());
+            if (milestoneViewModel != null) {
+                elementsToDelete.add(new Pair<>(milestoneViewModel.getHash(), Transaction.class));
+                elementsToDelete.add(new Pair<>(new IntegerIndex(milestoneViewModel.index()), Milestone.class));
+
+                DAGHelper.get(getTangle()).traverseApprovees(
+                        milestoneViewModel.getHash(),
+                        approvedTransaction -> approvedTransaction.snapshotIndex() >= milestoneViewModel.index(),
+                        approvedTransaction -> elementsToDelete.add(
+                                new Pair<>(approvedTransaction.getHash(), Transaction.class)
+                        )
+                );
+            }
+
+            return elementsToDelete;
+        } catch (Exception e) {
+            throw new TransactionPruningException("failed to determine which elements to delete", e);
         }
     }
 }
