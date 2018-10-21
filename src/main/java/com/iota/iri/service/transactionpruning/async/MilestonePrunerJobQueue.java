@@ -2,7 +2,6 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
-import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJobStatus;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
@@ -51,55 +50,37 @@ public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
     /**
      * {@inheritDoc}
      *
-     * This queue will only accept {@link MilestonePrunerJob}s, since it is tailored to the logic related to cleaning up
-     * milestones.
-     *
      * Since the {@link MilestonePrunerJob}s can take a long time to finish, we try to consolidate the queue when we add
      * new jobs, so the state file doesn't get to big while the node is busy cleaning up the milestones. To do so, we
-     * first check if the job that shall be added isn't covered by existing cleanup jobs, yet. If it targets a milestone
-     * outside of the already covered range, we also check if the last existing job can be extended to cover the target
-     * milestone index of our new job.
+     * first check if the job that shall be added isn't covered by existing cleanup jobs, yet.
      *
-     * If the job can not be appended to an existing job, we add it to the end of our queue.
+     * If it targets a milestone outside of the already covered range, we first check if the last existing job can be
+     * extended to cover the target milestone index of our new job. If the job can not be appended to an existing job,
+     * we add it to the end of our queue.
      *
-     * @param newMilestonePrunerJob the {@link MilestonePrunerJob} that shall be added to the queue
+     * @param job the {@link MilestonePrunerJob} that shall be added to the queue
      * @throws TransactionPruningException if the given job is no {@link MilestonePrunerJob}
      */
     @Override
-    public void addJob(MilestonePrunerJob newMilestonePrunerJob) throws TransactionPruningException {
+    public void addJob(MilestonePrunerJob job) throws TransactionPruningException {
         synchronized (jobs) {
             MilestonePrunerJob lastMilestonePrunerJob = jobs.peekLast();
 
-            // determine where the last job stops / stopped cleaning up
-            int lastTargetIndex = lastMilestonePrunerJob != null
-                                ? lastMilestonePrunerJob.getTargetIndex()
-                                : youngestFullyCleanedMilestoneIndex;
+            if (adjustedRangeCoversNewMilestones(job, lastMilestonePrunerJob)) {
+                if (lastMilestonePrunerJob != null) {
+                    // synchronize the status check so we can be 100% sure, that the job will see our modification
+                    // BEFORE it finishes and leaves the processing loop
+                    synchronized (lastMilestonePrunerJob) {
+                        if (lastMilestonePrunerJob.getStatus() != TransactionPrunerJobStatus.DONE) {
+                            lastMilestonePrunerJob.setTargetIndex(job.getTargetIndex());
 
-            // if the cleanup target of our job is covered already -> don't add
-            if (newMilestonePrunerJob.getTargetIndex() <= lastTargetIndex) {
-                return;
-            }
-
-            // adjust the job to reflect the progress that was / will be made by previous jobs in the queue
-            if (lastTargetIndex >= newMilestonePrunerJob.getStartingIndex()) {
-                newMilestonePrunerJob.setStartingIndex(lastTargetIndex + 1);
-            }
-            if (lastTargetIndex >= newMilestonePrunerJob.getCurrentIndex()) {
-                newMilestonePrunerJob.setCurrentIndex(lastTargetIndex + 1);
-            }
-
-            // if the last job is not DONE, we can just extend it to also clean our new target
-            if (lastMilestonePrunerJob != null) {
-                synchronized (lastMilestonePrunerJob) {
-                    if (lastMilestonePrunerJob.getStatus() != TransactionPrunerJobStatus.DONE) {
-                        lastMilestonePrunerJob.setTargetIndex(newMilestonePrunerJob.getTargetIndex());
-
-                        return;
+                            return;
+                        }
                     }
                 }
-            }
 
-            jobs.add(newMilestonePrunerJob);
+                jobs.add(job);
+            }
         }
     }
 
@@ -153,5 +134,34 @@ public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
     @Override
     public Stream<MilestonePrunerJob> stream() {
         return jobs.stream();
+    }
+
+    /**
+     * This method checks the range of a new cleanup job and adjusts it to reflect the progress made by previous jobs.
+     *
+     * We first check if the cleanup target was covered by previous jobs already. If the target index addresses a new
+     * milestone we adjust the starting and current index to account for the progress made by previous jobs.
+     *
+     * @param job the new job that shall be checked and adjusted to the previous progress
+     * @param lastMilestonePrunerJob the last cleanup job in the queue
+     * @return true if the job still has a range that has to be cleaned up or false otherwise
+     */
+    private boolean adjustedRangeCoversNewMilestones(MilestonePrunerJob job, MilestonePrunerJob lastMilestonePrunerJob) {
+        int lastTargetIndex = lastMilestonePrunerJob != null
+                ? lastMilestonePrunerJob.getTargetIndex()
+                : youngestFullyCleanedMilestoneIndex;
+
+        if (job.getTargetIndex() <= lastTargetIndex) {
+            return false;
+        }
+
+        if (lastTargetIndex >= job.getStartingIndex()) {
+            job.setStartingIndex(lastTargetIndex + 1);
+        }
+        if (lastTargetIndex >= job.getCurrentIndex()) {
+            job.setCurrentIndex(lastTargetIndex + 1);
+        }
+
+        return true;
     }
 }
