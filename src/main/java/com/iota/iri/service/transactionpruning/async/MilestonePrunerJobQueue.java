@@ -17,7 +17,7 @@ import java.util.stream.Stream;
  * The {@link AsyncTransactionPruner} uses a separate queue for every job type, to be able to adjust the processing
  * logic based on the type of the job.
  */
-public class MilestonePrunerJobQueue implements JobQueue {
+public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
     /**
      * Holds the youngest (highest) milestone index that was successfully cleaned (gets updated when a job finishes).
      */
@@ -31,7 +31,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
     /**
      * Used to internally store the queued jobs.
      */
-    private final Deque<TransactionPrunerJob> jobs = new ConcurrentLinkedDeque<>();
+    private final Deque<MilestonePrunerJob> jobs = new ConcurrentLinkedDeque<>();
 
     /**
      * Creates a new queue that is tailored to handle {@link MilestonePrunerJob}s.
@@ -62,18 +62,13 @@ public class MilestonePrunerJobQueue implements JobQueue {
      *
      * If the job can not be appended to an existing job, we add it to the end of our queue.
      *
-     * @param job the {@link MilestonePrunerJob} that shall be added to the queue
+     * @param newMilestonePrunerJob the {@link MilestonePrunerJob} that shall be added to the queue
      * @throws TransactionPruningException if the given job is no {@link MilestonePrunerJob}
      */
     @Override
-    public void addJob(TransactionPrunerJob job) throws TransactionPruningException {
-        if (!(job instanceof MilestonePrunerJob)) {
-            throw new TransactionPruningException("the MilestonePrunerJobQueue only supports MilestonePrunerJobs");
-        }
-
+    public void addJob(MilestonePrunerJob newMilestonePrunerJob) throws TransactionPruningException {
         synchronized (jobs) {
-            MilestonePrunerJob newMilestonePrunerJob = (MilestonePrunerJob) job;
-            MilestonePrunerJob lastMilestonePrunerJob = (MilestonePrunerJob) jobs.peekLast();
+            MilestonePrunerJob lastMilestonePrunerJob = jobs.peekLast();
 
             // determine where the last job stops / stopped cleaning up
             int lastTargetIndex = lastMilestonePrunerJob != null
@@ -133,7 +128,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
     @Override
     public void processJobs() throws TransactionPruningException {
         MilestonePrunerJob currentJob;
-        while (!Thread.currentThread().isInterrupted() && (currentJob = (MilestonePrunerJob) jobs.peek()) != null) {
+        while (!Thread.currentThread().isInterrupted() && (currentJob = jobs.peek()) != null) {
             try {
                 currentJob.process();
 
@@ -156,7 +151,7 @@ public class MilestonePrunerJobQueue implements JobQueue {
      * {@inheritDoc}
      */
     @Override
-    public Stream<TransactionPrunerJob> stream() {
+    public Stream<MilestonePrunerJob> stream() {
         return jobs.stream();
     }
 }

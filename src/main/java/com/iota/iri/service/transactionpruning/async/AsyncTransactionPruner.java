@@ -3,7 +3,6 @@ package com.iota.iri.service.transactionpruning.async;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.service.snapshot.Snapshot;
-import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
@@ -307,7 +306,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
             Files.write(
                 Paths.get(getStateFile().getAbsolutePath()),
                 () -> jobQueues.values().stream()
-                      .flatMap(JobQueue::stream)
+                      .<TransactionPrunerJob>flatMap(JobQueue::stream)
                       .<CharSequence>map(jobEntry -> {
                           jobsPersisted.incrementAndGet();
 

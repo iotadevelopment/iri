@@ -2,6 +2,7 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
+import com.iota.iri.service.transactionpruning.jobs.AbstractTransactionPrunerJob;
 
 import java.util.stream.Stream;
 
@@ -9,13 +10,13 @@ import java.util.stream.Stream;
  * Represents a queue of jobs which is used by the {@link AsyncTransactionPruner} to internally organize the different
  * kind of jobs.
  */
-public interface JobQueue {
+public interface JobQueue<T extends TransactionPrunerJob> {
     /**
      * Allows to add a job to the queue.
      *
      * @param job job that shall be added to the queue
      */
-    void addJob(TransactionPrunerJob job) throws TransactionPruningException;
+    void addJob(T job) throws TransactionPruningException;
 
     /**
      * Clears the stored jobs and resets the queue.
@@ -34,5 +35,5 @@ public interface JobQueue {
      *
      * @return Stream of jobs that are currently part of this queue
      */
-    Stream<TransactionPrunerJob> stream();
+    Stream<T> stream();
 }
