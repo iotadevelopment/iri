@@ -47,7 +47,7 @@ import static com.iota.iri.MilestoneTracker.Validity.VALID;
 
 public class MilestoneTracker {
     /**
-     * Validity states of transactions regarding their milestone status.
+     * Available runtime states of the {@link MilestoneTracker}.
      */
     public enum Status {
         INITIALIZING,
@@ -62,8 +62,6 @@ public class MilestoneTracker {
         INVALID,
         INCOMPLETE
     }
-
-    protected Status status = INITIALIZING;
 
     private static int RESCAN_INTERVAL = 5000;
 
@@ -100,6 +98,11 @@ public class MilestoneTracker {
 
     private MilestoneSolidifier milestoneSolidifier;
 
+    /**
+     * The current status of the {@link MilestoneTracker}.
+     */
+    protected Status status = Status.INITIALIZING;
+
     public MilestoneTracker(Tangle tangle,
                             SnapshotProvider snapshotProvider,
                             TransactionValidator transactionValidator,
@@ -124,6 +127,13 @@ public class MilestoneTracker {
         this.latestMilestone = snapshotProvider.getLatestSnapshot().getHash();
     }
 
+    /**
+     * This method returns the current status of the milestone tracker.
+     *
+     * It allows us to determine of all the "initializing" tasks have succeeded.
+     *
+     * @return INITIALIZED when all the startup tasks have finished and INITIALIZING otherwise
+     */
     public Status getStatus() {
         return this.status;
     }
