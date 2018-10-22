@@ -397,6 +397,13 @@ public class AsyncTransactionPruner implements TransactionPruner {
      */
     @FunctionalInterface
     private interface JobParser {
+        /**
+         * Parses the serialized version of a job back into its unserialized object.
+         *
+         * @param input serialized job
+         * @return unserialized job
+         * @throws TransactionPruningException if anything goes wrong while parsing the serialized job
+         */
         TransactionPrunerJob parse(String input) throws TransactionPruningException;
     }
 }
