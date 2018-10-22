@@ -8,6 +8,12 @@ import com.iota.iri.storage.Tangle;
 
 import java.util.Map;
 
+/**
+ * Represents the service for local snapshots that contains the relevant business logic for creating taking and
+ * generating local {@link Snapshot}s.
+ *
+ * This class is stateless and does not hold any domain specific models.
+ */
 public interface LocalSnapshotService {
     void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
             TransactionPruner transactionPruner) throws SnapshotException;

@@ -6,8 +6,6 @@ import com.iota.iri.conf.SnapshotConfig;
 /**
  * Represents the manager for local {@link Snapshot}s that takes care of periodically creating a new {@link Snapshot}
  * when the configured interval has passed.
- *
- * After the local snapshot was taken it also triggers the pruning of old transactions to clean up the database.
  */
 public interface LocalSnapshotManager {
     /**

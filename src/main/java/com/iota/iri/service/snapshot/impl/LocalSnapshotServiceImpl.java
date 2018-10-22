@@ -26,6 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Implements the basic contract of the {@link LocalSnapshotService}.
+ */
 public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     /**
      * Logger for this class allowing us to dump debug and status messages.
@@ -41,8 +44,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * Maximum age in milestones since creation of solid entry points.
      *
      * Since it is possible to artificially keep old solid entry points alive by periodically attaching new transactions
-     * to it, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
-     * measure against a potential attack vector of people trying to blow up the meta data of local snapshots.
+     * to them, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
+     * measure against a potential attack vector where somebody might try to blow up the meta data of local snapshots.
      */
     private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
 
@@ -50,38 +53,30 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config, TransactionPruner transactionPruner) throws SnapshotException {
-        // load necessary configuration parameters
-        String basePath = config.getLocalSnapshotsBasePath();
-        int snapshotDepth = config.getLocalSnapshotsDepth();
+    public void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
+            TransactionPruner transactionPruner) throws SnapshotException {
 
-        // determine our target milestone
-        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - snapshotDepth;
+        int targetMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex() - config.getLocalSnapshotsDepth();
 
-        // try to load the milestone
         MilestoneViewModel targetMilestone;
         try {
             targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
         } catch (Exception e) {
             throw new SnapshotException("could not load the target milestone", e);
         }
-
-        // if we couldn't find a milestone with the given index -> abort
         if (targetMilestone == null) {
             throw new SnapshotException("missing milestone with an index of " + targetMilestoneIndex + " or lower");
         }
 
         Snapshot newSnapshot;
         try {
-            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
-
             newSnapshot = generateLocalSnapshot(tangle, snapshotProvider, config, targetMilestone);
 
+            Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
             Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
 
             System.out.println(oldSolidEntryPoints.size() + " / " + newSolidEntryPoints.size());
 
-            // clean up the deleted solid entry points
             oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
                 if (!newSolidEntryPoints.containsKey(transactionHash)) {
                     try {
@@ -107,14 +102,15 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             int startingIndex = config.getMilestoneStartIndex() + 1;
 
             if (targetIndex >= startingIndex) {
-                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() - config.getLocalSnapshotsPruningDelay()));
+                transactionPruner.addJob(new MilestonePrunerJob(startingIndex, targetMilestone.index() -
+                        config.getLocalSnapshotsPruningDelay()));
             }
 
         } catch (TransactionPruningException e) {
             throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
         }
 
-        newSnapshot.writeToDisk(basePath);
+        newSnapshot.writeToDisk(config.getLocalSnapshotsBasePath());
 
         snapshotProvider.getInitialSnapshot().update(newSnapshot);
     }
@@ -166,7 +162,9 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public Map<Hash, Integer> generateSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone) throws SnapshotException {
+    public Map<Hash, Integer> generateSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
+            MilestoneViewModel targetMilestone) throws SnapshotException {
+
         HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
 
         processOldSolidEntryPoints(tangle, snapshotProvider, targetMilestone, solidEntryPoints);
@@ -181,14 +179,20 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config, MilestoneViewModel targetMilestone) throws SnapshotException {
-        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger("Taking local snapshot [3/3 processing seen milestones]", log);
+    public Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config,
+            MilestoneViewModel targetMilestone) throws SnapshotException {
+
+        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger(
+                "Taking local snapshot [3/3 processing seen milestones]", log
+        );
         HashMap<Hash, Integer> seenMilestones = new HashMap<>();
 
         seenMilestonesProgressLogger.start(config.getLocalSnapshotsDepth());
         try {
             MilestoneViewModel seenMilestone = targetMilestone;
-            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index())) != null) {
+            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index()))
+                    != null) {
+
                 seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
                 seenMilestonesProgressLogger.progress();
             }
@@ -202,7 +206,6 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         return seenMilestones;
     }
 
-
     /**
      * This method determines if a transaction is orphaned.
      *
@@ -213,17 +216,18 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * Since we currently use milestones as reference transactions that are sufficiently old, this definition in fact is
      * a relatively safe way to determine if a subtangle "above" a transaction got orphaned.
      *
+     * @param tangle Tangle object which acts as a database interface
      * @param transaction transaction that shall be checked
      * @param referenceTransaction transaction that acts as a judge to the other transaction
+     * @param processedTransactions transactions that were visited already while trying to determine the orphaned status
      * @return true if the transaction got orphaned and false otherwise
      * @throws SnapshotException if anything goes wrong while determining the orphaned status
      */
-    private boolean isOrphaned(Tangle tangle, TransactionViewModel transaction, TransactionViewModel referenceTransaction,
-                               HashSet<Hash> processedTransactions) throws SnapshotException {
+    private boolean isOrphaned(Tangle tangle, TransactionViewModel transaction,
+            TransactionViewModel referenceTransaction, Set<Hash> processedTransactions) throws SnapshotException {
 
-        long timeDiff = (referenceTransaction.getArrivalTime() / 1000L) - referenceTransaction.getTimestamp();
-
-        if (((transaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
+        long arrivalTime = transaction.getArrivalTime() / 1000L + ORPHANED_TRANSACTION_GRACE_TIME;
+        if (arrivalTime > referenceTransaction.getTimestamp()) {
             return false;
         }
 
@@ -233,7 +237,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
                     transaction.getHash(),
                     currentTransaction -> !nonOrphanedTransactionFound.get(),
                     currentTransaction -> {
-                        if (((currentTransaction.getArrivalTime() / 1000L) + ORPHANED_TRANSACTION_GRACE_TIME - timeDiff) > referenceTransaction.getTimestamp()) {
+                        if (arrivalTime > referenceTransaction.getTimestamp()) {
                             nonOrphanedTransactionFound.set(true);
                         }
                     },
@@ -252,8 +256,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * A transaction is considered a solid entry point if it has non-orphaned approvers.
      *
      * To check if the transaction has non-orphaned approvers we first check if any of its approvers got confirmed by a
-     * future milestone, since this is very cheap. If non of them got confirmed by another milestone we do the more
-     * expensive check from {@link #isOrphaned(Tangle, TransactionViewModel, TransactionViewModel, HashSet)}.
+     * future milestone, since this is very cheap. If none of them got confirmed by another milestone we do the more
+     * expensive check from {@link #isOrphaned(Tangle, TransactionViewModel, TransactionViewModel, Set)}.
      *
      * Since solid entry points have a limited life time and to prevent potential problems due to temporary errors in
      * the database, we assume that the checked transaction is a solid entry point if any error occurs while determining
@@ -278,7 +282,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
                 }
             }
 
-            HashSet<Hash> processedTransactions = new HashSet<>();
+            Set<Hash> processedTransactions = new HashSet<>();
 
             TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
             for (TransactionViewModel unconfirmedApprover : unconfirmedApprovers) {
@@ -295,7 +299,17 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         return false;
     }
 
-    private void processOldSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
+    /**
+     * This method
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param snapshotProvider
+     * @param targetMilestone
+     * @param solidEntryPoints
+     */
+    private void processOldSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
+            MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
+
         ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger(
                 "Taking local snapshot [2/4 analyzing old solid entry points]", log
         ).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
@@ -313,8 +327,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         oldSolidEntryPointsProgressLogger.finish();
     }
 
-    private void processNewSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneViewModel targetMilestone,
-            Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
+    private void processNewSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
+            MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
 
         ProgressLogger progressLogger = new ProgressLogger(
                 "Taking local snapshot [3/4 generating solid entry points]", log);
@@ -322,7 +336,9 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             // add new solid entry points
             progressLogger.start(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex());
             MilestoneViewModel nextMilestone = targetMilestone;
-            while (nextMilestone != null && nextMilestone.index() > snapshotProvider.getInitialSnapshot().getIndex() && progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
+            while (nextMilestone != null && nextMilestone.index() > snapshotProvider.getInitialSnapshot().getIndex() &&
+                    progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
+
                 MilestoneViewModel currentMilestone = nextMilestone;
                 DAGHelper.get(tangle).traverseApprovees(
                         currentMilestone.getHash(),
