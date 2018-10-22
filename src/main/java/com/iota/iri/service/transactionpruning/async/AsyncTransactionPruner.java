@@ -113,7 +113,9 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * @param snapshot last local or global snapshot that acts as a starting point for the state of ledger
      * @param config Configuration with important snapshot related configuration parameters
      */
-    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot, SnapshotConfig config) {
+    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot,
+            SnapshotConfig config) {
+
         this.tangle = tangle;
         this.tipsViewModel = tipsViewModel;
         this.snapshot = snapshot;
@@ -138,6 +140,8 @@ public class AsyncTransactionPruner implements TransactionPruner {
         job.setTipsViewModel(tipsViewModel);
         job.setSnapshot(snapshot);
 
+        // this call is "unchecked" to a "raw" JobQueue and it is intended since the matching JobQueue is defined by the
+        // registered job types
         getJobQueue(job.getClass()).addJob(job);
 
         saveState();

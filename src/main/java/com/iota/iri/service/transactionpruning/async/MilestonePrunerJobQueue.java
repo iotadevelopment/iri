@@ -66,7 +66,7 @@ public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
         synchronized (jobs) {
             MilestonePrunerJob lastMilestonePrunerJob = jobs.peekLast();
 
-            if (adjustedRangeCoversNewMilestones(job, lastMilestonePrunerJob)) {
+            if (adjustedRangeCoversNewMilestone(job, lastMilestonePrunerJob)) {
                 if (lastMilestonePrunerJob != null) {
                     // synchronize the status check so we can be 100% sure, that the job will see our modification
                     // BEFORE it finishes and leaves the processing loop
@@ -146,7 +146,7 @@ public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
      * @param lastMilestonePrunerJob the last cleanup job in the queue
      * @return true if the job still has a range that has to be cleaned up or false otherwise
      */
-    private boolean adjustedRangeCoversNewMilestones(MilestonePrunerJob job, MilestonePrunerJob lastMilestonePrunerJob) {
+    private boolean adjustedRangeCoversNewMilestone(MilestonePrunerJob job, MilestonePrunerJob lastMilestonePrunerJob) {
         int lastTargetIndex = lastMilestonePrunerJob != null
                 ? lastMilestonePrunerJob.getTargetIndex()
                 : youngestFullyCleanedMilestoneIndex;
