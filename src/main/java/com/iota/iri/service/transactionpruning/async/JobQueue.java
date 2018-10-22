@@ -2,7 +2,6 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
-import com.iota.iri.service.transactionpruning.jobs.AbstractTransactionPrunerJob;
 
 import java.util.stream.Stream;
 

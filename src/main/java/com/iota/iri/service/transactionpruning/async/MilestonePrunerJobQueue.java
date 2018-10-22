@@ -62,7 +62,7 @@ public class MilestonePrunerJobQueue implements JobQueue<MilestonePrunerJob> {
      * @throws TransactionPruningException if the given job is no {@link MilestonePrunerJob}
      */
     @Override
-    public void addJob(MilestonePrunerJob job) throws TransactionPruningException {
+    public void addJob(MilestonePrunerJob job) {
         synchronized (jobs) {
             MilestonePrunerJob lastMilestonePrunerJob = jobs.peekLast();
 
