@@ -228,14 +228,11 @@ public class Node {
                 try {
 
                     //Transaction bytes
-
-                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    digest.update(receivedData, 0, TransactionViewModel.SIZE);
-                    ByteBuffer byteHash = ByteBuffer.wrap(digest.digest());
+                    ByteBuffer digest = getBytesDigest(receivedData);
 
                     //check if cached
                     synchronized (recentSeenBytes) {
-                        cached = (receivedTransactionHash = recentSeenBytes.get(byteHash)) != null;
+                        cached = (receivedTransactionHash = recentSeenBytes.get(digest)) != null;
                     }
 
                     if (!cached) {
@@ -245,7 +242,7 @@ public class Node {
                         transactionValidator.runValidation(receivedTransactionViewModel, transactionValidator.getMinWeightMagnitude());
 
                         synchronized (recentSeenBytes) {
-                            recentSeenBytes.put(byteHash, receivedTransactionHash);
+                            recentSeenBytes.put(digest, receivedTransactionHash);
                         }
 
                         //if valid - add to receive queue (receivedTransactionViewModel, neighbor)
@@ -429,6 +426,10 @@ public class Node {
             try {
                 sendPacket(sendingPacket, transactionViewModel, neighbor);
 
+                ByteBuffer digest = getBytesDigest(transactionViewModel.getBytes());
+                synchronized (recentSeenBytes) {
+                    recentSeenBytes.put(digest, transactionViewModel.getHash());
+                }
             } catch (Exception e) {
                 log.error("Error fetching transaction to request.", e);
             }
@@ -670,6 +671,12 @@ public class Node {
     public void shutdown() throws InterruptedException {
         shuttingDown.set(true);
         executor.awaitTermination(6, TimeUnit.SECONDS);
+    }
+
+    private ByteBuffer getBytesDigest(byte[] receivedData) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(receivedData, 0, TransactionViewModel.SIZE);
+        return ByteBuffer.wrap(digest.digest());
     }
 
     // helpers methods

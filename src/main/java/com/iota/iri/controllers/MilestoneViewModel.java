@@ -39,8 +39,8 @@ public class MilestoneViewModel {
     /**
      * This method removes a {@link MilestoneViewModel} from the cache.
      *
-     * It is used by the {@link TransactionPruner} to remove milestones that were
-     * deleted in the database, so that the runtime environment correctly reflects the database state.
+     * It is used by the {@link com.iota.iri.service.transactionpruning.TransactionPruner} to remove milestones that
+     * were deleted in the database, so that the runtime environment correctly reflects the database state.
      *
      * @param milestoneIndex the index of the milestone
      */
@@ -93,7 +93,7 @@ public class MilestoneViewModel {
         Pair<Indexable, Persistable> milestonePair = tangle.previous(Milestone.class, this.milestone.index);
         if(milestonePair != null && milestonePair.hi != null) {
             Milestone milestone = (Milestone) milestonePair.hi;
-            return new MilestoneViewModel((Milestone) milestone);
+            return new MilestoneViewModel(milestone);
         }
         return null;
     }
@@ -102,7 +102,7 @@ public class MilestoneViewModel {
         Pair<Indexable, Persistable> milestonePair = tangle.next(Milestone.class, this.milestone.index);
         if(milestonePair != null && milestonePair.hi != null) {
             Milestone milestone = (Milestone) milestonePair.hi;
-            return new MilestoneViewModel((Milestone) milestone);
+            return new MilestoneViewModel(milestone);
         }
         return null;
     }
@@ -114,7 +114,7 @@ public class MilestoneViewModel {
         // create a counter variable
         int currentIndex = index;
 
-        // try to find the next milestone by index rather than db insertion order until we are successfull
+        // try to find the next milestone by index rather than db insertion order until we are successful
         while(previousMilestoneViewModel == null && --currentIndex >= index - MAX_MILESTONE_INDEX_GAP) {
             previousMilestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
         }
