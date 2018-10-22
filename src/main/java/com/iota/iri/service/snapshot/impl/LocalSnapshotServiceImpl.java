@@ -75,21 +75,18 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
             Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
 
-            System.out.println(oldSolidEntryPoints.size() + " / " + newSolidEntryPoints.size());
-
             oldSolidEntryPoints.forEach((transactionHash, milestoneIndex) -> {
                 if (!newSolidEntryPoints.containsKey(transactionHash)) {
                     try {
-                        System.out.println("CLEANUP SOLID ENTRY POINT1: " + transactionHash);
                         // only clean up if the corresponding milestone transaction was cleaned up already -> otherwise
                         // let the MilestonePrunerJob do this
                         if (TransactionViewModel.fromHash(tangle, transactionHash).getType() ==
                                 TransactionViewModel.PREFILLED_SLOT) {
-                            System.out.println("CLEANUP SOLID ENTRY POINT: " + transactionHash);
+
                             transactionPruner.addJob(new UnconfirmedSubtanglePrunerJob(transactionHash));
                         }
                     } catch (Exception e) {
-                        log.error("failed to add cleanup job to garbage collector", e);
+                        log.error("failed to add cleanup job to the transaction pruner", e);
                     }
                 }
             });
@@ -107,12 +104,22 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             }
 
         } catch (TransactionPruningException e) {
-            throw new SnapshotException("could not add the cleanup job to the garbage collector", e);
+            throw new SnapshotException("could not add the cleanup job to the transaction pruner", e);
         }
 
         newSnapshot.writeToDisk(config.getLocalSnapshotsBasePath());
 
+        snapshotProvider.getInitialSnapshot().lockWrite();
+        snapshotProvider.getLatestSnapshot().lockWrite();
+
         snapshotProvider.getInitialSnapshot().update(newSnapshot);
+
+        snapshotProvider.getLatestSnapshot().setInitialHash(snapshotProvider.getInitialSnapshot().getHash());
+        snapshotProvider.getLatestSnapshot().setInitialIndex(snapshotProvider.getInitialSnapshot().getIndex());
+        snapshotProvider.getLatestSnapshot().setInitialTimestamp(snapshotProvider.getInitialSnapshot().getTimestamp());
+
+        snapshotProvider.getInitialSnapshot().unlockWrite();
+        snapshotProvider.getLatestSnapshot().unlockWrite();
     }
 
     /**

@@ -80,35 +80,40 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
             if((line = reader.readLine()) != null) {
                 hash = HashFactory.TRANSACTION.create(line);
             } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                        snapshotMetaDataFile.getAbsolutePath());
             }
 
             // read the index
             if((line = reader.readLine()) != null) {
                 index = Integer.parseInt(line);
             } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                        snapshotMetaDataFile.getAbsolutePath());
             }
 
             // read the timestamp
             if((line = reader.readLine()) != null) {
                 timestamp = Long.parseLong(line);
             } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                        snapshotMetaDataFile.getAbsolutePath());
             }
 
             // read the solid entry points size
             if((line = reader.readLine()) != null) {
                 solidEntryPointsSize = Integer.parseInt(line);
             } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                        snapshotMetaDataFile.getAbsolutePath());
             }
 
             // read the solid entry points size
             if((line = reader.readLine()) != null) {
                 seenMilestonesSize = Integer.parseInt(line);
             } else {
-                throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                        snapshotMetaDataFile.getAbsolutePath());
             }
 
             // read the solid entry points from our file
@@ -120,7 +125,8 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
                         solidEntryPoints.put(HashFactory.TRANSACTION.create(parts[0]), Integer.parseInt(parts[1]));
                     }
                 } else {
-                    throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                    throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                            snapshotMetaDataFile.getAbsolutePath());
                 }
             }
 
@@ -133,7 +139,8 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
                         seenMilestones.put(HashFactory.TRANSACTION.create(parts[0]), Integer.parseInt(parts[1]));
                     }
                 } else {
-                    throw new SnapshotException("invalid or malformed snapshot metadata file at " + snapshotMetaDataFile.getAbsolutePath());
+                    throw new SnapshotException("invalid or malformed snapshot metadata file at " +
+                            snapshotMetaDataFile.getAbsolutePath());
                 }
             }
 
@@ -201,6 +208,14 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
      * {@inheritDoc}
      */
     @Override
+    public void setInitialHash(Hash initialHash) {
+        this.initialHash = initialHash;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public int getInitialIndex() {
         return initialIndex;
     }
@@ -209,8 +224,24 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
      * {@inheritDoc}
      */
     @Override
+    public void setInitialIndex(int initialIndex) {
+        this.initialIndex = initialIndex;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public long getInitialTimestamp() {
         return initialTimestamp;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setInitialTimestamp(long initialTimestamp) {
+        this.initialTimestamp = initialTimestamp;
     }
 
     /**

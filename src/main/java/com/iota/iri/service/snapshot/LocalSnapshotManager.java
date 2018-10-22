@@ -1,7 +1,6 @@
 package com.iota.iri.service.snapshot;
 
 import com.iota.iri.MilestoneTracker;
-import com.iota.iri.conf.SnapshotConfig;
 
 /**
  * Represents the manager for local {@link Snapshot}s that takes care of periodically creating a new {@link Snapshot}
@@ -10,11 +9,13 @@ import com.iota.iri.conf.SnapshotConfig;
 public interface LocalSnapshotManager {
     /**
      * Starts the automatic creation of local {@link Snapshot}s by spawning a background {@link Thread}, that
-     * periodically checks if the last snapshot is older than {@link SnapshotConfig#getLocalSnapshotsIntervalSynced()}.
+     * periodically checks if the last snapshot is older than
+     * {@link com.iota.iri.conf.SnapshotConfig#getLocalSnapshotsIntervalSynced()}.
      *
      * When we detect that it is time for a local snapshot we internally trigger its creation.
      *
-     * Note: If the node is not fully synced we use {@link SnapshotConfig#getLocalSnapshotsIntervalUnsynced()} instead.
+     * Note: If the node is not fully synced we use
+     * {@link com.iota.iri.conf.SnapshotConfig#getLocalSnapshotsIntervalUnsynced()} instead.
      *
      * @param milestoneTracker tracker for the milestones to determine when a new local snapshot is due
      */

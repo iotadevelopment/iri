@@ -27,6 +27,9 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      */
     private static final Logger log = LoggerFactory.getLogger(LocalSnapshotManagerImpl.class);
 
+    /**
+     * Service that contains the logic for generating local {@link Snapshot}s.
+     */
     private static final LocalSnapshotService localSnapshotService = new LocalSnapshotServiceImpl();
 
     /**

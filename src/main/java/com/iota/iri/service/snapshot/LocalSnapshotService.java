@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public interface LocalSnapshotService {
     /**
-     * This method creates a "full" local snapshot according to the configuration of the node.
+     * This method take a "full" local snapshot according to the configuration of the node.
      *
      * It first determines the necessary configuration parameters and which milestone to us as a reference. It then
      * generates the local {@link Snapshot}, issues the the required {@link TransactionPruner} jobs and writes the

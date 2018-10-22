@@ -13,34 +13,70 @@ import java.util.Map;
  */
 public interface SnapshotMetaData {
     /**
-     * Getter of the hash of the transaction that the snapshot belonged to when it was created.
+     * Getter of the hash of the transaction that the snapshot was "derived" from.
+     *
+     * In case of the "latest" {@link Snapshot} this value will be the hash of the "initial" {@link Snapshot}.
      *
      * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
      *       so this value differs from the value returned by {@link #getHash()}.
      *
-     * @return hash of the transaction that the snapshot belonged to when it was created
+     * @return hash of the transaction that the snapshot was "derived" from
      */
     Hash getInitialHash();
 
     /**
-     * Getter of the index of the milestone that the snapshot belonged to to when it was created.
+     * Setter of the hash of the transaction that the snapshot was "derived" from.
+     *
+     * Note: After creating a new local {@link Snapshot} we update this value in the latest {@link Snapshot} to
+     *       correctly reflect the new "origin" of the latest {@link Snapshot}.
+     *
+     * @param initialHash hash of the transaction that the snapshot was "derived" from
+     */
+    void setInitialHash(Hash initialHash);
+
+    /**
+     * Getter of the index of the milestone that the snapshot was "derived" from.
+     *
+     * In case of the "latest" {@link Snapshot} this value will be the index of the "initial" {@link Snapshot}.
      *
      * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
      *       so this value differs from the value returned by {@link #getIndex()}.
      *
-     * @return index of the milestone that the snapshot belonged to to when it was created
+     * @return index of the milestone that the snapshot was "derived" from
      */
     int getInitialIndex();
 
     /**
-     *  Getter of the timestamp of the transaction that the snapshot belonged to when it was created.
+     * Setter of the index of the milestone that the snapshot was "derived" from.
+     *
+     * Note: After creating a new local {@link Snapshot} we update this value in the latest {@link Snapshot} to
+     *       correctly reflect the new "origin" of the latest {@link Snapshot}.
+     *
+     * @param initialIndex index of the milestone that the snapshot was "derived" from
+     */
+    void setInitialIndex(int initialIndex);
+
+    /**
+     *  Getter of the timestamp of the transaction that the snapshot was "derived" from.
+     *
+     *  In case of the "latest" {@link Snapshot} this value will be the timestamp of the "initial" {@link Snapshot}.
      *
      * Note: a snapshot can be modified over time, as we apply the balance changes caused by consecutive transactions,
      *       so this value differs from the value returned by {@link #getTimestamp()}.
      *
-     * @return timestamp of the transaction that the snapshot belonged to when it was created
+     * @return timestamp of the transaction that the snapshot was "derived" from
      */
     long getInitialTimestamp();
+
+    /**
+     * Setter of the timestamp of the transaction that the snapshot was "derived" from.
+     *
+     * Note: After creating a new local {@link Snapshot} we update this value in the latest {@link Snapshot} to
+     *       correctly reflect the new "origin" of the latest {@link Snapshot}.
+     *
+     * @param initialTimestamp timestamp of the transaction that the snapshot was "derived" from
+     */
+    void setInitialTimestamp(long initialTimestamp);
 
     /**
      * Getter of the hash of the transaction that the snapshot currently belongs to.

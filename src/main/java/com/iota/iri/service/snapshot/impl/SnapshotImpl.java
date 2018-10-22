@@ -112,7 +112,9 @@ public class SnapshotImpl implements Snapshot {
         Snapshot snapshotBeforeChanges = new SnapshotImpl(this);
 
         try {
-            for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
+            for (int currentMilestoneIndex = getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex;
+                 currentMilestoneIndex++) {
+
                 MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                 if (currentMilestone != null) {
                     StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
@@ -122,8 +124,13 @@ public class SnapshotImpl implements Snapshot {
 
                     metaData.setIndex(currentMilestone.index());
                     metaData.setHash(currentMilestone.getHash());
-                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-                    if(currentMilestoneTransaction != null && currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+
+                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle,
+                            currentMilestone.getHash());
+
+                    if(currentMilestoneTransaction != null &&
+                            currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+
                         metaData.setTimestamp(currentMilestoneTransaction.getTimestamp());
                     }
                 } else {
@@ -145,11 +152,11 @@ public class SnapshotImpl implements Snapshot {
     @Override
     public void rollBackMilestones(int targetMilestoneIndex, Tangle tangle) throws SnapshotException {
         if(targetMilestoneIndex <= getInitialIndex()) {
-            throw new SnapshotException("the target milestone index is lower than the initial snapshot index - cannot revert back to an unknown milestone");
+            throw new SnapshotException("the target milestone index is lower than the initial snapshot index");
         }
 
         if(targetMilestoneIndex > getIndex()) {
-            throw new SnapshotException("the target milestone index is higher than the current one - consider using replayMilestones instead");
+            throw new SnapshotException("the target milestone index is higher than the current one");
         }
 
         lockWrite();
@@ -163,7 +170,7 @@ public class SnapshotImpl implements Snapshot {
             }
 
             if(targetMilestoneIndex < getIndex()) {
-                throw new SnapshotException("failed to reach the target milestone index when rolling back the milestones");
+                throw new SnapshotException("failed to reach the target milestone index when rolling back milestones");
             }
         } catch(SnapshotException e) {
             update(snapshotBeforeChanges);
@@ -237,9 +244,11 @@ public class SnapshotImpl implements Snapshot {
                 );
 
                 if (!snapshotStateDiff.isConsistent()) {
-                    throw new SnapshotException("the StateDiff belonging to milestone #" + getIndex() + " (" + getHash().toString() + ") is inconsistent");
+                    throw new SnapshotException("the StateDiff belonging to milestone #" + getIndex() +
+                            " (" + getHash() + ") is inconsistent");
                 } else if (!state.patchedState(snapshotStateDiff).isConsistent()) {
-                    throw new SnapshotException("the Snapshot would be inconsistent after applying patch belonging to milestone #" + getIndex() + " (" + getHash().toString() + ")");
+                    throw new SnapshotException("failed to apply patch belonging to milestone #" + getIndex() +
+                            " (" + getHash() + ")");
                 }
 
                 state.applyStateDiff(snapshotStateDiff);
@@ -276,6 +285,7 @@ public class SnapshotImpl implements Snapshot {
 
     //region [THREAD-SAFE METADATA METHODS] ////////////////////////////////////////////////////////////////////////////
 
+
     /**
      * {@inheritDoc}
      *
@@ -289,6 +299,22 @@ public class SnapshotImpl implements Snapshot {
             return metaData.getInitialHash();
         } finally {
             unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public void setInitialHash(Hash initialHash) {
+        lockWrite();
+
+        try {
+            metaData.setInitialHash(initialHash);
+        } finally {
+            unlockWrite();
         }
     }
 
@@ -314,6 +340,22 @@ public class SnapshotImpl implements Snapshot {
      * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
      */
     @Override
+    public void setInitialIndex(int initialIndex) {
+        lockWrite();
+
+        try {
+            metaData.setInitialIndex(initialIndex);
+        } finally {
+            unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
     public long getInitialTimestamp() {
         lockRead();
 
@@ -321,6 +363,22 @@ public class SnapshotImpl implements Snapshot {
             return metaData.getInitialTimestamp();
         } finally {
             unlockRead();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This is a thread-safe wrapper for the underlying {@link SnapshotMetaData} method.
+     */
+    @Override
+    public void setInitialTimestamp(long initialTimestamp) {
+        lockWrite();
+
+        try {
+            metaData.setInitialTimestamp(initialTimestamp);
+        } finally {
+            unlockWrite();
         }
     }
 
