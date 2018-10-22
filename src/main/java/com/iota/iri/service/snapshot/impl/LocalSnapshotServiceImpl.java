@@ -47,7 +47,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * to them, we limit the life time of solid entry points and ignore them whenever they become too old. This is a
      * measure against a potential attack vector where somebody might try to blow up the meta data of local snapshots.
      */
-    private static final int SOLID_ENTRY_POINT_LIFETIME = 20000;
+    private static final int SOLID_ENTRY_POINT_LIFETIME = 1000;
 
     /**
      * {@inheritDoc}
@@ -70,7 +70,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
         Snapshot newSnapshot;
         try {
-            newSnapshot = generateLocalSnapshot(tangle, snapshotProvider, config, targetMilestone);
+            newSnapshot = generateSnapshot(tangle, snapshotProvider, config, targetMilestone);
 
             Map<Hash, Integer> oldSolidEntryPoints = snapshotProvider.getInitialSnapshot().getSolidEntryPoints();
             Map<Hash, Integer> newSolidEntryPoints = newSnapshot.getSolidEntryPoints();
@@ -119,7 +119,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public Snapshot generateLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
+    public Snapshot generateSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
             MilestoneViewModel targetMilestone) throws SnapshotException {
 
         if (targetMilestone == null) {
@@ -165,12 +165,11 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     public Map<Hash, Integer> generateSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneViewModel targetMilestone) throws SnapshotException {
 
-        HashMap<Hash, Integer> solidEntryPoints = new HashMap<>();
+        Map<Hash, Integer> solidEntryPoints = new HashMap<>();
+        solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
         processOldSolidEntryPoints(tangle, snapshotProvider, targetMilestone, solidEntryPoints);
         processNewSolidEntryPoints(tangle, snapshotProvider, targetMilestone, solidEntryPoints);
-
-        solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 
         return solidEntryPoints;
     }
@@ -182,26 +181,26 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     public Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config,
             MilestoneViewModel targetMilestone) throws SnapshotException {
 
-        ProgressLogger seenMilestonesProgressLogger = new ProgressLogger(
-                "Taking local snapshot [3/3 processing seen milestones]", log
-        );
-        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [processing seen milestones]", log)
+                .start(config.getLocalSnapshotsDepth());
 
-        seenMilestonesProgressLogger.start(config.getLocalSnapshotsDepth());
+        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
         try {
             MilestoneViewModel seenMilestone = targetMilestone;
             while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index()))
                     != null) {
 
                 seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
-                seenMilestonesProgressLogger.progress();
+
+                progressLogger.progress();
             }
         } catch (Exception e) {
-            seenMilestonesProgressLogger.abort(e);
+            progressLogger.abort(e);
 
             throw new SnapshotException("could not generate the set of seen milestones", e);
         }
-        seenMilestonesProgressLogger.finish();
+
+        progressLogger.finish();
 
         return seenMilestones;
     }
@@ -264,6 +263,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * its status. This is a storage <=> reliability trade off, since the only bad effect of having too many solid entry
      * points) is a bigger snapshot file.
      *
+     * @param tangle Tangle object which acts as a database interface
      * @param transactionHash hash of the transaction that shall be checked
      * @param targetMilestone milestone that is used as an anchor for our checks
      * @return true if the transaction is a solid entry point and false otherwise
