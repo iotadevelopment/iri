@@ -300,19 +300,21 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     }
 
     /**
-     * This method
+     * This method analyzes the old solid entry points and determines if they are still not orphaned.
+     *
+     * It simply iterates through the old solid entry points and checks them one by one. If an old solid entry point
+     * is found to still be relevant it is added to the passed in map.
      *
      * @param tangle Tangle object which acts as a database interface
-     * @param snapshotProvider
-     * @param targetMilestone
-     * @param solidEntryPoints
+     * @param snapshotProvider data provider for the {@link Snapshot}s that are relevant for the node
+     * @param targetMilestone milestone that is used to generate the solid entry points
+     * @param solidEntryPoints map that is used to collect the solid entry points
      */
     private void processOldSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
 
-        ProgressLogger oldSolidEntryPointsProgressLogger = new ProgressLogger(
-                "Taking local snapshot [2/4 analyzing old solid entry points]", log
-        ).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
+        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [analyzing old solid entry points]",
+                log).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
 
         snapshotProvider.getInitialSnapshot().getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash) && targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME
@@ -321,20 +323,34 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
                 solidEntryPoints.put(hash, milestoneIndex);
             }
 
-            oldSolidEntryPointsProgressLogger.progress();
+            progressLogger.progress();
         });
 
-        oldSolidEntryPointsProgressLogger.finish();
+        progressLogger.finish();
     }
 
+    /**
+     * This method retrieves the new solid entry points of the snapshot reference given by the target milestone.
+     *
+     * It iterates over all unprocessed milestones and analyzes their directly and indirectly approved transactions.
+     * Every transaction is checked for being a solid entry point and added to the passed in map (if it was found to be
+     * one).
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param snapshotProvider data provider for the {@link Snapshot}s that are relevant for the node
+     * @param targetMilestone milestone that is used to generate the solid entry points
+     * @param solidEntryPoints map that is used to collect the solid entry points
+     * @throws SnapshotException if anything goes wrong while determining the solid entry points
+     */
     private void processNewSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
 
-        ProgressLogger progressLogger = new ProgressLogger(
-                "Taking local snapshot [3/4 generating solid entry points]", log);
+        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [generating solid entry points]",
+                log);
+
         try {
-            // add new solid entry points
             progressLogger.start(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex());
+
             MilestoneViewModel nextMilestone = targetMilestone;
             while (nextMilestone != null && nextMilestone.index() > snapshotProvider.getInitialSnapshot().getIndex() &&
                     progressLogger.getCurrentStep() < progressLogger.getStepCount()) {
@@ -353,8 +369,10 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
                 solidEntryPoints.put(currentMilestone.getHash(), targetMilestone.index());
 
                 nextMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+
                 progressLogger.progress();
             }
+
             progressLogger.finish();
         } catch (Exception e) {
             progressLogger.abort(e);
