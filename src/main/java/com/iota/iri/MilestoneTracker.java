@@ -130,9 +130,9 @@ public class MilestoneTracker {
     /**
      * This method returns the current status of the milestone tracker.
      *
-     * It allows us to determine of all the "initializing" tasks have succeeded.
+     * It allows us to determine if all of the "startup" tasks have succeeded.
      *
-     * @return INITIALIZED when all the startup tasks have finished and INITIALIZING otherwise
+     * @return {@code INITIALIZED} when all of the "startup" tasks have finished and {@code INITIALIZING} otherwise
      */
     public Status getStatus() {
         return this.status;
