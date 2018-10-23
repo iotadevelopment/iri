@@ -91,11 +91,13 @@ public class StatusLogger {
                         outputThread = new Thread(() -> {
                             try {
                                 Thread.sleep(Math.max(logInterval - (System.currentTimeMillis() - lastLogTime), 1));
-                            } catch(InterruptedException e) { /* do nothing */ }
 
-                            printStatusMessage();
-
-                            outputThread = null;
+                                printStatusMessage();
+                            } catch(InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            } finally {
+                                outputThread = null;
+                            }
                         }, Thread.currentThread().getName());
 
                         outputThread.start();

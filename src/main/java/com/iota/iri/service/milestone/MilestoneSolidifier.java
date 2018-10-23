@@ -202,10 +202,9 @@ public class MilestoneSolidifier {
      * {@link #youngestMilestoneInQueue}, we add the to the solidification queue.
      */
     private void processNewlyAddedMilestones() {
-        for (
-            Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator();
-            !Thread.currentThread().isInterrupted() && iterator.hasNext();
-        ) {
+        for (Iterator<Map.Entry<Hash, Integer>> iterator = newlyAddedMilestones.entrySet().iterator();
+                !Thread.currentThread().isInterrupted() && iterator.hasNext();) {
+
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
             unsolidMilestonesPool.put(currentEntry.getKey(), currentEntry.getValue());
@@ -226,10 +225,9 @@ public class MilestoneSolidifier {
      * pool and the queue and reset the {@link #youngestMilestoneInQueue} marker (if necessary).
      */
     private void processSolidificationQueue() {
-        for (
-            Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator();
-            !Thread.currentThread().isInterrupted() && iterator.hasNext();
-        ) {
+        for (Iterator<Map.Entry<Hash, Integer>> iterator = milestonesToSolidify.entrySet().iterator();
+                !Thread.currentThread().isInterrupted() && iterator.hasNext();) {
+
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
             if (currentEntry.getValue() <= initialSnapshot.getIndex() || isSolid(currentEntry)) {
