@@ -14,7 +14,8 @@ import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 import com.iota.iri.service.transactionpruning.jobs.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.ProgressLogger;
+import com.iota.iri.utils.log.ProgressLogger;
+import com.iota.iri.utils.log.interval.IntervalProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.utils.dag.TraversalException;
 import org.slf4j.Logger;
@@ -188,7 +189,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     public Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config,
             MilestoneViewModel targetMilestone) throws SnapshotException {
 
-        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [processing seen milestones]", log)
+        ProgressLogger progressLogger = new IntervalProgressLogger(
+                "Taking local snapshot [processing seen milestones]", log)
                 .start(config.getLocalSnapshotsDepth());
 
         HashMap<Hash, Integer> seenMilestones = new HashMap<>();
@@ -320,8 +322,9 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     private void processOldSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) {
 
-        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [analyzing old solid entry points]",
-                log).start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
+        ProgressLogger progressLogger = new IntervalProgressLogger(
+                "Taking local snapshot [analyzing old solid entry points]", log)
+                .start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
 
         snapshotProvider.getInitialSnapshot().getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash) && targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME
@@ -352,8 +355,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     private void processNewSolidEntryPoints(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneViewModel targetMilestone, Map<Hash, Integer> solidEntryPoints) throws SnapshotException {
 
-        ProgressLogger progressLogger = new ProgressLogger("Taking local snapshot [generating solid entry points]",
-                log);
+        ProgressLogger progressLogger = new IntervalProgressLogger(
+                "Taking local snapshot [generating solid entry points]", log);
 
         try {
             progressLogger.start(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex());

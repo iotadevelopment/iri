@@ -17,7 +17,8 @@ import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Converter;
-import com.iota.iri.utils.ProgressLogger;
+import com.iota.iri.utils.log.ProgressLogger;
+import com.iota.iri.utils.log.interval.IntervalProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.zmq.MessageQ;
 
@@ -40,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
-import static com.iota.iri.MilestoneTracker.Status.INITIALIZING;
 import static com.iota.iri.MilestoneTracker.Validity.INCOMPLETE;
 import static com.iota.iri.MilestoneTracker.Validity.INVALID;
 import static com.iota.iri.MilestoneTracker.Validity.VALID;
@@ -157,7 +157,7 @@ public class MilestoneTracker {
 
     private void spawnLatestMilestoneTracker() {
         (new Thread(() -> {
-            ProgressLogger scanningMilestonesProgress = new ProgressLogger("Scanning Latest Milestones", log);
+            ProgressLogger scanningMilestonesProgress = new IntervalProgressLogger("Scanning Latest Milestones", log);
 
             // bootstrap our latestMilestone with the last milestone in the database (faster startup)
             try {

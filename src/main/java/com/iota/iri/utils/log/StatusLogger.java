@@ -11,14 +11,19 @@ import org.slf4j.Logger;
  */
 public class StatusLogger {
     /**
-     * Holds the interval in milliseconds that status messages get printed.
+     * Holds the default interval in milliseconds that status messages get printed.
      */
-    private static final int LOG_INTERVAL = 3000;
+    private static final int DEFAULT_LOG_INTERVAL = 3000;
 
     /**
      * Holds a reference to the underlying logger.
      */
     private final Logger logger;
+
+    /**
+     * Holds the interval in milliseconds that status messages get printed.
+     */
+    private final int logInterval;
 
     /**
      * Holds the current status message that shall get printed to the console.
@@ -48,7 +53,19 @@ public class StatusLogger {
      * @param logger {@link Logger} object that is used in combination with logback to issue messages in the console
      */
     public StatusLogger(Logger logger) {
+        this(logger, DEFAULT_LOG_INTERVAL);
+    }
+
+    /**
+     * Constructor of the class.
+     *
+     * It simply stores the passed in parameters to be able to access them later on.
+     *
+     * @param logger {@link Logger} object that is used in combination with logback to issue messages in the console
+     */
+    public StatusLogger(Logger logger, int logInterval) {
         this.logger = logger;
+        this.logInterval = logInterval;
     }
 
     /**
@@ -66,14 +83,14 @@ public class StatusLogger {
         if (!message.equals(statusMessage)) {
             statusMessage = message;
 
-            if (System.currentTimeMillis() - lastLogTime >= LOG_INTERVAL) {
+            if (System.currentTimeMillis() - lastLogTime >= logInterval) {
                 printStatusMessage();
             } else if (outputThread == null) {
                 synchronized(this) {
                     if (outputThread == null) {
                         outputThread = new Thread(() -> {
                             try {
-                                Thread.sleep(Math.max(LOG_INTERVAL - (System.currentTimeMillis() - lastLogTime), 1));
+                                Thread.sleep(Math.max(logInterval - (System.currentTimeMillis() - lastLogTime), 1));
                             } catch(InterruptedException e) { /* do nothing */ }
 
                             printStatusMessage();
