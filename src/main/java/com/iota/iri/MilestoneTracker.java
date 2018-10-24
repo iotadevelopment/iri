@@ -154,7 +154,7 @@ public class MilestoneTracker {
 
             LinkedList<Hash> latestMilestoneQueue = new LinkedList<>();
             log.info("Tracker started.");
-            boolean firstRun = true;
+
             while (!shuttingDown) {
                 long scanTime = System.currentTimeMillis();
 
@@ -189,8 +189,6 @@ public class MilestoneTracker {
                 } catch (final Exception e) {
                     log.error("Error during Latest Milestone updating", e);
                 }
-
-                firstRun = false;
             }
         }, "Latest Milestone Tracker")).start();
     }
