@@ -9,22 +9,25 @@ public interface Logger {
      * This method allows us to set a new info message that shall get printed to the screen.
      *
      * @param message info message that shall get printed
+     * @return the logger itself to allow the chaining of calls
      */
-    void info(String message);
+    Logger info(String message);
 
     /**
      * This method allows us to set a new debug message that shall get printed to the screen.
      *
      * @param message debug message that shall get printed
+     * @return the logger itself to allow the chaining of calls
      */
-    void debug(String message);
+    Logger debug(String message);
 
     /**
      * This method allows us to set a new error message that shall get printed to the screen.
      *
      * @param message debug message that shall get printed
+     * @return the logger itself to allow the chaining of calls
      */
-    void error(String message);
+    Logger error(String message);
 
     /**
      * This method allows us to set a new error message that shall get printed to the screen.
@@ -32,7 +35,7 @@ public interface Logger {
      * @param message debug message that shall get printed
      * @param cause exception object that caused the error to happen (will be printed with the complete stacktrace)
      */
-    void error(String message, Throwable cause);
+    Logger error(String message, Throwable cause);
 
     /**
      * This method is the getter for the enabled flag of the logger.
@@ -49,6 +52,7 @@ public interface Logger {
      * If the logger is disabled it will simply omit showing log messages.
      *
      * @param enabled true if the logger shall output messages and false otherwise (the logger is enabled by default)
+     * @return the logger itself to allow the chaining of calls
      */
-    void setEnabled(boolean enabled);
+    Logger setEnabled(boolean enabled);
 }

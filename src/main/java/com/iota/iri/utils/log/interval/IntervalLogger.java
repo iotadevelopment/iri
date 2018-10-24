@@ -103,7 +103,7 @@ public class IntervalLogger implements Logger {
      * @param message info message that shall get printed
      */
     @Override
-    public void info(String message) {
+    public IntervalLogger info(String message) {
         Message newMessage = new InfoMessage(message);
 
         if (!newMessage.equals(lastReceivedMessage)) {
@@ -111,6 +111,8 @@ public class IntervalLogger implements Logger {
 
             triggerOutput();
         }
+
+        return this;
     }
 
     /**
@@ -119,7 +121,7 @@ public class IntervalLogger implements Logger {
      * It checks if the given message is new and then triggers the output.
      */
     @Override
-    public void debug(String message) {
+    public IntervalLogger debug(String message) {
         Message newMessage = new DebugMessage(message);
 
         if (!newMessage.equals(lastReceivedMessage)) {
@@ -127,6 +129,8 @@ public class IntervalLogger implements Logger {
 
             triggerOutput();
         }
+
+        return this;
     }
 
     /**
@@ -139,14 +143,8 @@ public class IntervalLogger implements Logger {
      * track down bugs more easily).
      */
     @Override
-    public void error(String message) {
-        Message newMessage = new ErrorMessage(message);
-
-        if (!newMessage.equals(lastReceivedMessage)) {
-            lastReceivedMessage = newMessage;
-
-            triggerOutput(true);
-        }
+    public IntervalLogger error(String message) {
+        return error(message, null);
     }
 
     /**
@@ -159,7 +157,7 @@ public class IntervalLogger implements Logger {
      * track down bugs more easily).
      */
     @Override
-    public void error(String message, Throwable cause) {
+    public IntervalLogger error(String message, Throwable cause) {
         Message newMessage = new ErrorMessage(message, cause);
 
         if (!newMessage.equals(lastReceivedMessage)) {
@@ -167,6 +165,8 @@ public class IntervalLogger implements Logger {
 
             triggerOutput(true);
         }
+
+        return this;
     }
 
     /**
@@ -181,8 +181,10 @@ public class IntervalLogger implements Logger {
      * {@inheritDoc}
      */
     @Override
-    public void setEnabled(boolean enabled) {
+    public IntervalLogger setEnabled(boolean enabled) {
         this.enabled = enabled;
+
+        return this;
     }
 
     /**
@@ -388,15 +390,6 @@ public class IntervalLogger implements Logger {
          * Holds the cause of the error message.
          */
         private final Throwable cause;
-
-        /**
-         * Does the same as {@link #ErrorMessage(String, Throwable)} but defaults to an empty cause.
-         *
-         * @param message message that shall get printed
-         */
-        public ErrorMessage(String message) {
-            this(message, null);
-        }
 
         /**
          * Creates a message that gets dumped of the "error logging level".
