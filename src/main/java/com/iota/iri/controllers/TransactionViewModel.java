@@ -84,7 +84,7 @@ public class TransactionViewModel implements Cacheable {
 
     public static TransactionViewModel fromHash(Tangle tangle, final Hash hash) throws Exception {
         TransactionViewModel transactionViewModel = cache.get(hash);
-        if (transactionViewModel == null) {
+        if (true || transactionViewModel == null) {
             transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
             fillMetadata(tangle, transactionViewModel);
 
