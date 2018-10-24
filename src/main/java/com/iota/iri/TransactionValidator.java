@@ -73,7 +73,7 @@ public class TransactionValidator {
 
     private boolean hasInvalidTimestamp(TransactionViewModel transactionViewModel) {
         // ignore invalid timestamps for transactions that where requested by our node while solidifying a milestone
-        if(transactionRequester.containsMilestoneRequest(transactionViewModel.getHash())) {
+        if(transactionRequester.isTransactionRequested(transactionViewModel.getHash(), true)) {
             return false;
         }
 
@@ -189,11 +189,8 @@ public class TransactionValidator {
                     if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(hashPointer)) {
                         solid = false;
 
-                        if (milestone && !transactionRequester.containsMilestoneRequest(hashPointer)) {
-                            transactionRequester.requestTransaction(hashPointer, true);
-                            break;
-                        } else if (!milestone && !transactionRequester.contains(hashPointer)) {
-                            transactionRequester.requestTransaction(hashPointer, false);
+                        if (!transactionRequester.isTransactionRequested(hashPointer, milestone)) {
+                            transactionRequester.requestTransaction(hashPointer, milestone);
                             break;
                         }
                     } else {
