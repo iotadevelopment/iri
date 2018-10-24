@@ -38,7 +38,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
 import static com.iota.iri.MilestoneTracker.Validity.INCOMPLETE;
@@ -69,11 +68,6 @@ public class MilestoneTracker {
      * How often (in milliseconds) to dump log messages about status updates.
      */
     private static int STATUS_LOG_INTERVAL = 5000;
-
-    /**
-     * This variable is used to keep track of the asynchronous tasks, that the "Solid Milestone Tracker" should wait for.
-     */
-    private AtomicInteger blockingSolidMilestoneTrackerTasks = new AtomicInteger(0);
 
     private final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
     private final Tangle tangle;
@@ -141,12 +135,6 @@ public class MilestoneTracker {
     public void init (LedgerValidator ledgerValidator) {
         this.ledgerValidator = ledgerValidator;
 
-        // to be able to process the milestones in the correct order after a rescan of the database, we initialize
-        // this variable with 1 and wait for the "Latest Milestone Tracker" to process all milestones at least once
-        if(isRescanning) {
-            blockingSolidMilestoneTrackerTasks.incrementAndGet();
-        }
-
         milestoneSolidifier.start();
 
         // start the threads
@@ -195,11 +183,6 @@ public class MilestoneTracker {
 
                     if (latestMilestoneQueue.size() >= 1) {
                         log.info("Milestone Tracker: Processing milestones ... " + latestMilestoneQueue.size() + " milestones remaining");
-                    }
-
-                    // allow the "Solid Milestone Tracker" to continue if we finished the first run in rescanning mode
-                    if(firstRun && isRescanning) {
-                        blockingSolidMilestoneTrackerTasks.decrementAndGet();
                     }
 
                     Thread.sleep(Math.max(1, RESCAN_INTERVAL - (System.currentTimeMillis() - scanTime)));
