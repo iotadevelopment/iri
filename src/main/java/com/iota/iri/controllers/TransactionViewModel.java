@@ -748,6 +748,13 @@ public class TransactionViewModel implements Cacheable {
         return Objects.hash(getHash());
     }
 
+    /**
+     * This method creates a human readable string representation of the transaction.
+     *
+     * It can be used to directly append the transaction in error and debug messages.
+     *
+     * @return human readable string representation of the transaction
+     */
     @Override
     public String toString() {
         return "transaction " + hash.toString();

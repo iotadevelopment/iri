@@ -161,8 +161,8 @@ public class TestnetConfig extends BaseIotaConfig {
 
     public interface Defaults {
         String COORDINATOR_ADDRESS = "EQQFCZBIHRHWPXKMTOLMYUYPCN9XLMJPYZVFJSAY9FQHCCLWTOLLUGKKMXYFDBOOYFBLBI9WUEILGECYM";
-        String LOCAL_SNAPSHOTS_BASE_PATH = "testnet";
         boolean DONT_VALIDATE_MILESTONE_SIG = false;
+        String LOCAL_SNAPSHOTS_BASE_PATH = "testnet";
         String SNAPSHOT_FILE = "/snapshotTestnet.txt";
         int REQUEST_HASH_SIZE = 49;
         String SNAPSHOT_SIG = "/snapshotTestnet.sig";

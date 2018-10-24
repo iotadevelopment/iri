@@ -32,6 +32,16 @@ import java.util.concurrent.atomic.AtomicLong;
  * The class node is responsible for managing Thread's connection.
  */
 public class Node {
+    /**
+     * Holds the minimum amount of transactions in the request queue that are required for the requester {@link Thread}
+     * to become active.
+     */
+    private static final int REQUESTER_THREAD_ACTIVATION_THRESHOLD = 50;
+
+    /**
+     * Holds the time in milliseconds, that the requester thread waits between its iterations.
+     */
+    private static final int REQUESTER_THREAD_INTERVAL = 100;
 
     private static final Logger log = LoggerFactory.getLogger(Node.class);
     private final int reqHashSize;
@@ -480,32 +490,45 @@ public class Node {
         sendPacketsCounter.getAndIncrement();
     }
 
+    /**
+     * This method returns the lambda for the requester {@link Thread} that tries to actively request missing
+     * transactions from the request queue by sending random tips together with our request.
+     *
+     * Without this thread we are limited to the amount of incoming transactions while syncing the node, because we can
+     * only request new transactions when we are re-broadcasting these received transactions.
+     *
+     * To not send unnecessary requests for "temporarily" missing transactions while receiving broadcasts from the
+     * network, we only trigger its logic when the queue exceeds the {@link #REQUESTER_THREAD_ACTIVATION_THRESHOLD}.
+     *
+     * @return lambda for the requester {@link Thread}
+     */
     private Runnable spawnRequesterThread() {
         return () -> {
+             log.info("Spawning Requester Thread");
 
-            log.info("Spawning Requester Thread");
+             while (!shuttingDown.get()) {
+                 try {
+                    if(transactionRequester.numberOfTransactionsToRequest() > REQUESTER_THREAD_ACTIVATION_THRESHOLD) {
+                        final TransactionViewModel transactionViewModel =
+                                TransactionViewModel.fromHash(tangle, getRandomTipPointer());
 
-            while (!shuttingDown.get()) {
-
-                try {
-                    if(transactionRequester.numberOfTransactionsToRequest() > 50) {
-                        final TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, getRandomTipPointer());
                         if (transactionViewModel != null) {
-
-                            for (final Neighbor neighbor : neighbors) {
+                             for (final Neighbor neighbor : neighbors) {
                                 try {
                                     sendPacket(sendingPacket, transactionViewModel, neighbor);
                                 } catch (final Exception e) {
-                                    // ignore
+                                    // ignore because there is nothing we can do here anyway
                                 }
                             }
                         }
                     }
-                    Thread.sleep(100);
+
+                    Thread.sleep(REQUESTER_THREAD_INTERVAL);
                 } catch (final Exception e) {
                     log.error("Requester Thread Exception:", e);
                 }
             }
+
             log.info("Shutting down Requester Thread");
         };
     }
