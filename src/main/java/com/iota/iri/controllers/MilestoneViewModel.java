@@ -108,18 +108,13 @@ public class MilestoneViewModel {
     }
 
     public static MilestoneViewModel findClosestPrevMilestone(Tangle tangle, int index) throws Exception {
-        // create a variable that will contain our search result
+        // search for the previous milestone preceding our index
         MilestoneViewModel previousMilestoneViewModel = null;
-
-        // create a counter variable
         int currentIndex = index;
-
-        // try to find the next milestone by index rather than db insertion order until we are successful
         while(previousMilestoneViewModel == null && --currentIndex >= index - MAX_MILESTONE_INDEX_GAP) {
             previousMilestoneViewModel = MilestoneViewModel.get(tangle, currentIndex);
         }
 
-        // return our result
         return previousMilestoneViewModel;
     }
 
