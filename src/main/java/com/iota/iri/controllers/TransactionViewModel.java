@@ -78,6 +78,11 @@ public class TransactionViewModel implements Cacheable {
     public static TransactionViewModel find(Tangle tangle, byte[] hash) throws Exception {
         TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.find(Transaction.class, hash), HashFactory.TRANSACTION.create(hash));
         fillMetadata(tangle, transactionViewModel);
+
+        if (transactionViewModel.getType() != PREFILLED_SLOT) {
+            cache.add(transactionViewModel);
+        }
+
         return transactionViewModel;
     }
 
