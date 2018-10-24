@@ -1,9 +1,6 @@
 package com.iota.iri.storage.cache;
 
-import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.model.Hash;
 import com.iota.iri.storage.Indexable;
-import com.iota.iri.storage.Tangle;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -48,6 +45,7 @@ public class Cache<T extends Cacheable> {
 
         CachedWeakReference(T o) {
             super(o, releasedCustomObjects);
+
             this.id = o.getId();
         }
     }
