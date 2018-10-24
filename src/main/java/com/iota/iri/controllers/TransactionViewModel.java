@@ -25,7 +25,7 @@ public class TransactionViewModel implements Cacheable {
 
     private static Cache<TransactionViewModel> cache = new Cache<>();
 
-    private final Transaction transaction;
+    public final Transaction transaction;
 
     public static final int SIZE = 1604;
     private static final int TAG_SIZE_IN_BYTES = 17; // = ceil(81 TRITS / 5 TRITS_PER_BYTE)
@@ -78,10 +78,6 @@ public class TransactionViewModel implements Cacheable {
     public static TransactionViewModel find(Tangle tangle, byte[] hash) throws Exception {
         TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.find(Transaction.class, hash), HashFactory.TRANSACTION.create(hash));
         fillMetadata(tangle, transactionViewModel);
-
-        if (transactionViewModel.getType() != PREFILLED_SLOT) {
-            cache.add(transactionViewModel);
-        }
 
         return transactionViewModel;
     }
@@ -147,6 +143,9 @@ public class TransactionViewModel implements Cacheable {
         if(initialSnapshot.hasSolidEntryPoint(hash)) {
             return false;
         }
+
+        cache.add(this);
+
         return tangle.update(transaction, hash, item);
     }
 
@@ -228,6 +227,9 @@ public class TransactionViewModel implements Cacheable {
         if (exists(tangle, hash)) {
             return false;
         }
+
+        cache.add(this);
+
         return tangle.saveBatch(batch);
     }
 

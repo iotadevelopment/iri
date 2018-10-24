@@ -333,8 +333,6 @@ public class WalkValidatorImplTest {
         //Now assume milestone 99 confirmed tx3
         tx3.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), 99);
 
-        System.out.println(tx3.snapshotIndex());
-
         Assert.assertTrue("Validation of tx4 failed but should have succeeded since tx is above max depth",
                 walkValidator.isValid(tx4.getHash()));
     }
