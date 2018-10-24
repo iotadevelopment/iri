@@ -1,14 +1,12 @@
 package com.iota.iri.utils.log.interval;
 
 import com.iota.iri.utils.log.ProgressLogger;
-import com.iota.iri.utils.log.StatusLogger;
 import org.slf4j.Logger;
 
 import java.text.DecimalFormat;
 
 /**
- * Implements the basic contract of the {@link ProgressLogger} while showing the progress as a status message in the
- * console.
+ * Implements the basic contract of the {@link ProgressLogger} while showing the progress as messages in the console.
  *
  * Instead of printing all messages immediately and unnecessarily spamming the console output, it rate limits the amount
  * of messages shown and only prints updates in a pre-defined interval.
@@ -25,12 +23,12 @@ public class IntervalProgressLogger implements ProgressLogger {
     private final String taskName;
 
     /**
-     * Holds the status logger, that takes care of showing our messages.
+     * Holds the logger that takes care of showing our messages.
      */
-    private final StatusLogger statusLogger;
+    private final IntervalLogger intervalLogger;
 
     /**
-     * The current step of the task.
+     * The last finished step of the task.
      */
     private int currentStep = 0;
 
@@ -40,30 +38,49 @@ public class IntervalProgressLogger implements ProgressLogger {
     private int stepCount = 1;
 
     /**
-     * Flag that indicates if the output is enabled.
+     * Does the same as {@link #IntervalProgressLogger(String, Class, int)} but defaults to
+     * {@link #DEFAULT_LOG_INTERVAL} for the interval.
+     *
+     * @param taskName name of the task that shall be shown on the screen
+     * @param clazz class that is used to identify the origin of the log messages
      */
-    private boolean enabled = true;
+    public IntervalProgressLogger(String taskName, Class<?> clazz) {
+        this(taskName, clazz, DEFAULT_LOG_INTERVAL);
+    }
+
+    /**
+     * Does the same as {@link #IntervalProgressLogger(String, Logger, int)} but defaults to
+     * {@link #DEFAULT_LOG_INTERVAL} for the interval.
+     *
+     * @param taskName name of the task that shall be shown on the screen
+     * @param logger logback logger for issuing the messages
+     */
+    public IntervalProgressLogger(String taskName, Logger logger) {
+        this(taskName, logger, DEFAULT_LOG_INTERVAL);
+    }
 
     /**
      * Creates a {@link ProgressLogger} that shows its progress in a pre-defined interval.
      *
      * @param taskName name of the task that shall be shown on the screen
-     * @param logger {@link Logger} object that is used in combination with logback to issue messages in the console
+     * @param clazz class that is used to identify the origin of the log messages
+     * @param logInterval the time in milliseconds between consecutive log messages
+     */
+    public IntervalProgressLogger(String taskName, Class<?> clazz, int logInterval) {
+        this.taskName = taskName;
+        this.intervalLogger = new IntervalLogger(clazz, logInterval);
+    }
+
+    /**
+     * Creates a {@link ProgressLogger} that shows its progress in a pre-defined interval.
+     *
+     * @param taskName name of the task that shall be shown on the screen
+     * @param logger logback logger for issuing the messages
      * @param logInterval the time in milliseconds between consecutive log messages
      */
     public IntervalProgressLogger(String taskName, Logger logger, int logInterval) {
         this.taskName = taskName;
-        this.statusLogger = new StatusLogger(logger, logInterval);
-    }
-
-    /**
-     * Does the same as {@link #IntervalProgressLogger(String, Logger, int)} but defaults to
-     *
-     * @param taskName name of the task that shall be shown on the screen
-     * @param logger {@link Logger} object that is used in combination with logback to issue messages in the console
-     */
-    public IntervalProgressLogger(String taskName, Logger logger) {
-        this(taskName, logger, DEFAULT_LOG_INTERVAL);
+        this.intervalLogger = new IntervalLogger(logger, logInterval);
     }
 
     /**
@@ -100,14 +117,18 @@ public class IntervalProgressLogger implements ProgressLogger {
 
     /**
      * {@inheritDoc}
+     *
+     * It will show the message immediately instead of waiting for the interval to pass.
      */
     @Override
     public IntervalProgressLogger finish() {
-        return setCurrentStep(stepCount).triggerOutput();
+        return setCurrentStep(stepCount).triggerOutput(true);
     }
 
     /**
      * {@inheritDoc}
+     *
+     * It will show the message immediately instead of waiting for the interval to pass.
      */
     @Override
     public IntervalProgressLogger abort() {
@@ -116,16 +137,18 @@ public class IntervalProgressLogger implements ProgressLogger {
 
     /**
      * {@inheritDoc}
+     *
+     * It will show the message immediately instead of waiting for the interval to pass.
      */
     @Override
-    public IntervalProgressLogger abort(Exception reason) {
+    public IntervalProgressLogger abort(Throwable cause) {
         double progress = Math.min(100d, ((double) currentStep / (double) stepCount) * 100d);
         String logMessage = taskName + ": " + new DecimalFormat("#.00").format(progress) + "% ... [FAILED]";
 
-        if (reason != null) {
-            statusLogger.error(logMessage, reason);
+        if (cause != null) {
+            intervalLogger.error(logMessage, cause);
         } else {
-            statusLogger.error(logMessage);
+            intervalLogger.error(logMessage);
         }
 
         return this;
@@ -171,10 +194,28 @@ public class IntervalProgressLogger implements ProgressLogger {
      * {@inheritDoc}
      */
     @Override
+    public boolean getEnabled() {
+        return intervalLogger.getEnabled();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public IntervalProgressLogger setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        this.intervalLogger.setEnabled(enabled);
 
         return this;
+    }
+
+    /**
+     * Does the same as {@link #triggerOutput(boolean)} but defaults to but defaults to letting the logger decide when
+     * to print the message.
+     *
+     * @return the logger itself to allow the chaining of calls
+     */
+    private IntervalProgressLogger triggerOutput() {
+        return triggerOutput(false);
     }
 
     /**
@@ -182,15 +223,20 @@ public class IntervalProgressLogger implements ProgressLogger {
      *
      * It calculates the current progress, generates the log message and passes it on to the underlying status logger.
      *
+     * @param printImmediately flag indicating if the message shall be printed immediately
      * @return the logger itself to allow the chaining of calls
      */
-    private IntervalProgressLogger triggerOutput() {
-        if (enabled && stepCount != 0) {
+    private IntervalProgressLogger triggerOutput(boolean printImmediately) {
+        if (stepCount != 0) {
             double progress = Math.min(100d, ((double) currentStep / (double) stepCount) * 100d);
             String logMessage = taskName + ": " + new DecimalFormat("0.00").format(progress) + "% ..." +
                     (currentStep >= stepCount ? " [DONE]" : "");
 
-            statusLogger.status(logMessage);
+            intervalLogger.info(logMessage);
+
+            if (printImmediately) {
+                intervalLogger.triggerOutput(true);
+            }
         }
 
         return this;

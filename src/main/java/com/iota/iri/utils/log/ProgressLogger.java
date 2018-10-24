@@ -10,7 +10,7 @@ import org.slf4j.Logger;
  */
 public interface ProgressLogger {
     /**
-     * Starts the logging by (re)setting the current step to 0 and triggers the output of the current progress.
+     * Starts the logging by (re)setting the current step to 0 and trigger the output of the current progress.
      *
      * @return the logger itself to allow the chaining of calls
      */
@@ -67,7 +67,7 @@ public interface ProgressLogger {
      * @param reason reason for the failure
      * @return the logger itself to allow the chaining of calls
      */
-    ProgressLogger abort(Exception reason);
+    ProgressLogger abort(Throwable reason);
 
     /**
      * Returns the current finished step of this logger.
@@ -98,6 +98,15 @@ public interface ProgressLogger {
      * @return the logger itself to allow the chaining of calls
      */
     ProgressLogger setStepCount(int stepCount);
+
+    /**
+     * This method is the getter for the enabled flag of the logger.
+     *
+     * If the logger is disabled it will simply omit showing log messages.
+     *
+     * @return true if the logger shall output messages and false otherwise (the logger is enabled by default)
+     */
+    boolean getEnabled();
 
     /**
      * This method is the setter for the enabled flag of the logger.

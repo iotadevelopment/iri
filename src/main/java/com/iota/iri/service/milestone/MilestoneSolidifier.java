@@ -3,9 +3,10 @@ package com.iota.iri.service.milestone;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.utils.log.Logger;
+import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
-import com.iota.iri.utils.log.StatusLogger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
@@ -43,7 +44,7 @@ public class MilestoneSolidifier {
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
-    private final StatusLogger statusLogger = new StatusLogger(LoggerFactory.getLogger(MilestoneSolidifier.class));
+    private final Logger statusLogger = new IntervalLogger(MilestoneSolidifier.class);
 
     /**
      * Holds a reference to the initial Snapshot which allows us to check if milestones are still relevant.
@@ -320,7 +321,7 @@ public class MilestoneSolidifier {
      */
     private boolean isSolid(Map.Entry<Hash, Integer> currentEntry) {
         if (unsolidMilestonesPool.size() > 1) {
-            statusLogger.status("Solidifying milestone #" + currentEntry.getValue() + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
+            statusLogger.info("Solidifying milestone #" + currentEntry.getValue() + " [" + milestonesToSolidify.size() + " / " + unsolidMilestonesPool.size() + "]");
         }
 
         try {
