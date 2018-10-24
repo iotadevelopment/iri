@@ -159,8 +159,12 @@ public class Transaction implements Persistable {
             confirmed = bytes[i] == 1;
             i++;
             */
-            solid = bytes[i] == 1;
+
+            // decode the boolean byte by checking the bitmasks
+            solid = (bytes[i] & IS_SOLID_BITMASK) != 0;
+            isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
             i++;
+
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
             byte[] senderBytes = new byte[bytes.length - i];

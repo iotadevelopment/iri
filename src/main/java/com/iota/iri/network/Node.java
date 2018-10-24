@@ -490,6 +490,34 @@ public class Node {
         sendPacketsCounter.getAndIncrement();
     }
 
+    private Runnable spawnBroadcasterThread() {
+        return () -> {
+
+            log.info("Spawning Broadcaster Thread");
+
+            while (!shuttingDown.get()) {
+
+                try {
+                    final TransactionViewModel transactionViewModel = broadcastQueue.pollFirst();
+                    if (transactionViewModel != null) {
+
+                        for (final Neighbor neighbor : neighbors) {
+                            try {
+                                sendPacket(sendingPacket, transactionViewModel, neighbor);
+                            } catch (final Exception e) {
+                                // ignore
+                            }
+                        }
+                    }
+                    Thread.sleep(PAUSE_BETWEEN_TRANSACTIONS);
+                } catch (final Exception e) {
+                    log.error("Broadcaster Thread Exception:", e);
+                }
+            }
+            log.info("Shutting down Broadcaster Thread");
+        };
+    }
+
     /**
      * This method returns the lambda for the requester {@link Thread} that tries to actively request missing
      * transactions from the request queue by sending random tips together with our request.
@@ -530,34 +558,6 @@ public class Node {
             }
 
             log.info("Shutting down Requester Thread");
-        };
-    }
-
-    private Runnable spawnBroadcasterThread() {
-        return () -> {
-
-            log.info("Spawning Broadcaster Thread");
-
-            while (!shuttingDown.get()) {
-
-                try {
-                    final TransactionViewModel transactionViewModel = broadcastQueue.pollFirst();
-                    if (transactionViewModel != null) {
-
-                        for (final Neighbor neighbor : neighbors) {
-                            try {
-                                sendPacket(sendingPacket, transactionViewModel, neighbor);
-                            } catch (final Exception e) {
-                                // ignore
-                            }
-                        }
-                    }
-                    Thread.sleep(PAUSE_BETWEEN_TRANSACTIONS);
-                } catch (final Exception e) {
-                    log.error("Broadcaster Thread Exception:", e);
-                }
-            }
-            log.info("Shutting down Broadcaster Thread");
         };
     }
 
