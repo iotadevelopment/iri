@@ -665,7 +665,7 @@ public class TransactionViewModel implements Cacheable {
      * @throws Exception if something goes wrong while saving the changes to the database
      */
     public void isSnapshot(Tangle tangle, Snapshot initialSnapshot, final boolean isSnapshot) throws Exception {
-        if ( isSnapshot != transaction.isSnapshot ) {
+        if (isSnapshot != transaction.isSnapshot) {
             transaction.isSnapshot = isSnapshot;
             update(tangle, initialSnapshot, "isSnapshot");
         }
