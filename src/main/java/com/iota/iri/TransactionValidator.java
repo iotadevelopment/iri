@@ -158,7 +158,7 @@ public class TransactionValidator {
     }
 
     public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions, boolean debug) throws Exception {
-        TransactionViewModel transactionToSolidify = TransactionViewModel.fromHash(tangle, hash);
+        TransactionViewModel transactionToSolidify = fromHash(tangle, hash);
         if(transactionToSolidify.isSolid()) {
             return true;
         }
@@ -177,7 +177,7 @@ public class TransactionValidator {
                     return false;
                 }
 
-                final TransactionViewModel transaction = TransactionViewModel.fromHash(tangle, hashPointer);
+                final TransactionViewModel transaction = fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
                     if (debug && txCount < 50) {
                         if (transaction.getTimestamp() < transactionToSolidify.getTimestamp() - 172800) {
@@ -186,7 +186,7 @@ public class TransactionValidator {
                         System.out.println(" => " + hashPointer.toString());
                         txCount++;
                     }
-                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(hashPointer)) {
+                    if (transaction.getType() == PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(hashPointer)) {
                         solid = false;
 
                         if (!transactionRequester.isTransactionRequested(hashPointer, milestone)) {
