@@ -109,6 +109,7 @@ public class Transaction implements Persistable {
         return buffer.array();
     }
 
+    @Override
     public void readMetadata(byte[] bytes) {
         int i = 0;
         if(bytes != null) {
