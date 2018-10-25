@@ -12,25 +12,12 @@ import java.util.*;
 public class BundleValidator {
 
     public static List<List<TransactionViewModel>> validate(Tangle tangle, Snapshot initialSnapshot, Hash tailHash) throws Exception {
-        return validate(tangle, initialSnapshot, tailHash, false);
-    }
-
-    public static List<List<TransactionViewModel>> validate(Tangle tangle, Snapshot initialSnapshot, Hash tailHash, boolean debug) throws Exception {
-        if (debug) {
-            System.out.println("u");
-        }
         TransactionViewModel tail = TransactionViewModel.fromHash(tangle, tailHash);
         List<List<TransactionViewModel>> transactions = new LinkedList<>();
         if (tail.getCurrentIndex() != 0) {
             return transactions;
         }
-        if (debug) {
-            System.out.println("a");
-        }
         final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail);
-        if (debug) {
-            System.out.println(bundleTransactions.size());
-        }
         for (TransactionViewModel transactionViewModel : bundleTransactions.values()) {
 
             if (transactionViewModel.getCurrentIndex() == 0 && transactionViewModel.getValidity() >= 0) {
