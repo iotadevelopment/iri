@@ -401,10 +401,6 @@ public class TransactionViewModel implements Cacheable {
             transactionViewModel = TransactionViewModel.fromHash(tangle, hashIterator.next());
 
             transactionViewModel.updateHeights(tangle, initialSnapshot);
-
-            // recursively update the referenced snapshots field of the transaction
-            transactionViewModel.updateReferencedSnapshot(tangle, initialSnapshot);
-
             if(!transactionViewModel.isSolid()) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.update(tangle, initialSnapshot, "solid|height");
