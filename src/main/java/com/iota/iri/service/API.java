@@ -272,10 +272,7 @@ public class API {
                     MilestoneViewModel snapshotIndexMilestone = MilestoneViewModel.get(instance.tangle, transaction.snapshotIndex());
                     String snapshotIndex = "" + transaction.snapshotIndex() + "" + (snapshotIndexMilestone == null ? "" : " (" + snapshotIndexMilestone.getHash().toString() + ")");
 
-                    MilestoneViewModel referencedSnapshotMilestone = MilestoneViewModel.get(instance.tangle, transaction.referencedSnapshot());
-                    String referencedSnapshot = "" + transaction.referencedSnapshot() + "" + (referencedSnapshotMilestone == null ? "" : " (" + referencedSnapshotMilestone.getHash().toString() + ")");
-
-                    return ErrorResponse.create(transaction.getHash().toString() + ": exists: " + exists + "; timestamp: " + transaction.getTimestamp() + "; arrivalTimestamp: " + transaction.getArrivalTime() + "; isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex + "; referencedSnapshot: " + referencedSnapshot);
+                    return ErrorResponse.create(transaction.getHash().toString() + ": exists: " + exists + "; timestamp: " + transaction.getTimestamp() + "; arrivalTimestamp: " + transaction.getArrivalTime() + "; isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex);
                 }
                 case "storeMessage": {
                     if (!testNet) {
@@ -1031,10 +1028,8 @@ public class API {
             Converter.trits(tryte, txTrits, 0);
             final TransactionViewModel transactionViewModel = instance.transactionValidator.validateTrits(txTrits, instance.transactionValidator.getMinWeightMagnitude());
             elements.add(transactionViewModel);
-            System.out.println("blub");
         }
         for (final TransactionViewModel transactionViewModel : elements) {
-            System.out.println("blab");
             //push first in line to broadcast
             transactionViewModel.weightMagnitude = Curl.HASH_LENGTH;
             instance.node.broadcast(transactionViewModel);
