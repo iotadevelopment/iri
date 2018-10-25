@@ -77,7 +77,7 @@ public class Transaction implements Persistable {
         int allocateSize =
                 Hash.SIZE_IN_BYTES * 6 + //address,bundle,trunk,branch,obsoleteTag,tag
                         Long.BYTES * 9 + //value,currentIndex,lastIndex,timestamp,attachmentTimestampLowerBound,attachmentTimestampUpperBound,arrivalTime,height
-                        Integer.BYTES * 4 + // validity, type, snapshot, referencedSnapshot
+                        Integer.BYTES * 3 + //validity,type,snapshot
                         1 + //solid
                         sender.getBytes().length; //sender
         ByteBuffer buffer = ByteBuffer.allocate(allocateSize);
@@ -110,13 +110,11 @@ public class Transaction implements Persistable {
 
         // store the milestone relates members
         buffer.put(Serializer.serialize(snapshot));
-        buffer.put(Serializer.serialize(referencedSnapshot));
-
         buffer.put(sender.getBytes());
         return buffer.array();
     }
 
-    public void readMetadataOld(byte[] bytes) {
+    public void readMetadata(byte[] bytes) {
         int i = 0;
         if(bytes != null) {
             address = HashFactory.ADDRESS.create(bytes, i, Hash.SIZE_IN_BYTES);
@@ -173,75 +171,6 @@ public class Transaction implements Persistable {
             }
             sender = new String(senderBytes);
             parsed = true;
-        }
-    }
-
-    @Override
-    public void readMetadata(byte[] bytes) {
-        try {
-            int i = 0;
-            if (bytes != null) {
-            address = HashFactory.ADDRESS.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                bundle = HashFactory.BUNDLE.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                trunk = HashFactory.TRANSACTION.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                branch = HashFactory.TRANSACTION.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                obsoleteTag = HashFactory.OBSOLETETAG.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                value = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                currentIndex = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                lastIndex = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                timestamp = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-
-                tag = HashFactory.TAG.create(bytes, i, Hash.SIZE_IN_BYTES);
-                i += Hash.SIZE_IN_BYTES;
-                attachmentTimestamp = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                attachmentTimestampLowerBound = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                attachmentTimestampUpperBound = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-
-                validity = Serializer.getInteger(bytes, i);
-                i += Integer.BYTES;
-                type = Serializer.getInteger(bytes, i);
-                i += Integer.BYTES;
-                arrivalTime = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-                height = Serializer.getLong(bytes, i);
-                i += Long.BYTES;
-            /*
-            confirmed = bytes[i] == 1;
-            i++;
-            */
-
-                // decode the boolean byte by checking the bitmasks
-                solid = (bytes[i] & IS_SOLID_BITMASK) != 0;
-                isSnapshot = (bytes[i] & IS_SNAPSHOT_BITMASK) != 0;
-                i++;
-
-                // restore the milestone related members
-                snapshot = Serializer.getInteger(bytes, i);
-                i += Integer.BYTES;
-                referencedSnapshot = Serializer.getInteger(bytes, i);
-                i += Integer.BYTES;
-
-                byte[] senderBytes = new byte[bytes.length - i];
-                if (senderBytes.length != 0) {
-                    System.arraycopy(bytes, i, senderBytes, 0, senderBytes.length);
-                }
-                sender = new String(senderBytes);
-                parsed = true;
-            }
-        } catch(Exception e) {
-            readMetadataOld(bytes);
         }
     }
 
