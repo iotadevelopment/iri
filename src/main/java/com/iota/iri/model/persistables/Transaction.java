@@ -55,11 +55,6 @@ public class Transaction implements Persistable {
     public String sender = "";
     public int snapshot;
 
-    /**
-     * This field indicates which milestone a transactions references.
-     */
-    public int referencedSnapshot = -1;
-
     public byte[] bytes() {
         return bytes;
     }
