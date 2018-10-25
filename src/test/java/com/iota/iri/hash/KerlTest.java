@@ -156,7 +156,7 @@ public class KerlTest {
                 maxdiff = diff;
             }
             if (i % interval == 0) {
-                //log.info("{}", new String(new char[(int) ((diff / 10000))]).replace('\0', '|'));
+                //log.info("{}", new String(new char[(int) ((balanceChanges / 10000))]).replace('\0', '|'));
             }
             if (i % interval == 0) {
                 log.info("Run time for {}: {} us.\tInterval Time: {} us.\tMax time per iter: {} us. \tAverage: {} us.\t Total time: {} us.", i,

@@ -3,6 +3,9 @@ package com.iota.iri;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.slf4j.Logger;
@@ -12,6 +15,7 @@ import java.util.*;
 
 public class LedgerValidator {
 
+    private final SnapshotProvider snapshotProvider;
     private final Logger log = LoggerFactory.getLogger(LedgerValidator.class);
     private final Tangle tangle;
     private final MilestoneTracker milestoneTracker;
@@ -19,9 +23,10 @@ public class LedgerValidator {
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.milestoneTracker = milestoneTracker;
+        this.snapshotProvider = snapshotProvider;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
     }
@@ -44,15 +49,18 @@ public class LedgerValidator {
      * @param tip                                the hash of a transaction to start the search from
      * @param latestSnapshotIndex                index of the latest snapshot to traverse to
      * @param milestone                          marker to indicate whether to stop only at confirmed transactions
-     * @return {state}                           the addresses that have a balance changed since the last diff check
+     * @return {state}                           the addresses that have a balance changed since the last balanceChanges check
      * @throws Exception
      */
     public Map<Hash,Long> getLatestDiff(final Set<Hash> visitedNonMilestoneSubtangleHashes, Hash tip, int latestSnapshotIndex, boolean milestone) throws Exception {
         Map<Hash, Long> state = new HashMap<>();
         int numberOfAnalyzedTransactions = 0;
-        Set<Hash> countedTx = new HashSet<>(Collections.singleton(Hash.NULL_HASH));
+        Set<Hash> countedTx = new HashSet<>();
 
-        visitedNonMilestoneSubtangleHashes.add(Hash.NULL_HASH);
+        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().keySet().forEach(solidEntryPointHash -> {
+            visitedNonMilestoneSubtangleHashes.add(solidEntryPointHash);
+            countedTx.add(solidEntryPointHash);
+        });
 
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
         Hash transactionPointer;
@@ -70,9 +78,11 @@ public class LedgerValidator {
 
                         if (transactionViewModel.getCurrentIndex() == 0) {
 
+
+
                             boolean validBundle = false;
 
-                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, transactionViewModel.getHash());
+                            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash());
                             /*
                             for(List<TransactionViewModel> transactions: bundleTransactions) {
                                 if (transactions.size() > 0) {
@@ -107,6 +117,8 @@ public class LedgerValidator {
                                 }
                             }
                             if (!validBundle) {
+                                System.out.println(2);
+                                System.out.println(BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash(), true).size());
                                 return null;
                             }
                         }
@@ -134,15 +146,19 @@ public class LedgerValidator {
      * @param index milestone index
      * @throws Exception
      */
-    private void updateSnapshotMilestone(Hash hash, int index) throws Exception {
+    private void updateSnapshotIndexOfMilestoneTransactions(Hash hash, int index) throws Exception {
+        Set<Integer> resettedMilestones = new HashSet<>();
         Set<Hash> visitedHashes = new HashSet<>();
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (visitedHashes.add(hashPointer)) {
                 final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
-                if(transactionViewModel2.snapshotIndex() == 0) {
-                    transactionViewModel2.setSnapshot(tangle, index);
+                if(transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) {
+                    if(transactionViewModel2.snapshotIndex() > index) {
+                        resettedMilestones.add(transactionViewModel2.snapshotIndex());
+                    }
+                    transactionViewModel2.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), index);
                     messageQ.publish("%s %s %d sn", transactionViewModel2.getAddressHash(), transactionViewModel2.getHash(), index);
                     messageQ.publish("sn %d %s %s %s %s %s", index, transactionViewModel2.getHash(),
                             transactionViewModel2.getAddressHash(),
@@ -152,115 +168,76 @@ public class LedgerValidator {
                     nonAnalyzedTransactions.offer(transactionViewModel2.getTrunkTransactionHash());
                     nonAnalyzedTransactions.offer(transactionViewModel2.getBranchTransactionHash());
                 }
-            }
-        }
-    }
 
-    /**
-     * Descends through transactions, trunk and branch, beginning at {tip}, until it reaches a transaction marked as
-     * confirmed, or until it reaches a transaction that has already been added to the transient consistent set.
-     * @param tip
-     * @throws Exception
-     */
-    private void updateConsistentHashes(final Set<Hash> visitedHashes, Hash tip, int index) throws Exception {
-        final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(tip));
-        Hash hashPointer;
-        while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
-            final TransactionViewModel transactionViewModel2 = TransactionViewModel.fromHash(tangle, hashPointer);
-            if((transactionViewModel2.snapshotIndex() == 0 || transactionViewModel2.snapshotIndex() > index) ) {
-                if(visitedHashes.add(hashPointer)) {
-                    nonAnalyzedTransactions.offer(transactionViewModel2.getTrunkTransactionHash());
-                    nonAnalyzedTransactions.offer(transactionViewModel2.getBranchTransactionHash());
+                // if we reference sth before the local snapshot -> add it to the solid entry points
+                else {
+                    Snapshot initialSnapshot = snapshotProvider.getInitialSnapshot();
+
+                    if (
+                        transactionViewModel2.snapshotIndex() <= initialSnapshot.getIndex() &&
+                        !initialSnapshot.hasSolidEntryPoint(transactionViewModel2.getHash())
+                    ) {
+                        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().put(
+                            transactionViewModel2.getHash(),
+                            initialSnapshot.getIndex()
+                        );
+                    }
                 }
             }
         }
-    }
 
-    /**
-     * Initializes the LedgerValidator. This updates the latest milestone and solid subtangle milestone, and then
-     * builds up the confirmed until it reaches the latest consistent confirmed. If any inconsistencies are detected,
-     * perhaps by database corruption, it will delete the milestone confirmed and all that follow.
-     * It then starts at the earliest consistent milestone index with a confirmed, and analyzes the tangle until it
-     * either reaches the latest solid subtangle milestone, or until it reaches an inconsistent milestone.
-     * @throws Exception
-     */
-    protected void init() throws Exception {
-        MilestoneViewModel latestConsistentMilestone = buildSnapshot();
-        if(latestConsistentMilestone != null) {
-            log.info("Loaded consistent milestone: #" + latestConsistentMilestone.index());
-
-            milestoneTracker.latestSolidSubtangleMilestone = latestConsistentMilestone.getHash();
-            milestoneTracker.latestSolidSubtangleMilestoneIndex = latestConsistentMilestone.index();
+        for (int resettedMilestoneIndex : resettedMilestones) {
+            milestoneTracker.resetCorruptedMilestone(resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
         }
     }
 
-    /**
-     * Only called once upon initialization, this builds the {latestSnapshot} state up to the most recent
-     * solid milestone confirmed. It gets the earliest confirmed, and while checking for consistency, patches the next
-     * newest confirmed diff into its map.
-     * @return              the most recent consistent milestone with a confirmed.
-     * @throws Exception
-     */
-    private MilestoneViewModel buildSnapshot() throws Exception {
-        MilestoneViewModel consistentMilestone = null;
-        milestoneTracker.latestSnapshot.rwlock.writeLock().lock();
-        try {
-            MilestoneViewModel candidateMilestone = MilestoneViewModel.first(tangle);
-            while (candidateMilestone != null) {
-                if (candidateMilestone.index() % 10000 == 0) {
-                    StringBuilder logMessage = new StringBuilder();
+    public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
+        if(updateMilestoneTransaction(milestone)) {
+            snapshotProvider.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
 
-                    logMessage.append("Building snapshot... Consistent: #");
-                    logMessage.append(consistentMilestone != null ? consistentMilestone.index() : -1);
-                    logMessage.append(", Candidate: #");
-                    logMessage.append(candidateMilestone.index());
+            return true;
+        }
 
-                    log.info(logMessage.toString());
-                }
-                if (StateDiffViewModel.maybeExists(tangle, candidateMilestone.getHash())) {
-                    StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, candidateMilestone.getHash());
+        return false;
+    }
 
-                    if (stateDiffViewModel != null && !stateDiffViewModel.isEmpty()) {
-                        if (Snapshot.isConsistent(milestoneTracker.latestSnapshot.patchedDiff(stateDiffViewModel.getDiff()))) {
-                            milestoneTracker.latestSnapshot.apply(stateDiffViewModel.getDiff(), candidateMilestone.index());
-                            consistentMilestone = candidateMilestone;
-                        } else {
-                            break;
+    public boolean updateMilestoneTransaction(MilestoneViewModel milestoneVM) throws Exception {
+        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
+
+        if(!transactionViewModel.isSolid()) {
+            return false;
+        }
+
+        final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
+        boolean successfullyProcessed = transactionSnapshotIndex == milestoneVM.index();
+        if (!successfullyProcessed) {
+            // if the snapshotIndex of our transaction was set already, we have processed our milestones in
+            // the wrong order (i.e. while rescanning the db)
+            if(transactionSnapshotIndex != 0) {
+                milestoneTracker.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
+            }
+
+            snapshotProvider.getLatestSnapshot().lockRead();
+            try {
+                Hash tail = transactionViewModel.getHash();
+                Map<Hash, Long> balanceChanges = getLatestDiff(new HashSet<>(), tail, snapshotProvider.getLatestSnapshot().getIndex(), true);
+                successfullyProcessed = balanceChanges != null;
+                if(successfullyProcessed) {
+                    successfullyProcessed = snapshotProvider.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(balanceChanges)).isConsistent();
+                    if(successfullyProcessed) {
+                        updateSnapshotIndexOfMilestoneTransactions(milestoneVM.getHash(), milestoneVM.index());
+
+                        if(balanceChanges.size() != 0) {
+                            new StateDiffViewModel(balanceChanges, milestoneVM.getHash()).store(tangle);
                         }
                     }
                 }
-                candidateMilestone = candidateMilestone.next(tangle);
+            } finally {
+                snapshotProvider.getLatestSnapshot().unlockRead();
             }
-        } finally {
-            milestoneTracker.latestSnapshot.rwlock.writeLock().unlock();
         }
-        return consistentMilestone;
-    }
 
-    public boolean updateSnapshot(MilestoneViewModel milestoneVM) throws Exception {
-        TransactionViewModel transactionViewModel = TransactionViewModel.fromHash(tangle, milestoneVM.getHash());
-        milestoneTracker.latestSnapshot.rwlock.writeLock().lock();
-        try {
-            final int transactionSnapshotIndex = transactionViewModel.snapshotIndex();
-            boolean hasSnapshot = transactionSnapshotIndex != 0;
-            if (!hasSnapshot) {
-                Hash tail = transactionViewModel.getHash();
-                Map<Hash, Long> currentState = getLatestDiff(new HashSet<>(), tail, milestoneTracker.latestSnapshot.index(), true);
-                hasSnapshot = currentState != null && Snapshot.isConsistent(milestoneTracker.latestSnapshot.patchedDiff(currentState));
-                if (hasSnapshot) {
-                    updateSnapshotMilestone(milestoneVM.getHash(), milestoneVM.index());
-                    StateDiffViewModel stateDiffViewModel;
-                    stateDiffViewModel = new StateDiffViewModel(currentState, milestoneVM.getHash());
-                    if (currentState.size() != 0) {
-                        stateDiffViewModel.store(tangle);
-                    }
-                    milestoneTracker.latestSnapshot.apply(currentState, milestoneVM.index());
-                }
-            }
-            return hasSnapshot;
-        } finally {
-            milestoneTracker.latestSnapshot.rwlock.writeLock().unlock();
-        }
+        return successfullyProcessed;
     }
 
     public boolean checkConsistency(List<Hash> hashes) throws Exception {
@@ -282,7 +259,7 @@ public class LedgerValidator {
             return true;
         }
         Set<Hash> visitedHashes = new HashSet<>(approvedHashes);
-        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, milestoneTracker.latestSnapshot.index(), false);
+        Map<Hash, Long> currentState = getLatestDiff(visitedHashes, tip, snapshotProvider.getLatestSnapshot().getIndex(), false);
         if (currentState == null) {
             return false;
         }
@@ -291,7 +268,7 @@ public class LedgerValidator {
                 currentState.putIfAbsent(key, value);
             }
         });
-        boolean isConsistent = Snapshot.isConsistent(milestoneTracker.latestSnapshot.patchedDiff(currentState));
+        boolean isConsistent = snapshotProvider.getLatestSnapshot().patchedState(new SnapshotStateDiffImpl(currentState)).isConsistent();
         if (isConsistent) {
             diff.putAll(currentState);
             approvedHashes.addAll(visitedHashes);

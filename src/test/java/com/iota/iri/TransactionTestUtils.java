@@ -13,11 +13,18 @@ public class TransactionTestUtils {
     public static void setCurrentIndex(TransactionViewModel tx, long currentIndex) {
         Converter.copyTrits(currentIndex, tx.trits(), TransactionViewModel.CURRENT_INDEX_TRINARY_OFFSET,
                 TransactionViewModel.CURRENT_INDEX_TRINARY_SIZE);
+        tx.transaction.currentIndex = currentIndex;
     }
 
     public static void setLastIndex(TransactionViewModel tx, long lastIndex) {
         Converter.copyTrits(lastIndex, tx.trits(), TransactionViewModel.LAST_INDEX_TRINARY_OFFSET,
                 TransactionViewModel.LAST_INDEX_TRINARY_SIZE);
+        tx.transaction.lastIndex = lastIndex;
+    }
+
+    public static void setTimestamp(TransactionViewModel tx, long timestamp) {
+        Converter.copyTrits(timestamp, tx.trits(), TransactionViewModel.TIMESTAMP_TRINARY_OFFSET,
+                TransactionViewModel.TIMESTAMP_TRINARY_SIZE);
     }
 
     public static TransactionViewModel createBundleHead(int index) {
@@ -42,6 +49,12 @@ public class TransactionTestUtils {
         String expandedTrytes  = expandTrytes(trytes);
         byte[] trits = Converter.allocatingTritsFromTrytes(expandedTrytes);
         return new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
+    }
+
+    public static TransactionViewModel createTransactionWithTrytes(String trytes, Hash transactionHash) {
+        String expandedTrytes  = expandTrytes(trytes);
+        byte[] trits = Converter.allocatingTritsFromTrytes(expandedTrytes);
+        return new TransactionViewModel(trits, transactionHash);
     }
 
     public static TransactionViewModel createTransactionWithTrunkAndBranch(String trytes, Hash trunk, Hash branch) {

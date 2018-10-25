@@ -1,8 +1,8 @@
 package com.iota.iri.service;
 
 import com.iota.iri.*;
+import com.iota.iri.controllers.*;
 import com.iota.iri.conf.APIConfig;
-import com.iota.iri.conf.ConsensusConfig;
 import com.iota.iri.controllers.AddressViewModel;
 import com.iota.iri.controllers.BundleViewModel;
 import com.iota.iri.controllers.TagViewModel;
@@ -15,6 +15,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.Neighbor;
 import com.iota.iri.service.dto.*;
+import com.iota.iri.service.snapshot.impl.SnapshotImpl;
 import com.iota.iri.service.tipselection.impl.WalkValidatorImpl;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.IotaIOUtils;
@@ -23,6 +24,7 @@ import com.iota.iri.utils.MapIdentityManager;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import com.iota.iri.utils.dag.DAGHelper;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +68,6 @@ public class API {
     public static final String REFERENCE_TRANSACTION_TOO_OLD = "reference transaction is too old";
     private static final Logger log = LoggerFactory.getLogger(API.class);
     private final IXI ixi;
-    private final int milestoneStartIndex;
 
     private Undertow server;
 
@@ -106,7 +107,6 @@ public class API {
         maxGetTrytes = configuration.getMaxGetTrytes();
         maxBodyLength = configuration.getMaxBodyLength();
         testNet = configuration.isTestnet();
-        milestoneStartIndex = ((ConsensusConfig) configuration).getMilestoneStartIndex();
 
         previousEpochsSpentAddresses = new ConcurrentHashMap<>();
     }
@@ -158,7 +158,7 @@ public class API {
                 .getPreviousEpochSpentAddressesFiles()
                 .split(" ");
         for (String previousEpochsSpentAddressesFile : previousEpochsSpentAddressesFiles) {
-            InputStream in = Snapshot.class.getResourceAsStream(previousEpochsSpentAddressesFile);
+            InputStream in = SnapshotImpl.class.getResourceAsStream(previousEpochsSpentAddressesFile);
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
@@ -210,6 +210,73 @@ public class API {
             log.debug("# {} -> Requesting command '{}'", counter.incrementAndGet(), command);
 
             switch (command) {
+                case "hardReset": {
+                        /*instance.milestoneTracker.hardReset(
+                            MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))),
+                                Integer.parseInt(getParameterAsString(request, "transactionUntil")),
+                            "manual reset"
+                        );*/
+
+                    return ErrorResponse.create("reset successfull");
+                }
+                case "diagnostic": {
+                    Hash transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
+                    TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+
+                    if (milestoneTransaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                        return ErrorResponse.create("requested transaction does not exist");
+                    }
+
+                    AtomicInteger transactionsTraversed = new AtomicInteger(0);
+                    AtomicInteger lowestReferencedMilestone = new AtomicInteger(milestoneTransaction.snapshotIndex());
+
+                    DAGHelper.get(instance.tangle).traverseApprovees(
+                        transactionHash,
+                        transaction -> {
+                            transactionsTraversed.incrementAndGet();
+                            lowestReferencedMilestone.set(Math.min(lowestReferencedMilestone.get(), transaction.snapshotIndex()));
+
+                            return transaction.snapshotIndex() == milestoneTransaction.snapshotIndex();
+                        },
+                        transaction -> {
+                            System.out.println(transaction.getHash());
+                        }
+                    );
+
+                    return ErrorResponse.create("lowest referenced milestone: " + lowestReferencedMilestone.get() + "; transactions traversed: " + transactionsTraversed.get());
+                }
+                case "getTransactionDetails": {
+                    Hash transactionHash;
+                    try {
+                        transactionHash = HashFactory.TRANSACTION.create(getParameterAsStringAndValidate(request, "transaction", HASH_SIZE));
+                    } catch(ValidationException e) {
+                        transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
+                    }
+
+                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+
+                    String exists = transaction.getType() != TransactionViewModel.PREFILLED_SLOT ? "true" : "false";
+
+                    if (transaction.getType() == TransactionViewModel.PREFILLED_SLOT) {
+                        instance.transactionRequester.requestTransaction(transactionHash, true);
+                    }
+
+                    String isConsistent = "" + transaction.getValidity();
+
+                    System.out.println(instance.transactionValidator.checkSolidity(transactionHash, true, Integer.MAX_VALUE, true));
+
+                    String isSolid = transaction.isSolid() ? "true" : "false";
+
+                    String isSnapshot = transaction.isSnapshot() ? "true" : "false";
+
+                    MilestoneViewModel snapshotIndexMilestone = MilestoneViewModel.get(instance.tangle, transaction.snapshotIndex());
+                    String snapshotIndex = "" + transaction.snapshotIndex() + "" + (snapshotIndexMilestone == null ? "" : " (" + snapshotIndexMilestone.getHash().toString() + ")");
+
+                    MilestoneViewModel referencedSnapshotMilestone = MilestoneViewModel.get(instance.tangle, transaction.referencedSnapshot());
+                    String referencedSnapshot = "" + transaction.referencedSnapshot() + "" + (referencedSnapshotMilestone == null ? "" : " (" + referencedSnapshotMilestone.getHash().toString() + ")");
+
+                    return ErrorResponse.create(transaction.getHash().toString() + ": exists: " + exists + "; timestamp: " + transaction.getTimestamp() + "; arrivalTimestamp: " + transaction.getArrivalTime() + "; isConsistent: " + isConsistent + "; isSolid: " + isSolid + "; isSnapshot: " + isSnapshot + "; snapshotIndex: " + snapshotIndex + "; referencedSnapshot: " + referencedSnapshot);
+                }
                 case "storeMessage": {
                     if (!testNet) {
                         return AccessLimitedResponse.create("COMMAND storeMessage is only available on testnet");
@@ -351,7 +418,6 @@ public class API {
      * Check if a list of addresses was ever spent from, in the current epoch, or in previous epochs.
      *
      * @param addresses List of addresses to check if they were ever spent from.
-     * @return {@link com.iota.iri.service.dto.wereAddressesSpentFrom}
      **/
     private AbstractResponse wereAddressesSpentFromStatement(List<String> addresses) throws Exception {
         final List<Hash> addressesHash = addresses.stream().map(HashFactory.ADDRESS::create).collect(Collectors.toList());
@@ -380,7 +446,7 @@ public class API {
                 }
                 //pending
                 Hash tail = findTail(hash);
-                if (tail != null && BundleValidator.validate(instance.tangle, tail).size() != 0) {
+                if (tail != null && BundleValidator.validate(instance.tangle, instance.snapshotProvider.getInitialSnapshot(), tail).size() != 0) {
                     return true;
                 }
             }
@@ -446,7 +512,7 @@ public class API {
                 state = false;
                 info = "tails are not solid (missing a referenced tx): " + transaction;
                 break;
-            } else if (BundleValidator.validate(instance.tangle, txVM.getHash()).size() == 0) {
+            } else if (BundleValidator.validate(instance.tangle, instance.snapshotProvider.getInitialSnapshot(), txVM.getHash()).size() == 0) {
                 state = false;
                 info = "tails are not consistent (bundle is invalid): " + transaction;
                 break;
@@ -454,10 +520,10 @@ public class API {
         }
 
         if (state) {
-            instance.milestoneTracker.latestSnapshot.rwlock.readLock().lock();
+            instance.snapshotProvider.getLatestSnapshot().lockRead();
             try {
-                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.ledgerValidator,
-                        instance.milestoneTracker, instance.configuration);
+                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotProvider, instance.ledgerValidator,
+                        instance.configuration);
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
                         state = false;
@@ -466,7 +532,7 @@ public class API {
                     }
                 }
             } finally {
-                instance.milestoneTracker.latestSnapshot.rwlock.readLock().unlock();
+                instance.snapshotProvider.getLatestSnapshot().unlockRead();
             }
         }
 
@@ -503,6 +569,12 @@ public class API {
         return result;
     }
 
+    private String getParameterAsString(Map<String, Object> request, String paramName) throws ValidationException {
+        validateParamExists(request, paramName);
+        String result = (String) request.get(paramName);
+        return result;
+    }
+
     private void validateTrytes(String paramName, int size, String result) throws ValidationException {
         if (!validTrytes(result,size,ZERO_LENGTH_NOT_ALLOWED)) {
             throw new ValidationException("Invalid " + paramName + " input");
@@ -534,7 +606,7 @@ public class API {
     }
 
     public boolean invalidSubtangleStatus() {
-        return (instance.milestoneTracker.latestSolidSubtangleMilestoneIndex == milestoneStartIndex);
+        return (instance.snapshotProvider.getLatestSnapshot().getIndex() == instance.snapshotProvider.getInitialSnapshot().getIndex());
     }
 
     /**
@@ -680,11 +752,11 @@ public class API {
         }
         for (final TransactionViewModel transactionViewModel : elements) {
             //store transactions
-            if(transactionViewModel.store(instance.tangle)) {
+            if(transactionViewModel.store(instance.tangle, instance.snapshotProvider.getInitialSnapshot())) {
                 transactionViewModel.setArrivalTime(System.currentTimeMillis() / 1000L);
                 instance.transactionValidator.updateStatus(transactionViewModel);
                 transactionViewModel.updateSender("local");
-                transactionViewModel.update(instance.tangle, "sender");
+                transactionViewModel.update(instance.tangle, instance.snapshotProvider.getInitialSnapshot(), "sender");
             }
         }
     }
@@ -718,9 +790,8 @@ public class API {
         String name = instance.configuration.isTestnet() ? IRI.TESTNET_NAME : IRI.MAINNET_NAME;
         return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                 Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
-                Runtime.getRuntime().totalMemory(), instance.milestoneTracker.latestMilestone, instance.milestoneTracker
-                        .latestMilestoneIndex,
-                instance.milestoneTracker.latestSolidSubtangleMilestone, instance.milestoneTracker.latestSolidSubtangleMilestoneIndex, instance.milestoneTracker.milestoneStartIndex,
+                Runtime.getRuntime().totalMemory(), instance.milestoneTracker.latestMilestone, instance.milestoneTracker.latestMilestoneIndex,
+                instance.snapshotProvider.getLatestSnapshot().getHash(), instance.snapshotProvider.getLatestSnapshot().getIndex(), instance.snapshotProvider.getInitialSnapshot().getIndex(),
                 instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                 System.currentTimeMillis(), instance.tipsViewModel.size(),
                 instance.transactionRequester.numberOfTransactionsToRequest());
@@ -960,8 +1031,10 @@ public class API {
             Converter.trits(tryte, txTrits, 0);
             final TransactionViewModel transactionViewModel = instance.transactionValidator.validateTrits(txTrits, instance.transactionValidator.getMinWeightMagnitude());
             elements.add(transactionViewModel);
+            System.out.println("blub");
         }
         for (final TransactionViewModel transactionViewModel : elements) {
+            System.out.println("blab");
             //push first in line to broadcast
             transactionViewModel.weightMagnitude = Curl.HASH_LENGTH;
             instance.node.broadcast(transactionViewModel);
@@ -991,17 +1064,17 @@ public class API {
                 .collect(Collectors.toCollection(LinkedList::new));
         final List<Hash> hashes;
         final Map<Hash, Long> balances = new HashMap<>();
-        instance.milestoneTracker.latestSnapshot.rwlock.readLock().lock();
-        final int index = instance.milestoneTracker.latestSnapshot.index();
+        instance.snapshotProvider.getLatestSnapshot().lockRead();
+        final int index = instance.snapshotProvider.getLatestSnapshot().getIndex();
         if (tips == null || tips.size() == 0) {
-            hashes = Collections.singletonList(instance.milestoneTracker.latestSolidSubtangleMilestone);
+            hashes = Collections.singletonList(instance.snapshotProvider.getLatestSnapshot().getHash());
         } else {
             hashes = tips.stream().map(address -> (HashFactory.ADDRESS.create(address)))
                     .collect(Collectors.toCollection(LinkedList::new));
         }
         try {
             for (final Hash address : addressList) {
-                Long value = instance.milestoneTracker.latestSnapshot.getBalance(address);
+                Long value = instance.snapshotProvider.getLatestSnapshot().getBalance(address);
                 if (value == null) {
                     value = 0L;
                 }
@@ -1023,7 +1096,7 @@ public class API {
             }
             diff.forEach((key, value) -> balances.computeIfPresent(key, (hash, aLong) -> value + aLong));
         } finally {
-            instance.milestoneTracker.latestSnapshot.rwlock.readLock().unlock();
+            instance.snapshotProvider.getLatestSnapshot().unlockRead();
         }
 
         final List<String> elements = addressList.stream().map(address -> balances.get(address).toString())
