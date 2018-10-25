@@ -49,7 +49,7 @@ public class LedgerValidator {
      * @param tip                                the hash of a transaction to start the search from
      * @param latestSnapshotIndex                index of the latest snapshot to traverse to
      * @param milestone                          marker to indicate whether to stop only at confirmed transactions
-     * @return {state}                           the addresses that have a balance changed since the last balanceChanges check
+     * @return {state}                           the addresses that have a balance changed since the last diff check
      * @throws Exception
      */
     public Map<Hash,Long> getLatestDiff(final Set<Hash> visitedNonMilestoneSubtangleHashes, Hash tip, int latestSnapshotIndex, boolean milestone) throws Exception {
@@ -77,8 +77,6 @@ public class LedgerValidator {
                     } else {
 
                         if (transactionViewModel.getCurrentIndex() == 0) {
-
-
 
                             boolean validBundle = false;
 
