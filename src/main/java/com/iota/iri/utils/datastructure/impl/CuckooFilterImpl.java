@@ -1,6 +1,6 @@
 package com.iota.iri.utils.datastructure.impl;
 
-import com.iota.iri.utils.ByteUtils;
+import com.iota.iri.utils.BitSetUtils;
 import com.iota.iri.utils.datastructure.CuckooFilter;
 
 import java.security.MessageDigest;
@@ -394,7 +394,7 @@ public class CuckooFilterImpl implements CuckooFilter {
      */
     private int getIndex(BitSet fingerPrint, long oldIndex) {
         // calculate the hash of the finger print (partial-key cuckoo hashing)
-        byte[] fingerPrintHash = hashFunction.digest(ByteUtils.convertBitSetToByteArray(fingerPrint));
+        byte[] fingerPrintHash = hashFunction.digest(BitSetUtils.convertBitSetToByteArray(fingerPrint));
 
         // initialize the new address with an empty bit sequence
         long index = 0;
@@ -431,7 +431,7 @@ public class CuckooFilterImpl implements CuckooFilter {
         }
 
         // do a simple conversion of the byte array to a BitSet of the desired length
-        return ByteUtils.convertByteArrayToBitSet(hash, 4, fingerPrintSize);
+        return BitSetUtils.convertByteArrayToBitSet(hash, 4, fingerPrintSize);
     }
 
     /**

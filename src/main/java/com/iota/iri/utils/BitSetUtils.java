@@ -2,8 +2,17 @@ package com.iota.iri.utils;
 
 import java.util.BitSet;
 
-public class ByteUtils {
-    // converts a byte array to a BitSet starting at the offset
+/**
+ * This class offers utility methods to transform BitSets into Arrays of Bytes
+ */
+public class BitSetUtils {
+    /**
+     * This method converts
+     * @param byteArray
+     * @param startOffset
+     * @param sizeOfBitSet
+     * @return
+     */
     public static BitSet convertByteArrayToBitSet(byte[] byteArray, int startOffset, int sizeOfBitSet) {
         if((byteArray.length - startOffset) * 8 < sizeOfBitSet) {
             throw new IllegalArgumentException("the byte[] is too small to create a BitSet of length " + sizeOfBitSet);
