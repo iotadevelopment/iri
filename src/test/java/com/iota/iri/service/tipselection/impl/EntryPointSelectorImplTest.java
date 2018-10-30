@@ -51,7 +51,7 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointAWithoutTangleData() throws Exception {
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider.getLatestSnapshot());
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
@@ -61,9 +61,9 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointBWithTangleData() throws Exception {
         Hash milestoneHash = TransactionHash.calculate(SpongeFactory.Mode.CURLP81, new byte[]{1});
         mockTangleBehavior(milestoneHash);
-        mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
+        mockMilestoneTrackerBehavior(snapshotProvider.getInitialSnapshot().getIndex(), Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider.getLatestSnapshot());
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);
@@ -76,8 +76,8 @@ public class EntryPointSelectorImplTest {
 
     private void mockTangleBehavior(Hash milestoneModelHash) throws Exception {
         com.iota.iri.model.persistables.Milestone milestoneModel = new com.iota.iri.model.persistables.Milestone();
-        milestoneModel.index = new IntegerIndex(0);
+        milestoneModel.index = new IntegerIndex(snapshotProvider.getInitialSnapshot().getIndex() + 1);
         milestoneModel.hash = milestoneModelHash;
-        tangle.save(milestoneModel, new IntegerIndex(0));
+        tangle.save(milestoneModel, milestoneModel.index);
     }
 }
