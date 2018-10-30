@@ -12,8 +12,10 @@ import com.iota.iri.service.TipsSolidifier;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.impl.LocalSnapshotManagerImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
+import com.iota.iri.service.snapshot.impl.SnapshotServiceImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.service.tipselection.TailFinder;
@@ -50,6 +52,7 @@ public class Iota {
     public final LedgerValidator ledgerValidator;
     public final MilestoneTracker milestoneTracker;
     public final Tangle tangle;
+    public final SnapshotService snapshotService;
     public final SnapshotProvider snapshotProvider;
     public final TransactionPruner transactionPruner;
     public final LocalSnapshotManager localSnapshotManager;
@@ -70,17 +73,18 @@ public class Iota {
             messageQ = MessageQ.createWith(configuration);
             tipsViewModel = new TipsViewModel();
             snapshotProvider = new SnapshotProviderImpl(configuration);
+            snapshotService = new SnapshotServiceImpl();
             transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
             transactionPruner.restoreState();
-            localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, transactionPruner, tangle, configuration);
+            localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);
             transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
             transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
-            milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, transactionRequester, messageQ, configuration);
+            milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, snapshotService, transactionValidator, transactionRequester, messageQ, configuration);
             node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
                     configuration);
             replicator = new Replicator(node, configuration);
             udpReceiver = new UDPReceiver(node, configuration);
-            ledgerValidator = new LedgerValidator(tangle, snapshotProvider, milestoneTracker, transactionRequester, messageQ);
+            ledgerValidator = new LedgerValidator(tangle, snapshotProvider, snapshotService, milestoneTracker, transactionRequester, messageQ);
             tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
             tipsSelector = createTipSelector(configuration);
     }

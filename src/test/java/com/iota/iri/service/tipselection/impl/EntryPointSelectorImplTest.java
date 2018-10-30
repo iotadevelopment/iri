@@ -61,7 +61,7 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointBWithTangleData() throws Exception {
         Hash milestoneHash = TransactionHash.calculate(SpongeFactory.Mode.CURLP81, new byte[]{1});
         mockTangleBehavior(milestoneHash);
-        mockMilestoneTrackerBehavior(snapshotProvider.getInitialSnapshot().getIndex(), Hash.NULL_HASH);
+        mockMilestoneTrackerBehavior(snapshotProvider.getInitialSnapshot().getIndex() + 1, Hash.NULL_HASH);
 
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);

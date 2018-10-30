@@ -2,7 +2,10 @@ package com.iota.iri.service.snapshot.impl;
 
 import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.SnapshotConfig;
-import com.iota.iri.service.snapshot.*;
+import com.iota.iri.service.snapshot.LocalSnapshotManager;
+import com.iota.iri.service.snapshot.SnapshotService;
+import com.iota.iri.service.snapshot.SnapshotException;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.storage.Tangle;
 
@@ -18,7 +21,8 @@ import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
  */
 public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     /**
-     * The interval (in milliseconds) in which we check if a new local {@link Snapshot} is due.
+     * The interval (in milliseconds) in which we check if a new local {@link com.iota.iri.service.snapshot.Snapshot} is
+     * due.
      */
     private static final int LOCAL_SNAPSHOT_RESCAN_INTERVAL = 10000;
 
@@ -28,14 +32,14 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     private static final Logger log = LoggerFactory.getLogger(LocalSnapshotManagerImpl.class);
 
     /**
-     * Service that contains the logic for generating local {@link Snapshot}s.
-     */
-    private static final LocalSnapshotService localSnapshotService = new LocalSnapshotServiceImpl();
-
-    /**
-     * Data provider for the relevant {@link Snapshot} instances.
+     * Data provider for the relevant {@link com.iota.iri.service.snapshot.Snapshot} instances.
      */
     private final SnapshotProvider snapshotProvider;
+
+    /**
+     * Service that contains the logic for generating local {@link com.iota.iri.service.snapshot.Snapshot}s.
+     */
+    private final SnapshotService snapshotService;
 
     /**
      * Manager for the pruning jobs that allows us to clean up old transactions.
@@ -66,15 +70,16 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      *
      * It simply stores the passed in parameters in their private properties.
      *
-     * @param snapshotProvider data provider for the relevant {@link Snapshot} instances
+     * @param snapshotProvider data provider for the relevant {@link com.iota.iri.service.snapshot.Snapshot} instances
      * @param transactionPruner manager for the pruning jobs that allows us to clean up old transactions
      * @param tangle object which acts as a database interface
      * @param config configuration with important snapshot related parameters
      */
-    public LocalSnapshotManagerImpl(SnapshotProvider snapshotProvider, TransactionPruner transactionPruner,
-            Tangle tangle, SnapshotConfig config) {
+    public LocalSnapshotManagerImpl(SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+            TransactionPruner transactionPruner, Tangle tangle, SnapshotConfig config) {
 
         this.snapshotProvider = snapshotProvider;
+        this.snapshotService = snapshotService;
         this.transactionPruner = transactionPruner;
         this.tangle = tangle;
         this.config = config;
@@ -99,9 +104,11 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     /**
      * This method contains the logic for the monitoring Thread.
      *
-     * It periodically checks if a new {@link Snapshot} has to be taken until the {@link Thread} is terminated. If it
-     * detects that a {@link Snapshot} is due it triggers the creation of the {@link Snapshot} by calling
-     * {@link LocalSnapshotService#takeLocalSnapshot(Tangle, SnapshotProvider, SnapshotConfig, TransactionPruner)}.
+     * It periodically checks if a new {@link com.iota.iri.service.snapshot.Snapshot} has to be taken until the
+     * {@link Thread} is terminated. If it detects that a {@link com.iota.iri.service.snapshot.Snapshot} is due it
+     * triggers the creation of the {@link com.iota.iri.service.snapshot.Snapshot} by calling
+     * {@link SnapshotService#takeLocalSnapshot(Tangle, SnapshotProvider, SnapshotConfig, MilestoneTracker,
+     * TransactionPruner)}.
      *
      * @param milestoneTracker tracker for the milestones to determine when a new local snapshot is due
      */
@@ -112,11 +119,13 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
                     ? config.getLocalSnapshotsIntervalSynced()
                     : config.getLocalSnapshotsIntervalUnsynced();
 
-            if (snapshotProvider.getLatestSnapshot().getIndex() - snapshotProvider.getInitialSnapshot().getIndex() >
-                    config.getLocalSnapshotsDepth() + localSnapshotInterval) {
+            int latestSnapshotIndex = snapshotProvider.getLatestSnapshot().getIndex();
+            int initialSnapshotIndex = snapshotProvider.getInitialSnapshot().getIndex();
 
+            if (latestSnapshotIndex - initialSnapshotIndex > config.getLocalSnapshotsDepth() + localSnapshotInterval) {
                 try {
-                    localSnapshotService.takeLocalSnapshot(tangle, snapshotProvider, config, transactionPruner);
+                    snapshotService.takeLocalSnapshot(tangle, snapshotProvider, config, milestoneTracker,
+                            transactionPruner);
                 } catch (SnapshotException e) {
                     log.error("error while taking local snapshot", e);
                 }

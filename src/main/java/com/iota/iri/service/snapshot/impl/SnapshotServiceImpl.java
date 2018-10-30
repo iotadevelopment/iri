@@ -1,11 +1,14 @@
 package com.iota.iri.service.snapshot.impl;
 
+import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.ApproveeViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
+import com.iota.iri.controllers.StateDiffViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
-import com.iota.iri.service.snapshot.LocalSnapshotService;
+import com.iota.iri.service.snapshot.SnapshotMetaData;
+import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
@@ -26,15 +29,16 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
- * Implements the basic contract of the {@link LocalSnapshotService}.
+ * Implements the basic contract of the {@link SnapshotService}.
  */
-public class LocalSnapshotServiceImpl implements LocalSnapshotService {
+public class SnapshotServiceImpl implements SnapshotService {
     /**
      * Logger for this class allowing us to dump debug and status messages.
      */
-    private static final Logger log = LoggerFactory.getLogger(LocalSnapshotServiceImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(SnapshotServiceImpl.class);
 
     /**
      * If transactions got orphaned we wait this additional time (in seconds) until we consider them orphaned.
@@ -54,12 +58,89 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      * {@inheritDoc}
      */
     @Override
+    public void replayMilestones(Tangle tangle, Snapshot snapshot, int targetMilestoneIndex) throws SnapshotException {
+        snapshot.lockWrite();
+
+        Snapshot snapshotBeforeChanges = new SnapshotImpl(snapshot);
+
+        try {
+            for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex;
+                 currentMilestoneIndex++) {
+
+                MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
+                if (currentMilestone != null) {
+                    StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, currentMilestone.getHash());
+                    if(!stateDiffViewModel.isEmpty()) {
+                        snapshot.applyStateDiff(new SnapshotStateDiffImpl(stateDiffViewModel.getDiff()));
+                    }
+
+                    snapshot.setIndex(currentMilestone.index());
+                    snapshot.setHash(currentMilestone.getHash());
+
+                    TransactionViewModel currentMilestoneTransaction = TransactionViewModel.fromHash(tangle,
+                            currentMilestone.getHash());
+
+                    if(currentMilestoneTransaction != null &&
+                            currentMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+
+                        snapshot.setTimestamp(currentMilestoneTransaction.getTimestamp());
+                    }
+                } else {
+                    snapshot.addSkippedMilestone(currentMilestoneIndex);
+                }
+            }
+        } catch (Exception e) {
+            snapshot.update(snapshotBeforeChanges);
+
+            throw new SnapshotException("failed to replay the the state of the ledger", e);
+        } finally {
+            snapshot.unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void rollBackMilestones(Tangle tangle, Snapshot snapshot, int targetMilestoneIndex) throws
+            SnapshotException {
+
+        if(targetMilestoneIndex <= snapshot.getInitialIndex() || targetMilestoneIndex > snapshot.getIndex()) {
+            throw new SnapshotException("invalid milestone index");
+        }
+
+        snapshot.lockWrite();
+
+        Snapshot snapshotBeforeChanges = new SnapshotImpl(snapshot);
+
+        try {
+            boolean rollbackSuccessful = true;
+            while (targetMilestoneIndex <= snapshot.getIndex() && rollbackSuccessful) {
+                rollbackSuccessful = rollbackLastMilestone(tangle, snapshot);
+            }
+
+            if(targetMilestoneIndex < snapshot.getIndex()) {
+                throw new SnapshotException("failed to reach the target milestone index when rolling back milestones");
+            }
+        } catch(SnapshotException e) {
+            snapshot.update(snapshotBeforeChanges);
+
+            throw e;
+        } finally {
+            snapshot.unlockWrite();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void takeLocalSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
-            TransactionPruner transactionPruner) throws SnapshotException {
+            MilestoneTracker milestoneTracker, TransactionPruner transactionPruner) throws SnapshotException {
 
         MilestoneViewModel targetMilestone = determineMilestoneForLocalSnapshot(tangle, snapshotProvider, config);
 
-        Snapshot newSnapshot = generateSnapshot(tangle, snapshotProvider, config, targetMilestone);
+        Snapshot newSnapshot = generateSnapshot(tangle, snapshotProvider, config, milestoneTracker, targetMilestone);
 
         cleanupExpiredSolidEntryPoints(tangle, snapshotProvider.getInitialSnapshot().getSolidEntryPoints(),
                 newSnapshot.getSolidEntryPoints(), transactionPruner);
@@ -74,7 +155,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      */
     @Override
     public Snapshot generateSnapshot(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config,
-            MilestoneViewModel targetMilestone) throws SnapshotException {
+            MilestoneTracker milestoneTracker, MilestoneViewModel targetMilestone) throws SnapshotException {
 
         if (targetMilestone == null) {
             throw new SnapshotException("the target milestone must not be null");
@@ -89,17 +170,19 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
         Snapshot snapshot;
         try {
-            int distanceFromInitialSnapshot = Math.abs(snapshotProvider.getInitialSnapshot().getIndex() - targetMilestone.index());
-            int distanceFromLatestSnapshot = Math.abs(snapshotProvider.getLatestSnapshot().getIndex() - targetMilestone.index());
+            int distanceFromInitialSnapshot = Math.abs(snapshotProvider.getInitialSnapshot().getIndex() -
+                    targetMilestone.index());
+            int distanceFromLatestSnapshot = Math.abs(snapshotProvider.getLatestSnapshot().getIndex() -
+                    targetMilestone.index());
 
             if (distanceFromInitialSnapshot <= distanceFromLatestSnapshot) {
                 snapshot = new SnapshotImpl(snapshotProvider.getInitialSnapshot());
 
-                snapshot.replayMilestones(targetMilestone.index(), tangle);
+                replayMilestones(tangle, snapshot, targetMilestone.index());
             } else {
                 snapshot = new SnapshotImpl(snapshotProvider.getLatestSnapshot());
 
-                snapshot.rollBackMilestones(targetMilestone.index() + 1, tangle);
+                rollBackMilestones(tangle, snapshot, targetMilestone.index() + 1);
             }
         } finally {
             snapshotProvider.getInitialSnapshot().unlockRead();
@@ -107,7 +190,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         }
 
         snapshot.setSolidEntryPoints(generateSolidEntryPoints(tangle, snapshotProvider, targetMilestone));
-        snapshot.setSeenMilestones(generateSeenMilestones(tangle, config, targetMilestone));
+        snapshot.setSeenMilestones(generateSeenMilestones(tangle, config, milestoneTracker, targetMilestone));
 
         return snapshot;
     }
@@ -133,17 +216,17 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
      */
     @Override
     public Map<Hash, Integer> generateSeenMilestones(Tangle tangle, SnapshotConfig config,
-            MilestoneViewModel targetMilestone) throws SnapshotException {
+            MilestoneTracker milestoneTracker, MilestoneViewModel targetMilestone) throws SnapshotException {
 
         ProgressLogger progressLogger = new IntervalProgressLogger(
                 "Taking local snapshot [processing seen milestones]", log)
                 .start(config.getLocalSnapshotsDepth());
 
-        HashMap<Hash, Integer> seenMilestones = new HashMap<>();
+        Map<Hash, Integer> seenMilestones = new HashMap<>();
         try {
             MilestoneViewModel seenMilestone = targetMilestone;
-            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index()))
-                    != null) {
+            while ((seenMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, seenMilestone.index(),
+                    milestoneTracker.latestMilestoneIndex)) != null) {
 
                 seenMilestones.put(seenMilestone.getHash(), seenMilestone.index());
 
@@ -158,6 +241,78 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
         progressLogger.finish();
 
         return seenMilestones;
+    }
+
+    /**
+     * This method reverts the changes caused by the last milestone that was applied to this snapshot.
+     *
+     * It first checks if we didn't arrive at the initial index yet and then reverts the balance changes that were
+     * caused by the last milestone. Then it checks if any milestones were skipped while applying the last milestone and
+     * determines the {@link SnapshotMetaData} that this Snapshot had before and restores it.
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @return true if the snapshot was rolled back or false otherwise
+     * @throws SnapshotException if anything goes wrong while accessing the database
+     */
+    private boolean rollbackLastMilestone(Tangle tangle, Snapshot snapshot) throws SnapshotException {
+        if (snapshot.getIndex() == snapshot.getInitialIndex()) {
+            return false;
+        }
+
+        snapshot.lockWrite();
+
+        try {
+            // revert the last balance changes
+            StateDiffViewModel stateDiffViewModel = StateDiffViewModel.load(tangle, snapshot.getHash());
+            if (!stateDiffViewModel.isEmpty()) {
+                SnapshotStateDiffImpl snapshotStateDiff = new SnapshotStateDiffImpl(
+                    stateDiffViewModel.getDiff().entrySet().stream().map(
+                        hashLongEntry -> new HashMap.SimpleEntry<>(
+                            hashLongEntry.getKey(), -1 * hashLongEntry.getValue()
+                        )
+                    ).collect(
+                        Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+                    )
+                );
+
+                if (!snapshotStateDiff.isConsistent()) {
+                    throw new SnapshotException("the StateDiff belonging to milestone #" + snapshot.getIndex() +
+                            " (" + snapshot.getHash() + ") is inconsistent");
+                } else if (!snapshot.patchedState(snapshotStateDiff).isConsistent()) {
+                    throw new SnapshotException("failed to apply patch belonging to milestone #" + snapshot.getIndex() +
+                            " (" + snapshot.getHash() + ")");
+                }
+
+                snapshot.applyStateDiff(snapshotStateDiff);
+            }
+
+            // jump skipped milestones
+            int currentIndex = snapshot.getIndex() - 1;
+            while (snapshot.removeSkippedMilestone(currentIndex)) {
+                currentIndex--;
+            }
+
+            // check if we arrived at the start
+            if (currentIndex <= snapshot.getInitialIndex()) {
+                snapshot.setIndex(snapshot.getInitialIndex());
+                snapshot.setHash(snapshot.getInitialHash());
+                snapshot.setTimestamp(snapshot.getInitialTimestamp());
+
+                return true;
+            }
+
+            // otherwise set metadata of the previous milestone
+            MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentIndex);
+            snapshot.setIndex(currentMilestone.index());
+            snapshot.setHash(currentMilestone.getHash());
+            snapshot.setTimestamp(TransactionViewModel.fromHash(tangle, currentMilestone.getHash()).getTimestamp());
+
+            return true;
+        } catch (Exception e) {
+            throw new SnapshotException("failed to rollback last milestone", e);
+        } finally {
+            snapshot.unlockWrite();
+        }
     }
 
     /**
@@ -179,7 +334,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
         MilestoneViewModel targetMilestone;
         try {
-            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex);
+            targetMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, targetMilestoneIndex,
+                    snapshotProvider.getInitialSnapshot().getIndex());
         } catch (Exception e) {
             throw new SnapshotException("could not load the target milestone", e);
         }
@@ -191,8 +347,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     }
 
     /**
-     * This method creates {@link TransactionPruner} jobs for the expired solid entry points, which removes the
-     * unconfirmed subtangles branching off of these transactions.
+     * This method creates {@link com.iota.iri.service.transactionpruning.TransactionPrunerJob}s for the expired solid
+     * entry points, which removes the unconfirmed subtangles branching off of these transactions.
      *
      * We only clean up these subtangles if the transaction that they are branching off has been cleaned up already by a
      * {@link MilestonePrunerJob}. If the corresponding milestone has not been processed we leave them in the database
@@ -226,7 +382,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     }
 
     /**
-     * This method creates the {@link TransactionPruner} jobs that are responsible for removing the old data.
+     * This method creates the {@link com.iota.iri.service.transactionpruning.TransactionPrunerJob}s that are
+     * responsible for removing the old data.
      *
      * It first calculates the range of milestones that shall be deleted and then issues a {@link MilestonePrunerJob}
      * for this range (if it is not empty).
@@ -265,7 +422,7 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
     private void persistLocalSnapshot(SnapshotProvider snapshotProvider, Snapshot newSnapshot, SnapshotConfig config)
             throws SnapshotException {
 
-        newSnapshot.writeToDisk(config.getLocalSnapshotsBasePath());
+        snapshotProvider.writeSnapshotToDisk(newSnapshot, config.getLocalSnapshotsBasePath());
 
         snapshotProvider.getInitialSnapshot().lockWrite();
         snapshotProvider.getLatestSnapshot().lockWrite();
@@ -358,7 +515,6 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
             }
 
             Set<Hash> processedTransactions = new HashSet<>();
-
             TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
             for (TransactionViewModel unconfirmedApprover : unconfirmedApprovers) {
                 if (!isOrphaned(tangle, unconfirmedApprover, milestoneTransaction, processedTransactions)) {
@@ -392,7 +548,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
                 "Taking local snapshot [analyzing old solid entry points]", log)
                 .start(snapshotProvider.getInitialSnapshot().getSolidEntryPoints().size());
 
-        snapshotProvider.getInitialSnapshot().getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
+        Snapshot initialSnapshot = snapshotProvider.getInitialSnapshot();
+        initialSnapshot.getSolidEntryPoints().forEach((hash, milestoneIndex) -> {
             if (!Hash.NULL_HASH.equals(hash) && targetMilestone.index() - milestoneIndex <= SOLID_ENTRY_POINT_LIFETIME
                     && isSolidEntryPoint(tangle, hash, targetMilestone)) {
 
@@ -444,7 +601,8 @@ public class LocalSnapshotServiceImpl implements LocalSnapshotService {
 
                 solidEntryPoints.put(currentMilestone.getHash(), targetMilestone.index());
 
-                nextMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index());
+                nextMilestone = MilestoneViewModel.findClosestPrevMilestone(tangle, currentMilestone.index(),
+                        snapshotProvider.getInitialSnapshot().getIndex());
 
                 progressLogger.progress();
             }

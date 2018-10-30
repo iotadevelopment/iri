@@ -5,6 +5,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.impl.SnapshotStateDiffImpl;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
@@ -15,18 +16,20 @@ import java.util.*;
 
 public class LedgerValidator {
 
-    private final SnapshotProvider snapshotProvider;
     private final Logger log = LoggerFactory.getLogger(LedgerValidator.class);
     private final Tangle tangle;
+    private final SnapshotProvider snapshotProvider;
+    private final SnapshotService snapshotService;
     private final MilestoneTracker milestoneTracker;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
-        this.milestoneTracker = milestoneTracker;
         this.snapshotProvider = snapshotProvider;
+        this.snapshotService = snapshotService;
+        this.milestoneTracker = milestoneTracker;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
     }
@@ -189,7 +192,7 @@ public class LedgerValidator {
 
     public boolean applyMilestoneToLedger(MilestoneViewModel milestone) throws Exception {
         if(updateMilestoneTransaction(milestone)) {
-            snapshotProvider.getLatestSnapshot().replayMilestones(milestone.index(), tangle);
+            snapshotService.replayMilestones(tangle, snapshotProvider.getLatestSnapshot(), milestone.index());
 
             return true;
         }

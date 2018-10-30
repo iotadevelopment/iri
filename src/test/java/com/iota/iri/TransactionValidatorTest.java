@@ -8,6 +8,7 @@ import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
+import com.iota.iri.service.snapshot.impl.SnapshotServiceImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -47,7 +48,7 @@ public class TransactionValidatorTest {
     TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
     txValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, txRequester);
     txValidator.setMwm(false, MAINNET_MWM);
-    milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, txValidator, Mockito.mock(TransactionRequester.class), messageQ, new MainnetConfig());
+    milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, new SnapshotServiceImpl(), txValidator, Mockito.mock(TransactionRequester.class), messageQ, new MainnetConfig());
     txValidator.init(false, MAINNET_MWM, milestoneTracker);
   }
 

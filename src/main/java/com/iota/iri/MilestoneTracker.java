@@ -13,8 +13,10 @@ import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.StateDiff;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.Converter;
 import com.iota.iri.utils.log.ProgressLogger;
@@ -71,6 +73,7 @@ public class MilestoneTracker {
 
     private final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
     private final Tangle tangle;
+    private final SnapshotService snapshotService;
     private final SnapshotProvider snapshotProvider;
     private final Hash coordinator;
     private final TransactionRequester transactionRequester;
@@ -99,6 +102,7 @@ public class MilestoneTracker {
 
     public MilestoneTracker(Tangle tangle,
                             SnapshotProvider snapshotProvider,
+                            SnapshotService snapshotService,
                             TransactionValidator transactionValidator,
                             TransactionRequester transactionRequester,
                             MessageQ messageQ,
@@ -106,6 +110,7 @@ public class MilestoneTracker {
     ) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
+        this.snapshotService = snapshotService;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
         this.milestoneSolidifier = new MilestoneSolidifier(snapshotProvider.getInitialSnapshot(), transactionValidator);
@@ -122,11 +127,11 @@ public class MilestoneTracker {
     }
 
     /**
-     * This method returns the current status of the milestone tracker.
+     * This method returns the current status of the {@link MilestoneTracker}.
      *
      * It allows us to determine if all of the "startup" tasks have succeeded.
      *
-     * @return {@code INITIALIZED} when all of the "startup" tasks have finished and {@code INITIALIZING} otherwise
+     * @return the current status of the {@link MilestoneTracker}
      */
     public Status getStatus() {
         return this.status;
@@ -337,7 +342,8 @@ public class MilestoneTracker {
             if(milestoneToRepair != null) {
                 // reset the ledger to the state before the erroneous milestone appeared
                 if(milestoneToRepair.index() <= snapshotProvider.getLatestSnapshot().getIndex()) {
-                    snapshotProvider.getLatestSnapshot().rollBackMilestones(milestoneToRepair.index(), tangle);
+                    snapshotService.rollBackMilestones(tangle, snapshotProvider.getLatestSnapshot(),
+                            milestoneToRepair.index());
                 }
 
                 resetSnapshotIndexOfMilestoneTransactions(milestoneToRepair, processedTransactions);
@@ -448,7 +454,7 @@ public class MilestoneTracker {
                             // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
                             if(index < snapshotProvider.getLatestSnapshot().getIndex() && index > snapshotProvider.getInitialSnapshot().getIndex()) {
                                 try {
-                                    snapshotProvider.getLatestSnapshot().rollBackMilestones(newMilestoneViewModel.index(), tangle);
+                                    snapshotService.rollBackMilestones(tangle, snapshotProvider.getLatestSnapshot(), newMilestoneViewModel.index());
                                 } catch(SnapshotException e) {
                                     log.error("could not reset ledger to missing milestone: " + index);
                                 }
@@ -474,13 +480,10 @@ public class MilestoneTracker {
         long lastScan = System.currentTimeMillis();
 
         // get the next milestone
-        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex);
+        MilestoneViewModel nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, prevSolidMilestoneIndex, prevSolidMilestoneIndex + 1);
 
         // while we have a milestone which is solid
-        while(
-        !shuttingDown &&
-        nextMilestone != null
-        ) {
+        while (!shuttingDown && nextMilestone != null) {
             if(nextMilestone.index() > errorCausingMilestone) {
                 System.out.println(errorCausingMilestone + " / " + nextMilestone.index());
 
@@ -495,7 +498,9 @@ public class MilestoneTracker {
                     latestMilestone = nextMilestone.getHash();
                 }
 
-                nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, snapshotProvider.getLatestSnapshot().getIndex());
+                Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
+                nextMilestone = MilestoneViewModel.findClosestNextMilestone(tangle, latestSnapshot.getIndex(),
+                        latestSnapshot.getIndex() + 1);
             } else {
                 if (TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
                     int currentIndex = nextMilestone.index();
