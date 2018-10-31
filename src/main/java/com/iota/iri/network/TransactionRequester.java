@@ -90,8 +90,8 @@ public class TransactionRequester {
      * @return true if the transaction is in the set of transactions to be requested and false otherwise
      */
     public boolean isTransactionRequested(Hash transactionHash, boolean milestoneRequest) {
-        return (milestoneRequest && milestoneTransactionsToRequest.contains(transactionHash)) || (!milestoneRequest &&
-                milestoneTransactionsToRequest.contains(transactionHash) ||
+        return (milestoneRequest && milestoneTransactionsToRequest.contains(transactionHash))
+                || (!milestoneRequest && milestoneTransactionsToRequest.contains(transactionHash) ||
                 transactionsToRequest.contains(transactionHash));
     }
 
