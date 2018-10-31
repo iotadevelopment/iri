@@ -152,7 +152,6 @@ public class TransactionValidator {
      * @return true if the transaction is solid and false otherwise
      * @throws Exception if anything goes wrong while trying to solidify the transaction
      */
-
     public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions) throws Exception {
         return checkSolidity(hash, milestone, maxProcessedTransactions, false);
     }
