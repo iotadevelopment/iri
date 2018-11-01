@@ -1,7 +1,6 @@
 package com.iota.iri.utils.thread;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -14,8 +13,8 @@ public interface SilentScheduledExecutorService {
      * @param delay the time from now to delay execution
      * @param unit the time unit of the delay parameter
      * @return a ScheduledFuture representing pending completion of the task and whose {@code get()} method will return
-     *         {@code null} upon completion or {@code null} if the command could not be scheduled because we have
-     *         scheduled another command already
+     *         {@code null} upon completion / {@code null} if the command could not be scheduled because the thread pool
+     *         capacity is exhausted
      * @throws NullPointerException if command is null
      */
     ScheduledFuture<?> silentSchedule(Runnable command, long delay, TimeUnit unit);
@@ -28,8 +27,8 @@ public interface SilentScheduledExecutorService {
      * @param delay the time from now to delay execution
      * @param unit the time unit of the delay parameter
      * @param <V> the type of the callable's result
-     * @return a ScheduledFuture that can be used to extract result or cancel or {@code null} if the callable could not
-     *         be scheduled because we have scheduled another callable already
+     * @return a ScheduledFuture that can be used to extract result or cancel / {@code null} if the callable could not
+     *         be scheduled because the thread pool capacity is exhausted
      * @throws NullPointerException if callable is null
      */
     <V> ScheduledFuture<V> silentSchedule(Callable<V> callable, long delay, TimeUnit unit);
@@ -52,8 +51,8 @@ public interface SilentScheduledExecutorService {
      * @param period the period between successive executions
      * @param unit the time unit of the initialDelay and period parameters
      * @return a ScheduledFuture representing pending completion of the task, and whose {@code get()} method will throw
-     *         an exception upon cancellation or {@code null} if the command could not be scheduled because we have
-     *         scheduled another command already
+     *         an exception upon cancellation / {@code null} if the command could not be scheduled because the thread
+     *         pool capacity is exhausted
      * @throws NullPointerException if command is null
      * @throws IllegalArgumentException if period less than or equal to zero
      */

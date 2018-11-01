@@ -398,7 +398,7 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
         if (timeout == 0) {
             return null;
         } else {
-            return "in " + timeout + buildUnitAbbreviation(unit);
+            return "starts in " + timeout + buildUnitAbbreviation(unit);
         }
     }
 
@@ -406,7 +406,7 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
         if (interval == 0) {
             return null;
         } else {
-            return "every " + interval + buildUnitAbbreviation(unit);
+            return "runs every " + interval + buildUnitAbbreviation(unit);
         }
     }
 
