@@ -1,7 +1,5 @@
 package com.iota.iri.utils.thread;
 
-import jdk.nashorn.internal.objects.annotations.Constructor;
-import jdk.nashorn.internal.objects.annotations.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,14 +8,23 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class DedicatedScheduledExecutorService implements ScheduledExecutorService {
+public class DedicatedScheduledExecutorService implements ScheduledExecutorService, SilentScheduledExecutorService {
     /**
-     * Logger for this class allowing us to dump debug and status messages.
+     * Default logger for this class allowing us to dump debug and status messages.
+     *
+     * Note: The used logger can be overwritten by providing a different logger in the constructor (to have transparent
+     *       log messages that look like they are coming from a different source).
      */
     private static final Logger DEFAULT_LOGGER = LoggerFactory.getLogger(DedicatedScheduledExecutorService.class);
 
+    /**
+     * Holds the underlying {@link ScheduledExecutorService} that manages the Threads in the background.
+     */
     private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
+    /**
+     * Holds a reference to the logger that is used to emit messages.
+     */
     private final Logger logger;
 
     private final String threadName;
@@ -60,7 +67,22 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
         return threadName;
     }
 
-    public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
+    //region METHODS OF SilentScheduledExecutorService INTERFACE ///////////////////////////////////////////////////////
+
+    @Override
+    public ScheduledFuture<?> silentSchedule(Runnable command, long delay, TimeUnit unit) {
+        try {
+            return schedule(command, delay, unit);
+        } catch (RejectedExecutionException e) {
+            // omit error message (we are silent)
+            return null;
+        }
+    }
+
+    @Override
+    public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable command, long initialDelay, long period,
+            TimeUnit unit) {
+
         try {
             return scheduleAtFixedRate(command, initialDelay, period, unit);
         } catch (RejectedExecutionException e) {
@@ -68,6 +90,10 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
             return null;
         }
     }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //region METHODS OF ScheduledExecutorService INTERFACE /////////////////////////////////////////////////////////////
 
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
@@ -177,28 +203,66 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
 
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-        return executorService.invokeAll(tasks);
+        if (tasks.size() == 1 && threadStarted.compareAndSet(false, true)) {
+            printStartupMessage();
+
+            return executorService.invokeAll(tasks);
+        }
+
+        throw new RejectedExecutionException("thread pool capacity exhausted");
     }
 
     @Override
-    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
-        return null;
+    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+            throws InterruptedException {
+
+        if (tasks.size() == 1 && threadStarted.compareAndSet(false, true)) {
+            printStartupMessage();
+
+            return executorService.invokeAll(tasks, timeout, unit);
+        }
+
+        throw new RejectedExecutionException("thread pool capacity exhausted");
     }
 
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-        return null;
+        if (tasks.size() == 1 && threadStarted.compareAndSet(false, true)) {
+            printStartupMessage();
+
+            return executorService.invokeAny(tasks);
+        }
+
+        throw new RejectedExecutionException("thread pool capacity exhausted");
     }
 
     @Override
-    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return null;
+    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+
+        if (tasks.size() == 1 && threadStarted.compareAndSet(false, true)) {
+            printStartupMessage();
+
+            return executorService.invokeAny(tasks, timeout, unit);
+        }
+
+        throw new RejectedExecutionException("thread pool capacity exhausted");
     }
 
     @Override
     public void execute(Runnable command) {
+        if (threadStarted.compareAndSet(false, true)) {
+            printStartupMessage();
 
+            executorService.execute(command);
+        }
+
+        throw new RejectedExecutionException("thread pool capacity exhausted");
     }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //region PRIVATE UTILITY METHODS ///////////////////////////////////////////////////////////////////////////////////
 
     private <V> Callable<V> buildLoggingCallable(Callable<V> callable) {
         String callerThreadName = Thread.currentThread().getName();
@@ -271,30 +335,34 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
     }
 
     private void printStartupMessage(long delay, long interval, TimeUnit unit) {
-        if (threadName != null) {
+        if (debug || threadName != null) {
             logger.info(buildStartupMessage(delay, interval, unit));
         }
     }
 
     private void printStartupMessage(long delay, TimeUnit unit) {
-        if (threadName != null) {
+        if (debug || threadName != null) {
             logger.info(buildStartupMessage(delay, unit));
         }
     }
 
     private void printStartupMessage() {
-        if (threadName != null) {
+        if (debug || threadName != null) {
             logger.info(buildStartupMessage());
         }
     }
 
     private void printStopMessage() {
-        if (threadName != null) {
+        if (debug || threadName != null) {
             logger.info(buildStopMessage());
         }
     }
 
     private String buildStartupMessage(long delay, long interval, TimeUnit unit) {
+        String printableThreadName = threadName != null
+                ? threadName
+                : "UNNAMED THREAD (started by \"" + Thread.currentThread().getName() + "\")";
+
         String timeoutMessageFragment = buildTimeoutMessageFragment(delay, unit);
         String intervalMessageFragment = buildIntervalMessageFragment(interval, unit);
 
@@ -306,11 +374,7 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
             timeMessageFragment += (timeoutMessageFragment == null ? " (" : "") + intervalMessageFragment + ")";
         }
 
-        if (threadName != null) {
-            return "Starting [" + threadName + "]" + timeMessageFragment + " ...";
-        } else {
-            return "Starting [UNNAMED]" + timeMessageFragment + " ...";
-        }
+        return "Starting [" + printableThreadName + "]" + timeMessageFragment + " ...";
     }
 
     private String buildStartupMessage(long delay, TimeUnit unit) {
@@ -351,6 +415,12 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
     }
 
     private String buildStopMessage() {
-        return "Stopping " + threadName + " ...";
+        String printableThreadName = threadName != null
+                ? threadName
+                : "UNNAMED THREAD (started by \"" + Thread.currentThread().getName() + "\")";
+
+        return "Stopping [" + printableThreadName + "] ...";
     }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
