@@ -71,24 +71,36 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
 
     @Override
     public ScheduledFuture<?> silentSchedule(Runnable command, long delay, TimeUnit unit) {
-        try {
-            return schedule(command, delay, unit);
-        } catch (RejectedExecutionException e) {
-            // omit error message (we are silent)
-            return null;
+        if (threadStarted.compareAndSet(false, true)) {
+            printStartupMessage(delay, unit);
+
+            return executorService.schedule(buildLoggingRunnable(command), delay, unit);
         }
+
+        return null;
+    }
+
+    @Override
+    public <V> ScheduledFuture<V> silentSchedule(Callable<V> callable, long delay, TimeUnit unit) {
+        if (threadStarted.compareAndSet(false, true)) {
+            printStartupMessage(delay, unit);
+
+            return executorService.schedule(buildLoggingCallable(callable), delay, unit);
+        }
+
+        return null;
     }
 
     @Override
     public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable command, long initialDelay, long period,
             TimeUnit unit) {
+        if (threadStarted.compareAndSet(false, true)) {
+            printStartupMessage(initialDelay, period, unit);
 
-        try {
-            return scheduleAtFixedRate(command, initialDelay, period, unit);
-        } catch (RejectedExecutionException e) {
-            // omit error message (we are silent)
-            return null;
+            return executorService.scheduleAtFixedRate(buildLoggingRunnable(command), initialDelay, period, unit);
         }
+
+        return null;
     }
 
     //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,35 +109,32 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
 
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
-        if (threadStarted.compareAndSet(false, true)) {
-            printStartupMessage(delay, unit);
-
-            return executorService.schedule(buildLoggingRunnable(command), delay, unit);
+        ScheduledFuture<?> result = silentSchedule(command, delay, unit);
+        if (result == null) {
+            throw new RejectedExecutionException("thread pool capacity exhausted");
         }
 
-        throw new RejectedExecutionException("thread pool capacity exhausted");
+        return result;
     }
 
     @Override
     public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
-        if (threadStarted.compareAndSet(false, true)) {
-            printStartupMessage(delay, unit);
-
-            return executorService.schedule(buildLoggingCallable(callable), delay, unit);
+        ScheduledFuture<V> result = silentSchedule(callable, delay, unit);
+        if (result == null) {
+            throw new RejectedExecutionException("thread pool capacity exhausted");
         }
 
-        throw new RejectedExecutionException("thread pool capacity exhausted");
+        return result;
     }
 
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
-        if (threadStarted.compareAndSet(false, true)) {
-            printStartupMessage(initialDelay, period, unit);
-
-            return executorService.scheduleAtFixedRate(buildLoggingRunnable(command), initialDelay, period, unit);
+        ScheduledFuture<?> result = silentScheduleAtFixedRate(command, initialDelay, period, unit);
+        if (result == null) {
+            throw new RejectedExecutionException("thread pool capacity exhausted");
         }
 
-        throw new RejectedExecutionException("thread pool capacity exhausted");
+        return result;
     }
 
     @Override

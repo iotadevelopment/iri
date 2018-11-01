@@ -1,5 +1,6 @@
 package com.iota.iri.utils.thread;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +19,20 @@ public interface SilentScheduledExecutorService {
      * @throws NullPointerException if command is null
      */
     ScheduledFuture<?> silentSchedule(Runnable command, long delay, TimeUnit unit);
+
+    /**
+     * Creates and executes a ScheduledFuture that becomes enabled after the
+     * given delay.
+     *
+     * @param callable the function to execute
+     * @param delay the time from now to delay execution
+     * @param unit the time unit of the delay parameter
+     * @param <V> the type of the callable's result
+     * @return a ScheduledFuture that can be used to extract result or cancel or {@code null} if the callable could not
+     *         be scheduled because we have scheduled another callable already
+     * @throws NullPointerException if callable is null
+     */
+    <V> ScheduledFuture<V> silentSchedule(Callable<V> callable, long delay, TimeUnit unit);
 
     /**
      * Creates and executes a periodic action that becomes enabled first
