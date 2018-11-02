@@ -27,36 +27,139 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
      */
     private final Logger logger;
 
+    /**
+     * Holds the name of the thread that gets started by this {@link ExecutorService} and that gets printed in the log
+     * messages.
+     */
     private final String threadName;
 
+    /**
+     * Flag indicating if we want to issue debug messages (for example whenever a task gets started and finished) .
+     */
     private final boolean debug;
 
+    /**
+     * Flag that is used to determine if the task for this {@link ExecutorService} was started already.
+     *
+     * Note: Since this {@link ExecutorService} is dedicated to exactly one task we do not allow to submit more than
+     *       exactly one.
+     */
     private AtomicBoolean threadStarted = new AtomicBoolean(false);
 
+    /**
+     * Creates a {@link ScheduledExecutorService} that is associated with one specific task for which it provides
+     * automatic logging capabilities (using the provided thread name).
+     *
+     * The task informs the user about its lifecycle using the logback loggers used by IRI. In addition it offers
+     * silent* methods of the {@link ScheduledExecutorService} that do not throw {@link Exception}s when we try to
+     * start the same task multiple times. This is handy for implementing the "start" and "shutdown" methods of the
+     * background workers of IRI that would otherwise have to take care of not starting the same task more than once
+     * (when trying to be robust against coding errors or tests that start the same thread multiple times).
+     *  <pre>
+     *
+     * <code>Example:
+     *
+     *     private final static Logger logger = LoggerFactor.getLogger(MilestoneSolidifier.class);
+     *
+     *     private DedicatedScheduledExecutorService milestoneSolidifier = new DedicatedScheduledExecutorService(
+     *             "Solidification Thread", logger, false);
+     *
+     *     // calling this multiple times will only start exactly one background job (ignore additional requests)
+     *     public void start() {
+     *         milestoneSolidifier.silentScheduleAtFixedRate(this::solidificationThread, 0, 500, MILLISECONDS);
+     *     }
+     *
+     *     // calling this multiple times will only stop the one instance that is running (if it is running)
+     *     public void shutdown() {
+     *         milestoneSolidifier.shutdownNow();
+     *     }
+     *
+     *     public void solidificationThread() {
+     *         System.out.println("I get executed every 500 milliseconds");
+     *     }
+     * </code>
+     * <code>Resulting Log Output:
+     *
+     *     [main] INFO  MilestoneSolidifier - Starting [Solidification Thread] (runs every 500ms) ...
+     *     [Solidification Thread] INFO  c.i.i.s.m.MilestoneSolidifier - I get executed every 500 milliseconds
+     *     [Solidification Thread] INFO  c.i.i.s.m.MilestoneSolidifier - I get executed every 500 milliseconds
+     *     [Solidification Thread] INFO  c.i.i.s.m.MilestoneSolidifier - I get executed every 500 milliseconds
+     *     [main] INFO  MilestoneSolidifier - Stopping [Solidification Thread] ...
+     * </code
+     * </pre>
+     *
+     * @param threadName name of the thread (or null if we want to disable the automatic logging - exceptions will
+     *                   always be logged)
+     * @param logger logback logger that shall be used for the origin of the log messages
+     * @param debug debug flag that indicates if every "run" should be accompanied with a log message
+     */
     public DedicatedScheduledExecutorService(String threadName, Logger logger, boolean debug) {
         this.threadName = threadName;
         this.logger = logger;
         this.debug = debug;
     }
 
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to the
+     * {@link #DEFAULT_LOGGER} for the log messages.
+     *
+     * @param threadName name of the thread (or null if we want to disable the automatic logging - exceptions will
+     *                   always be logged)
+     * @param debug debug flag that indicates if every "run" should be accompanied with a log message
+     */
     public DedicatedScheduledExecutorService(String threadName, boolean debug) {
         this(threadName, DEFAULT_LOGGER, debug);
     }
 
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to false
+     * for the debug flag.
+     *
+     * @param threadName name of the thread (or null if we want to disable the automatic logging - exceptions will
+     *                   always be logged)
+     * @param logger logback logger that shall be used for the origin of the log messages
+     */
     public DedicatedScheduledExecutorService(String threadName, Logger logger) {
         this(threadName, logger, false);
     }
 
-    public DedicatedScheduledExecutorService(boolean debug, Logger logger) {
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to {@code null}
+     * for the thread name (which causes only error messages to be printed - unless debug is true).
+     *
+     * Note: This is for example used by the {@link com.iota.iri.utils.log.interval.IntervalLogger} which does not want
+     *       to inform the user when scheduling a log output, but which still needs the "only run one task" logic.
+     *
+     * @param logger logback logger that shall be used for the origin of the log messages
+     * @param debug debug flag that indicates if every "run" should be accompanied with a log message
+     */
+    public DedicatedScheduledExecutorService(Logger logger, boolean debug) {
         this(null, logger, true);
     }
 
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to the
+      {@link #DEFAULT_LOGGER} for the log messages and false for the debug flag.
+     *
+     * @param threadName name of the thread (or null if we want to disable the automatic logging - exceptions will
+     *                   always be logged)
+     */
     public DedicatedScheduledExecutorService(String threadName) {
         this(threadName, DEFAULT_LOGGER, false);
     }
 
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to {@code null}
+     * for the thread name (which causes only error messages to be printed - unless debug is true) and the
+     * {@link #DEFAULT_LOGGER} for the log messages.
+     *
+     * Note: This is for example used by the {@link com.iota.iri.utils.log.interval.IntervalLogger} which does not want
+     *       to inform the user when scheduling a log output, but which still needs the "only run one task" logic.
+     *
+     * @param debug debug flag that indicates if every "run" should be accompanied with a log message
+     */
     public DedicatedScheduledExecutorService(boolean debug) {
-        this(null, DEFAULT_LOGGER, true);
+        this(null, DEFAULT_LOGGER, debug);
     }
 
     public DedicatedScheduledExecutorService() {
