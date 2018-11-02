@@ -162,10 +162,23 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
         this(null, DEFAULT_LOGGER, debug);
     }
 
+    /**
+     * Does the same as {@link #DedicatedScheduledExecutorService(String, Logger, boolean)} but defaults to {@code null}
+     * for the thread name (which causes only error messages to be printed), the {@link #DEFAULT_LOGGER} for the log
+     * messages and {@code false} for the debug flag.
+     *
+     * Note: This is for example used by the {@link com.iota.iri.utils.log.interval.IntervalLogger} which does not want
+     *       to inform the user when scheduling a log output, but which still needs the "only run one task" logic.
+     */
     public DedicatedScheduledExecutorService() {
         this(null, DEFAULT_LOGGER, false);
     }
 
+    /**
+     * This method is the getter for the name of the thread that gets created by this service.
+     *
+     * @return it simply returns the private property of {@link #threadName}.
+     */
     public String getThreadName() {
         return threadName;
     }
