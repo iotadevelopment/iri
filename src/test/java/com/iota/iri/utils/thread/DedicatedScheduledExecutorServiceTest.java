@@ -19,7 +19,7 @@ public class DedicatedScheduledExecutorServiceTest {
 
         ThreadUtils.sleep(5000);
 
-        executorService.shutdown();
+        executorService.shutdownNow();
     }
 
     private void solidificationThread() {

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class DedicatedScheduledExecutorService implements ScheduledExecutorService, SilentScheduledExecutorService {
+public class DedicatedScheduledExecutorService implements SilentScheduledExecutorService {
     /**
      * Default logger for this class allowing us to dump debug and status messages.
      *
