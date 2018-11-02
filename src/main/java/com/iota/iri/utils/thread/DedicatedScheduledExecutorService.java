@@ -219,6 +219,51 @@ public class DedicatedScheduledExecutorService implements ScheduledExecutorServi
         return null;
     }
 
+    @Override
+    public ScheduledFuture<?> silentScheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
+        return null;
+    }
+
+    @Override
+    public <T> Future<T> silentSubmit(Callable<T> task) {
+        return null;
+    }
+
+    @Override
+    public Future<?> silentSubmit(Runnable task) {
+        return null;
+    }
+
+    @Override
+    public <T> Future<T> silentSubmit(Runnable task, T result) {
+        return null;
+    }
+
+    @Override
+    public <T> List<Future<T>> silentInvokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
+        return null;
+    }
+
+    @Override
+    public <T> List<Future<T>> silentInvokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
+        return null;
+    }
+
+    @Override
+    public <T> T silentInvokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
+        return null;
+    }
+
+    @Override
+    public <T> T silentInvokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        return null;
+    }
+
+    @Override
+    public void silentExecute(Runnable command) {
+
+    }
+
     //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //region METHODS OF ScheduledExecutorService INTERFACE /////////////////////////////////////////////////////////////
