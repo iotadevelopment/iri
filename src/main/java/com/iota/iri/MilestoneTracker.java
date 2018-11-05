@@ -309,14 +309,14 @@ public class MilestoneTracker {
                         milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     }
 
-                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotProvider.getInitialSnapshot(), true);
+                    potentialMilestoneTransaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
 
                     return VALID;
 
                 case INCOMPLETE:
                     milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
 
-                    potentialMilestoneTransaction.isSnapshot(tangle, snapshotProvider.getInitialSnapshot(), true);
+                    potentialMilestoneTransaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
 
                     return INCOMPLETE;
             }

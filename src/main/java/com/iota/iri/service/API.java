@@ -98,6 +98,8 @@ public class API {
     private final static char ZERO_LENGTH_NOT_ALLOWED = 'N';
     private Iota instance;
 
+    private final String[] features;
+
     public API(Iota instance, IXI ixi) {
         this.instance = instance;
         this.ixi = ixi;
@@ -109,6 +111,8 @@ public class API {
         testNet = configuration.isTestnet();
 
         previousEpochsSpentAddresses = new ConcurrentHashMap<>();
+
+        features = Feature.calculateFeatureNames(instance.configuration);
     }
 
     public void init() throws IOException {
@@ -267,7 +271,7 @@ public class API {
 
                     String isSolid = transaction.isSolid() ? "true" : "false";
 
-                    String isSnapshot = transaction.isSnapshot() ? "true" : "false";
+                    String isSnapshot = transaction.isMilestone() ? "true" : "false";
 
                     MilestoneViewModel snapshotIndexMilestone = MilestoneViewModel.get(instance.tangle, transaction.snapshotIndex());
                     String snapshotIndex = "" + transaction.snapshotIndex() + "" + (snapshotIndexMilestone == null ? "" : " (" + snapshotIndexMilestone.getHash().toString() + ")");
@@ -791,7 +795,8 @@ public class API {
                 instance.snapshotProvider.getLatestSnapshot().getHash(), instance.snapshotProvider.getLatestSnapshot().getIndex(), instance.snapshotProvider.getInitialSnapshot().getIndex(),
                 instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                 System.currentTimeMillis(), instance.tipsViewModel.size(),
-                instance.transactionRequester.numberOfTransactionsToRequest());
+                instance.transactionRequester.numberOfTransactionsToRequest(),
+                features);
     }
 
     /**
@@ -1167,7 +1172,7 @@ public class API {
                 Converter.copyTrits(MAX_TIMESTAMP_VALUE,transactionTrits,TransactionViewModel.ATTACHMENT_TIMESTAMP_UPPER_BOUND_TRINARY_OFFSET,
                         TransactionViewModel.ATTACHMENT_TIMESTAMP_UPPER_BOUND_TRINARY_SIZE);
 
-                if (!pearlDiver.search(transactionTrits, minWeightMagnitude, 0)) {
+                if (!pearlDiver.search(transactionTrits, minWeightMagnitude, instance.configuration.getPowThreads())) {
                     transactionViewModels.clear();
                     break;
                 }
