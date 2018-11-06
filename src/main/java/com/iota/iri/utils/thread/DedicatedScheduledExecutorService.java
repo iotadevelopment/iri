@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class DedicatedScheduledExecutorService implements SilentScheduledExecutorService {
+public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorService {
     /**
      * Default logger for this class allowing us to dump debug and status messages.
      *
@@ -94,6 +94,8 @@ public class DedicatedScheduledExecutorService implements SilentScheduledExecuto
      * @param debug debug flag that indicates if every "run" should be accompanied with a log message
      */
     public DedicatedScheduledExecutorService(String threadName, Logger logger, boolean debug) {
+        super(1);
+
         this.threadName = threadName;
         this.logger = logger;
         this.debug = debug;
@@ -210,13 +212,13 @@ public class DedicatedScheduledExecutorService implements SilentScheduledExecuto
     @Override
     public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable command, long initialDelay, long period,
             TimeUnit unit) {
-        if (threadStarted.compareAndSet(false, true)) {
-            printStartupMessage(initialDelay, period, unit);
 
-            return executorService.scheduleAtFixedRate(buildLoggingRunnable(command), initialDelay, period, unit);
+        ScheduledFuture<?> result = super.silentScheduleAtFixedRate(buildLoggingRunnable(command), initialDelay, period, unit);
+        if (result != null) {
+            printStartupMessage(initialDelay, period, unit);
         }
 
-        return null;
+        return result;
     }
 
     @Override
