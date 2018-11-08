@@ -30,8 +30,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
     private final Logger logger;
 
     /**
-     * Holds the name of the thread that gets started by this {@link ExecutorService} and that gets printed in the log
-     * messages.<br />
+     * Holds the name of the thread that gets started by this class and that gets printed in the log messages.<br />
      */
     private final String threadName;
 
@@ -44,12 +43,11 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * Creates a {@link ScheduledExecutorService} that is associated with one specific task for which it provides
      * automatic logging capabilities (using the provided thread name).<br />
      * <br />
-     * The {@link ScheduledExecutorService} informs the user about its lifecycle using the logback loggers used by IRI.
-     * In addition it offers "silent" methods of the {@link ScheduledExecutorService} that do not throw
-     * {@link Exception}s when we try to start the same task multiple times. This is handy for implementing the "start"
-     * and "shutdown" methods of the background workers of IRI that would otherwise have to take care of not starting
-     * the same task more than once (when trying to be robust against coding errors or tests that start the same thread
-     * multiple times).<br />
+     * It informs the user about its lifecycle using the logback loggers used by IRI. In addition it offers "silent"
+     * methods of the {@link ScheduledExecutorService} that do not throw {@link Exception}s when we try to start the
+     * same task multiple times. This is handy for implementing the "start" and "shutdown" methods of the background
+     * workers of IRI that would otherwise have to take care of not starting the same task more than once (when trying
+     * to be robust against coding errors or tests that start the same thread multiple times).<br />
      * <br />
      * <pre>
      *     <code>Example:
@@ -221,14 +219,14 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * This method shows a message whenever a task starts to be processed.<br />
      * <br />
      * We only show the starting message if debug is enabled or if it is the first start of the task in a named
-     * {@link DedicatedScheduledExecutorService} (show like it would be a {@link Thread} with one start message and one
-     * stop message - to not pollute the CLI with meaningless messages).<br />
+     * {@link DedicatedScheduledExecutorService} (display it like it would be a {@link Thread} with one start message
+     * and one stop message - to not pollute the CLI with meaningless messages).<br />
      * <br />
      * To increase the information available for debugging, we change the thread name to the one that initiated the
      * start (rather than the randomly assigned one from the executor service) before printing the start message.<br />
      * <br />
-     * After the start message was printed, we set the name of the {@link Thread} (if one is set) that will consequently
-     * be used for log messages from the task.<br />
+     * After the start message was printed, we set the name of the {@link Thread} that will consequently be used for log
+     * messages from the task itself.<br />
      *
      * @param taskDetails metadata holding the relevant information of the task
      */
@@ -247,6 +245,8 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
 
         if (threadName != null) {
             Thread.currentThread().setName(threadName);
+        } else {
+            Thread.currentThread().setName(getPrintableThreadName(taskDetails));
         }
     }
 
@@ -255,7 +255,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * This method shows a message when the task finishes its execution (can happen multiple times for recurring
      * tasks).<br />
      * <br />
-     * We only show the finishing message if debug is enabled or if no error occurred (otherwise the
+     * We only show the finishing message if debug is enabled and if no error occurred (otherwise the
      * {@link #onCompleteTask(TaskDetails, Throwable)} callback will give enough information about the crash).<br />
      * <br />
      * To be consistent with the start message, we change the thread name to the one that initiated the task (this also
@@ -296,8 +296,8 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
 
     /**
      * {@inheritDoc}
-     * This method makes the task show a stopped message whenever it finally terminates (and doesn't get launched again
-     * in case of recurring tasks).<br />
+     * This method shows a stopped message whenever it finally terminates (and doesn't get launched again in case of
+     * recurring tasks).<br />
      * <br />
      * We only show the stopped message if debug is enabled, an exception occurred (always show unexpected errors) or if
      * we have a named {@link DedicatedScheduledExecutorService} (to not pollute the CLI with meaningless
@@ -334,8 +334,8 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
     /**
      * This method is a utility method that prints the schedule message of the task.<br />
      * <br />
-     * It simply switches between the different possible value combinations in the {@link TaskDetails} and constructs
-     * the matching message by passing the parameters into the {@link #buildScheduledMessage(TaskDetails)} method.<br />
+     * It constructs the matching message by passing the task details into the
+     * {@link #buildScheduledMessage(TaskDetails)} method.<br />
      *
      * @param taskDetails metadata holding the relevant information of the task
      */
@@ -444,9 +444,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * @return the started message that can be used with the logger
      */
     private String buildStartedMessage(TaskDetails taskDetails) {
-        String printableThreadName = threadName != null
-                ? threadName
-                : "UNNAMED THREAD (started by \"" + taskDetails.getThreadName() + "\")";
+        String printableThreadName = getPrintableThreadName(taskDetails);
 
         return "[" + printableThreadName + "] Started (execution #" + (taskDetails.getExecutionCount().get() + 1) +
                 ") ...";
@@ -460,9 +458,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * @return the finished message that can be used with the logger
      */
     private String buildFinishedMessage(TaskDetails taskDetails) {
-        String printableThreadName = threadName != null
-                ? threadName
-                : "UNNAMED THREAD (started by \"" + taskDetails.getThreadName() + "\")";
+        String printableThreadName = getPrintableThreadName(taskDetails);
 
         return "[" + printableThreadName + "] Finished (execution #" + (taskDetails.getExecutionCount().get()) +
                 ") ...";
@@ -476,9 +472,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * @return the stop message that can be used with the logger
      */
     private String buildStopMessage(TaskDetails taskDetails) {
-        String printableThreadName = threadName != null
-                ? threadName
-                : "UNNAMED THREAD (started by \"" + Thread.currentThread().getName() + "\")";
+        String printableThreadName = getPrintableThreadName(taskDetails);
 
         return taskDetails.getExecutionCount().get() > 0 ? "Stopping [" + printableThreadName + "] ..."
                                                          : "Cancelling Start [" + printableThreadName + "] ...";
@@ -494,9 +488,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
      * @return the stop message that can be used with the logger
      */
     private String buildStoppedMessage(TaskDetails taskDetails, Throwable error) {
-        String printableThreadName = threadName != null
-                ? threadName
-                : "UNNAMED THREAD (started by \"" + Thread.currentThread().getName() + "\")";
+        String printableThreadName = getPrintableThreadName(taskDetails);
 
         if (error != null) {
             return "[" + printableThreadName + "] Crashed (after #" + taskDetails.getExecutionCount().get() +

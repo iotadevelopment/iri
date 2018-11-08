@@ -12,7 +12,7 @@ public class DedicatedScheduledExecutorServiceTest {
     private static final Logger logger = LoggerFactory.getLogger(MilestoneSolidifier.class);
 
     private static final BoundedScheduledExecutorService executorService =
-            new DedicatedScheduledExecutorService("Milestone Solidifier", logger);
+            new DedicatedScheduledExecutorService(logger, true);
 
     @Test
     public void testSubmit() {
