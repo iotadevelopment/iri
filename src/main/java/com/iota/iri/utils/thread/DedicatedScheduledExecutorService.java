@@ -315,7 +315,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
 
         if (debug || threadName != null || error != null) {
             String oldThreadName = Thread.currentThread().getName();
-            if (oldThreadName.equals(threadName)) {
+            if (oldThreadName.equals(getPrintableThreadName(taskDetails))) {
                 Thread.currentThread().setName(taskDetails.getThreadName());
             }
 
