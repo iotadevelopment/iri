@@ -3,50 +3,55 @@ package com.iota.iri.utils.thread;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * This class represents a {@link SilentScheduledExecutorService} that accepts only a pre-defined amount of tasks that
  * can be queued or executed at the same time. All tasks exceeding the defined limit will be ignored (instead of being
  * queued) by either throwing a {@link RejectedExecutionException} or returning {@code null} depending on the method we
- * call (non-silent vs silent).<br>
- * <br>
+ * call (non-silent vs silent).<br />
+ * <br />
  * Whenever a non-recurring task finishes (or a recurring one is cancelled through its {@link Future}), it makes space
  * for a new task. This is useful for classes like the {@link com.iota.iri.utils.log.interval.IntervalLogger} that want
- * to delay an action if and only if there is no other delayed action queued already.<br>
- * <br>
+ * to delay an action if and only if there is no other delayed action queued already.<br />
+ * <br />
  * Note: In contrast to other existing implementations like the SizedScheduledExecutorService of the apache package,
  *       this class is thread-safe and will only allow to spawn and queue the exact amount of tasks defined during its
- *       creation (since it does not rely on approximate numbers like the queue size).
+ *       creation (since it does not rely on approximate numbers like the queue size).<br />
  */
-public class BoundedScheduledExecutorService implements SilentScheduledExecutorService {
+public class BoundedScheduledExecutorService implements SilentScheduledExecutorService, ReportingExecutorService {
     /**
-     * Holds the maximum amount of tasks that can be submitted for execution.
+     * Holds the maximum amount of tasks that can be submitted for execution.<br />
      */
     private final int capacity;
 
     /**
-     * Holds the underlying {@link ScheduledExecutorService} that manages the Threads in the background.
+     * Holds the underlying {@link ScheduledExecutorService} that manages the Threads in the background.<br />
      */
     private final ScheduledExecutorService delegate;
 
     /**
-     * Counter that is used to determine how many tasks were scheduled already.<br>
-     * <br>
-     * Note: Whenever a task finishes, we clean up the used resources and make space for new tasks.
+     * Holds a set of scheduled tasks tasks that are going to be executed by this
+     * {@link ScheduledExecutorService}.<br />
+     */
+    private final Set<TaskDetails> scheduledTasks = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Thread-safe counter that is used to determine how many tasks were exactly scheduled already.<br />
+     * <br />
+     * Note: Whenever a task finishes, we clean up the used resources and make space for new tasks.<br />
      */
     private AtomicInteger tasksQueued = new AtomicInteger(0);
 
     /**
-     * Creates an executor service that that accepts only a pre-defined amount of tasks that can be queued at the same
-     * time.<br>
-     * <br>
+     * Creates an executor service that that accepts only a pre-defined amount of tasks that can be queued and run at
+     * the same time.<br />
+     * <br />
      * All tasks exceeding the defined limit will be ignored (instead of being queued) by either throwing a
      * {@link RejectedExecutionException} or returning {@code null} depending on the method we call (non-silent vs
-     * silent).
+     * silent).<br />
      *
      * @param capacity the amount of tasks that can be scheduled simultaneously
      */
@@ -56,160 +61,249 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
         delegate = Executors.newScheduledThreadPool(capacity);
     }
 
+    //region METHODS OF ReportingExecutorService INTERFACE /////////////////////////////////////////////////////////////
+
+    /**
+     * {@inheritDoc}
+     * <br />
+     * It simply adds the task to the internal set of scheduled tasks.<br />
+     */
+    @Override
+    public void onScheduleTask(TaskDetails taskDetails) {
+        scheduledTasks.add(taskDetails);
+    }
+
+    @Override
+    public void onStartTask(TaskDetails taskDetails) {}
+
+    @Override
+    public void onFinishTask(TaskDetails taskDetails, Throwable error) {}
+
+    @Override
+    public void onCancelTask(TaskDetails taskDetails) {}
+
+    /**
+     * {@inheritDoc}
+     * <br />
+     * It frees the reserved resources by decrementing the {@link #tasksQueued} counter and removing the task from the
+     * {@link #scheduledTasks} set.<br />
+     */
+    @Override
+    public void onCompleteTask(TaskDetails taskDetails, Throwable error) {
+        scheduledTasks.remove(taskDetails);
+        tasksQueued.decrementAndGet();
+    }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     //region METHODS OF SilentScheduledExecutorService INTERFACE ///////////////////////////////////////////////////////
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link ScheduledFuture} returned by this method allows to cancel jobs without their unwinding
      *       logic being executed, we wrap the returned {@link ScheduledFuture} AND the {@link Runnable} to correctly
-     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.
+     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.<br />
      */
     @Override
-    public ScheduledFuture<?> silentSchedule(Runnable command, long delay, TimeUnit unit) {
-        return reserveCapacity(1) ? wrapScheduledFuture(cmd -> delegate.schedule(cmd, delay, unit), command) : null;
+    public ScheduledFuture<?> silentSchedule(Runnable task, long delay, TimeUnit unit) {
+        return reserveCapacity(1) ? wrapScheduledFuture(
+                wrappedTask -> delegate.schedule(wrappedTask, delay, unit),
+                task,
+                new TaskDetails()
+                        .setDelay(delay)
+                        .setTimeUnit(unit)
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link ScheduledFuture} returned by this method allows to cancel jobs without their unwinding
      *       logic being executed, we wrap the returned {@link ScheduledFuture} AND the {@link Callable} to correctly
-     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.
+     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.<br />
      */
     @Override
-    public <V> ScheduledFuture<V> silentSchedule(Callable<V> callable, long delay, TimeUnit unit) {
-        return reserveCapacity(1) ? wrapScheduledFuture(cmd -> delegate.schedule(cmd, delay, unit), callable) : null;
+    public <V> ScheduledFuture<V> silentSchedule(Callable<V> task, long delay, TimeUnit unit) {
+        return reserveCapacity(1) ? wrapScheduledFuture(
+                wrappedTask -> delegate.schedule(wrappedTask, delay, unit),
+                task,
+                new TaskDetails()
+                        .setDelay(delay)
+                        .setTimeUnit(unit)
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link ScheduledFuture} returned by this method allows to cancel jobs without their unwinding
      *       logic being executed, we wrap the returned {@link ScheduledFuture} AND the {@link Runnable} to correctly
-     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.
+     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.<br />
      */
     @Override
-    public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable command, long initialDelay, long period,
+    public ScheduledFuture<?> silentScheduleAtFixedRate(Runnable task, long initialDelay, long period,
             TimeUnit unit) {
 
-        return reserveCapacity(1) ? wrapScheduledFuture(cmd -> delegate.scheduleAtFixedRate(cmd, initialDelay, period,
-                unit), command, true) : null;
+        return reserveCapacity(1) ? wrapScheduledFuture(
+                wrappedTask -> delegate.scheduleAtFixedRate(wrappedTask, initialDelay, period, unit),
+                task,
+                new TaskDetails()
+                        .setDelay(initialDelay)
+                        .setInterval(period)
+                        .setTimeUnit(unit)
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link ScheduledFuture} returned by this method allows to cancel jobs without their unwinding
      *       logic being executed, we wrap the returned {@link ScheduledFuture} AND the {@link Runnable} to correctly
-     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.
+     *       free the resources if its {@link ScheduledFuture#cancel(boolean)} method is called.<br />
      */
     @Override
-    public ScheduledFuture<?> silentScheduleWithFixedDelay(Runnable command, long initialDelay, long delay,
+    public ScheduledFuture<?> silentScheduleWithFixedDelay(Runnable task, long initialDelay, long delay,
             TimeUnit unit) {
 
-        return reserveCapacity(1) ? wrapScheduledFuture(cmd -> delegate.scheduleWithFixedDelay(cmd, initialDelay, delay,
-                unit), command, true) : null;
+        return reserveCapacity(1) ? wrapScheduledFuture(
+                wrappedTask -> delegate.scheduleWithFixedDelay(wrappedTask, initialDelay, delay, unit),
+                task,
+                new TaskDetails()
+                        .setDelay(initialDelay)
+                        .setInterval(delay)
+                        .setTimeUnit(unit)
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future} returned by this method allows to cancel jobs without their unwinding logic being
      *       executed, we wrap the returned {@link Future} AND the {@link Callable} to correctly free the resources if
-     *       its {@link Future#cancel(boolean)} method is called.
+     *       its {@link Future#cancel(boolean)} method is called.<br />
      */
     @Override
     public <T> Future<T> silentSubmit(Callable<T> task) {
-        return reserveCapacity(1) ? wrapFuture(delegate::submit, task) : null;
+        return reserveCapacity(1) ? wrapFuture(
+                delegate::submit,
+                task,
+                new TaskDetails()
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future} returned by this method allows to cancel jobs without their unwinding logic being
      *       executed, we wrap the returned {@link Future} AND the {@link Runnable} to correctly free the resources if
-     *       its {@link Future#cancel(boolean)} method is called.
+     *       its {@link Future#cancel(boolean)} method is called.<br />
      */
     @Override
     public Future<?> silentSubmit(Runnable task) {
-        return reserveCapacity(1) ? wrapFuture(delegate::submit, task) : null;
+        return reserveCapacity(1) ? wrapFuture(
+                delegate::submit,
+                task,
+                new TaskDetails()
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future} returned by this method allows to cancel jobs without their unwinding logic being
      *       executed, we wrap the returned {@link Future} AND the {@link Runnable} to correctly free the resources if
-     *       its {@link Future#cancel(boolean)} method is called.
+     *       its {@link Future#cancel(boolean)} method is called.<br />
      */
     @Override
     public <T> Future<T> silentSubmit(Runnable task, T result) {
-        return reserveCapacity(1) ? wrapFuture(cmd -> delegate.submit(cmd, result), task) : null;
+        return reserveCapacity(1) ? wrapFuture(
+                wrappedTask -> delegate.submit(wrappedTask, result),
+                task,
+                new TaskDetails()
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future}s will all be finished (and cannot be cancelled anymore) when the underlying method
      *       returns, we only wrap the {@link Callable}s to correctly free the resources and omit wrapping the returned
-     *       {@link Future}s.
+     *       {@link Future}s.<br />
      */
     @Override
     public <T> List<Future<T>> silentInvokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-        return reserveCapacity(tasks.size()) ? delegate.invokeAll(wrapCallables(tasks)) : null;
+        return reserveCapacity(tasks.size()) ? delegate.invokeAll(wrapTasks(tasks, new TaskDetails())) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future}s will all be finished (and cannot be cancelled anymore) when the underlying method
      *       returns, we only wrap the {@link Callable}s to correctly free the resources and omit wrapping the returned
-     *       {@link Future}s.
+     *       {@link Future}s.<br />
      */
     @Override
     public <T> List<Future<T>> silentInvokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
             throws InterruptedException {
 
-        return reserveCapacity(tasks.size()) ? delegate.invokeAll(wrapCallables(tasks), timeout, unit) : null;
+        return reserveCapacity(tasks.size()) ? delegate.invokeAll(
+                wrapTasks(
+                        tasks,
+                        new TaskDetails()
+                                .setTimeout(timeout)
+                                .setTimeUnit(unit)
+                ),
+                timeout,
+                unit
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future}s are not passed to the caller, we only wrap the {@link Callable}s to correctly
-     *       free the resources and omit wrapping the {@link Future}s as well.
+     *       free the resources and omit wrapping the {@link Future}s as well.<br />
      */
     @Override
     public <T> T silentInvokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException,
             ExecutionException {
 
-        return reserveCapacity(tasks.size()) ? delegate.invokeAny(wrapCallables(tasks)) : null;
+        return reserveCapacity(tasks.size()) ? delegate.invokeAny(wrapTasks(tasks, new TaskDetails())) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since the {@link Future}s are not passed to the caller, we only wrap the {@link Callable}s to correctly
-     *       free the resources and omit wrapping the related {@link Future}s as well.
+     *       free the resources and omit wrapping the related {@link Future}s as well.<br />
      */
     @Override
     public <T> T silentInvokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws
             InterruptedException, ExecutionException, TimeoutException {
 
-        return reserveCapacity(tasks.size()) ? delegate.invokeAny(wrapCallables(tasks), timeout, unit) : null;
+        return reserveCapacity(tasks.size()) ? delegate.invokeAny(
+                wrapTasks(
+                        tasks,
+                        new TaskDetails()
+                                .setTimeout(timeout)
+                                .setTimeUnit(unit)
+                ),
+                timeout,
+                unit
+        ) : null;
     }
 
     /**
-     * {@inheritDoc}<br>
-     * <br>
+     * {@inheritDoc}
+     * <br />
      * Note: Since there is no {@link Future} passed to the caller, we only wrap the {@link Runnable} to correctly free
-     *       the resources.
+     *       the resources.<br />
      */
     @Override
-    public void silentExecute(Runnable command) {
+    public void silentExecute(Runnable task) {
         if (reserveCapacity(1)) {
-            delegate.execute(wrapTask(command));
+            delegate.execute(wrapTask(task, new TaskDetails()));
         }
     }
 
@@ -258,7 +352,9 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     }
 
     @Override
-    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
+    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+            throws InterruptedException {
+
         return throwCapacityExhaustedIfNull(silentInvokeAll(tasks, timeout, unit));
     }
 
@@ -268,26 +364,65 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     }
 
     @Override
-    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws
+            InterruptedException, ExecutionException, TimeoutException {
+
         return throwCapacityExhaustedIfNull(silentInvokeAny(tasks, timeout, unit));
     }
 
     @Override
     public void execute(Runnable command) {
         if (reserveCapacity(1)) {
-            delegate.execute(wrapTask(command));
+            delegate.execute(wrapTask(command, new TaskDetails()));
         } else {
             throw new RejectedExecutionException("the capacity is exhausted");
         }
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * In addition to delegating the method call to the internal {@link ScheduledExecutorService}, we call the cancel
+     * logic for recurring tasks because shutdown prevents them from firing again. If these "cancelled" jobs are
+     * scheduled for execution (and not running right now), we also call their
+     * {@link #onCompleteTask(TaskDetails, Throwable)} callback to "report" that hey have finished (otherwise this will
+     * be fired inside the wrapped task).<br />
+     */
     @Override
     public void shutdown() {
         delegate.shutdown();
+
+        for (TaskDetails currentTask : scheduledTasks) {
+            if (currentTask.getInterval() != null) {
+                onCancelTask(currentTask);
+
+                if (currentTask.getScheduledForExecution().compareAndSet(true, false)) {
+                    onCompleteTask(currentTask, null);
+                }
+            }
+        }
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * Before delegating the method call to the internal {@link ScheduledExecutorService}, we call the
+     * {@link #onCancelTask(TaskDetails)} callback for all scheduled tasks and fire the
+     * {@link #onCompleteTask(TaskDetails, Throwable)} callback for all tasks that are not being executed right now
+     * (otherwise this will be fired inside the wrapped task).<br />
+     */
     @Override
     public List<Runnable> shutdownNow() {
+        if (!delegate.isShutdown()) {
+            for (TaskDetails currentTask : scheduledTasks) {
+                onCancelTask(currentTask);
+
+                if (currentTask.getScheduledForExecution().compareAndSet(true, false)) {
+                    onCompleteTask(currentTask, null);
+                }
+            }
+        }
+
         return delegate.shutdownNow();
     }
 
@@ -308,52 +443,11 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
 
     //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    //region PRIVATE UTILITY METHODS ///////////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * This method checks if we have enough resources to schedule the given amount of tasks and reserves the space if
-     * the check is successful.<br>
-     * <br>
-     * The reserved resources will be freed again once the tasks finish their execution or when they are cancelled
-     * through their corresponding {@link Future}.
-     *
-     * @param requestedJobCount the amount of tasks that shall be scheduled
-     * @return true if we could reserve the given space and false otherwise
-     */
-    private boolean reserveCapacity(int requestedJobCount) {
-        if (tasksQueued.addAndGet(requestedJobCount) <= capacity) {
-            return true;
-        } else {
-            tasksQueued.addAndGet(-requestedJobCount);
-
-            return false;
-        }
-    }
-
-    /**
-     * This is a utility method that wraps a {@link Collection} of {@link Callable}s to make them free their resources
-     * upon completion.<br>
-     * <br>
-     * It simply iterates over the tasks and wraps them one by one by calling {@link #wrapTask(Callable)}.
-     *
-     * @param tasks list of jobs that shall be wrapped
-     * @param <T> the type of the values returned by the {@link Callable}s
-     * @return wrapped list of jobs that will free their reserved resources upon completion
-     */
-    private <T> Collection<? extends Callable<T>> wrapCallables(Collection<? extends Callable<T>> tasks) {
-        List<Callable<T>> wrappedTasks = new ArrayList<>(tasks.size());
-        for (Callable<T> task : tasks) {
-            wrappedTasks.add(wrapTask(task));
-        }
-
-        return wrappedTasks;
-    }
-
-    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //region PRIVATE UTILITY METHODS AND MEMBERS ///////////////////////////////////////////////////////////////////////
 
     /**
      * This interface is used to generically describe the lambda that is used to create the unwrapped future from the
-     * delegated {@link ScheduledExecutorService} by passing in the wrapped command.
+     * delegated {@link ScheduledExecutorService} by passing in the wrapped command.<br />
      *
      * @param <RESULT> the kind of future returned by this factory ({@link ScheduledFuture} vs {@link Future})
      * @param <ARGUMENT> type of the wrapped command that is passed in ({@link Runnable} vs {@link Callable})
@@ -364,7 +458,7 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
          * This method creates the unwrapped future from the wrapped task by passing it on to the delegated
          * {@link ScheduledExecutorService}.
          *
-         * @param task the wrapped task that shall be delegated
+         * @param task the wrapped task that shall be scheduled
          * @return the unwrapped "original" {@link Future} of the delegated {@link ScheduledExecutorService}
          */
         RESULT create(ARGUMENT task);
@@ -373,51 +467,49 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     /**
      * This is a wrapper for the {@link Future}s returned by the {@link ScheduledExecutorService} that allows us to
      * override the behaviour of the {@link #cancel(boolean)} method (to be able to free the resources of a task that
-     * gets cancelled without being executed).
+     * gets cancelled without being executed).<br />
      *
      * @param <V> the type of the result returned by the task that is the origin of this {@link Future}.
      */
     private class WrappedFuture<V> implements Future<V> {
         /**
-         * Flag that indicates of the task is pending (scheduled for a later point in time).<br>
-         * <br>
-         * Note: This instance is shared between the wrapped task and the wrapped {@link Future} to ensure
-         *       thread-safety.
+         * Holds the metadata of the task that this {@link Future} belongs to.<br />
          */
-        protected final AtomicBoolean taskPending;
+        protected final TaskDetails taskDetails;
 
         /**
-         * "Original" unwrapped {@link Future} that is returned by the delegated {@link ScheduledExecutorService}.<br>
-         * <br>
-         * Note: All methods except the {@link #cancel(boolean)} are getting passed through without any modifications.
+         * "Original" unwrapped {@link Future} that is returned by the delegated {@link ScheduledExecutorService}.<br />
+         * <br />
+         * Note: All methods except the {@link #cancel(boolean)} are getting passed through without any
+         *       modifications.<br />
          */
         private Future<V> delegate;
 
         /**
-         * This creates a {@link Future} that cleans up the reserved resources when it is cancelled while the task is
-         * still pending.<br>
-         * <br>
+         * This creates a {@link WrappedFuture} that cleans up the reserved resources when it is cancelled while the
+         * task is still pending.<br />
+         * <br />
          * We do not hand in the {@link #delegate} in the constructor because we need to populate this instance to the
-         * wrapped task before we "launch" the processing of the task (see {@link #delegate(Future)}).
+         * wrapped task before we "launch" the processing of the task (see {@link #delegate(Future)}).<br />
          *
-         * @param taskPending a flag indicating if the task is pending for execution - it gets shared with the wrapped
-         *                    task
+         * @param taskDetails metadata holding the relevant information of the task
          */
-        public WrappedFuture(AtomicBoolean taskPending) {
-            this.taskPending = taskPending;
+        public WrappedFuture(TaskDetails taskDetails) {
+            this.taskDetails = taskDetails;
         }
 
         /**
-         * This method stores the delegated {@link Future} in its internal property.<br>
-         * <br>
+         * This method stores the delegated {@link Future} in its internal property.<br />
+         * <br />
          * After the delegated {@link Future} is created, the underlying {@link ScheduledExecutorService} starts
          * processing the task. To be able to "address" this wrapped future before we start processing the task (the
-         * wrapped task needs to access it), we populate this lazy (see {@link #wrapFuture(FutureFactory, Runnable)} and
-         * {@link #wrapFuture(FutureFactory, Callable)}).
+         * wrapped task needs to access it), we populate this lazy (see
+         * {@link #wrapFuture(FutureFactory, Runnable, TaskDetails)} and
+         * {@link #wrapFuture(FutureFactory, Callable, TaskDetails)}).<br />
          *
          * @param delegatedFuture the "original" future that handles the logic in the background
-         * @return the instance itself (since we want to return the {@link WrappedFuture} immediately after launching
-         *         the underlying processing).
+         * @return the instance itself (since we want to return the {@link WrappedFuture} after launching the underlying
+         *         processing).
          */
         public Future<V> delegate(Future<V> delegatedFuture) {
             this.delegate = delegatedFuture;
@@ -426,10 +518,10 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
         }
 
         /**
-         * This method returns the delegated future.<br>
-         * <br>
+         * This method returns the delegated future.<br />
+         * <br />
          * We define a getter for this property to be able to override it in the extending class and achieve a
-         * polymorphic behavior.
+         * polymorphic behavior.<br />
          *
          * @return the original "unwrapped" {@link Future} that is used as a delegate for the methods of this class
          */
@@ -438,21 +530,23 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
         }
 
         /**
-         * {@inheritDoc}<br>
-         * <br>
-         * This method additionally frees the reserved resources if the task was scheduled for a later point in time
-         * and didn't start its execution, yet.
+         * {@inheritDoc}
+         * <br />
+         * This method fires the {@link #onCancelTask(TaskDetails)} if the future has not been cancelled before.
+         * Afterwards it also fires the {@link #onCompleteTask(TaskDetails, Throwable)} callback if the task is not
+         * running right now (otherwise this will be fired inside the wrapped task).<br />
          */
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean result = delegate().cancel(mayInterruptIfRunning);
-
-            // clean up if the task was pending and mark it as "not-pending" so it doesn't start another time
-            if (taskPending.compareAndSet(true, false)) {
-                tasksQueued.decrementAndGet();
+            if (!delegate().isCancelled() && !delegate().isDone()) {
+                onCancelTask(taskDetails);
             }
 
-            return result;
+            if (taskDetails.getScheduledForExecution().compareAndSet(true, false)) {
+                onCompleteTask(taskDetails, null);
+            }
+
+            return delegate().cancel(mayInterruptIfRunning);
         }
 
         @Override
@@ -479,40 +573,39 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     /**
      * This is a wrapper for the {@link ScheduledFuture}s returned by the {@link ScheduledExecutorService} that allows
      * us to override the behaviour of the {@link #cancel(boolean)} method (to be able to free the resources of a task
-     * that gets cancelled without being executed).
+     * that gets cancelled without being executed).<br />
      *
      * @param <V> the type of the result returned by the task that is the origin of this {@link ScheduledFuture}.
      */
     private class WrappedScheduledFuture<V> extends WrappedFuture<V> implements ScheduledFuture<V> {
         /**
          * "Original" unwrapped {@link ScheduledFuture} that is returned by the delegated
-         * {@link ScheduledExecutorService}.<br>
-         * <br>
+         * {@link ScheduledExecutorService}.<br />
+         * <br />
          * Note: All methods except the {@link #cancel(boolean)} are getting passed through without any modifications.
          */
         private ScheduledFuture<V> delegate;
 
         /**
          * This creates a {@link ScheduledFuture} that cleans up the reserved resources when it is cancelled while the
-         * task is still pending.<br>
-         * <br>
+         * task is still pending.<br />
+         * <br />
          * We do not hand in the {@link #delegate} in the constructor because we need to populate this instance to the
          * wrapped task before we "launch" the processing of the task (see {@link #delegate(Future)}).
          *
-         * @param taskPending a flag indicating if the task is pending for execution - it gets shared with the wrapped
-         *                    task
+         * @param taskDetails metadata holding the relevant information of the task
          */
-        private WrappedScheduledFuture(AtomicBoolean taskPending) {
-            super(taskPending);
+        private WrappedScheduledFuture(TaskDetails taskDetails) {
+            super(taskDetails);
         }
 
         /**
-         * This method stores the delegated {@link ScheduledFuture} in its internal property.<br>
-         * <br>
+         * This method stores the delegated {@link ScheduledFuture} in its internal property.<br />
+         * <br />
          * After the delegated {@link ScheduledFuture} is created, the underlying {@link ScheduledExecutorService}
          * starts processing the task. To be able to "address" this wrapped future before we start processing the task
          * (the wrapped task needs to access it), we populate this lazy (see
-         * {@link #wrapScheduledFuture(FutureFactory, Runnable, boolean)}).
+         * {@link #wrapScheduledFuture(FutureFactory, Runnable, TaskDetails)}).<br />
          *
          * @param delegatedFuture the "original" future that handles the logic in the background
          * @return the instance itself (since we want to return the {@link WrappedFuture} immediately after launching
@@ -540,21 +633,23 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
         }
 
         /**
-         * {@inheritDoc}<br>
-         * <br>
-         * This method additionally frees the reserved resources if the task was scheduled for a later point in time
-         * and didn't start its execution, yet.
+         * {@inheritDoc}
+         * <br />
+         * This method fires the {@link #onCancelTask(TaskDetails)} if the future has not been cancelled before.
+         * Afterwards it also fires the {@link #onCompleteTask(TaskDetails, Throwable)} callback if the task is not
+         * running right now (otherwise this will be fired inside the wrapped task).<br />
          */
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean result = delegate().cancel(mayInterruptIfRunning);
-
-            // clean up if the task was pending and mark it as "not-pending" so it doesn't start another time
-            if (taskPending.compareAndSet(true, false)) {
-                tasksQueued.decrementAndGet();
+            if (!delegate().isCancelled() && !delegate().isDone()) {
+                onCancelTask(taskDetails);
             }
 
-            return result;
+            if (taskDetails.getScheduledForExecution().compareAndSet(true, false)) {
+                onCompleteTask(taskDetails, null);
+            }
+
+            return delegate().cancel(mayInterruptIfRunning);
         }
 
         @Override
@@ -564,42 +659,41 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     }
 
     /**
-     * This method wraps the passed in task to automatically free its reserved resources when it finishes its
-     * execution.<br>
-     * <br>
-     * We first check if the task is still pending (was not cancelled during it's launch) and then call it. If the task
-     * crashed (raised an Exception), is a non-recurring task or was executed outside the scope of a {@link Future} we
-     * clean up its reserved resources. If it is however an recurring task that didn't get cancelled we maintain the
-     * reservation for its next run and mark it as pending again.
+     * This method wraps the passed in task to automatically call the callbacks for its lifecycle.<br />
+     * <br />
+     * The lifecycle methods are for example used to manage the resources that are reserved for this task.<br />
      *
      * @param task the raw task that shall be wrapped with the resource freeing logic
-     * @param recurringTask a flag indicating if this task is scheduled to run periodically
-     * @param taskScheduledForExecution a flag indicating if this task is pending - it is used to synchronize the
-     *                                  cleaning up of the resources with the corresponding {@link Future}
-     * @param futureReference an atomic reference to the {@link Future} that this task belongs to - it allows us to
-     *                        check if it was cancelled
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param future the wrapped {@link Future} that this task belongs to - it allows us to check if the task was
+     *               cancelled from the outside
      * @param <V> the return type of the task
      * @return a wrapped task that cleans up its reserved resources upon completion
      */
-    private <V> Callable<V> wrapTask(Callable<V> task, boolean recurringTask, AtomicBoolean taskScheduledForExecution,
-            AtomicReference<Future<V>> futureReference) {
+    private <V> Callable<V> wrapTask(Callable<V> task, TaskDetails taskDetails, Future<V> future) {
+        onScheduleTask(taskDetails);
 
         return () -> {
-            if (taskScheduledForExecution.compareAndSet(true, false)) {
-                Future<V> future = futureReference.get();
-
-                boolean crashed = false;
+            if (taskDetails.getScheduledForExecution().compareAndSet(true, false)) {
+                Throwable error = null;
                 try {
+                    onStartTask(taskDetails);
+                    taskDetails.getExecutionCount().incrementAndGet();
+
                     return task.call();
                 } catch (Exception e) {
-                    crashed = true;
+                    error = e;
 
                     throw e;
                 } finally {
-                    if (!recurringTask || crashed || future == null || future.isCancelled()) {
-                        tasksQueued.decrementAndGet();
+                    onFinishTask(taskDetails, error);
+
+                    if (taskDetails.getInterval() == null || error != null || future == null || future.isCancelled() ||
+                            delegate.isShutdown()) {
+
+                        onCompleteTask(taskDetails, error);
                     } else {
-                        taskScheduledForExecution.set(true);
+                        taskDetails.getScheduledForExecution().set(true);
                     }
                 }
             }
@@ -609,59 +703,57 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     }
 
     /**
-     * This method does the same as {@link #wrapTask(Callable, boolean, AtomicBoolean, AtomicReference)} but defaults to
-     * a non-recurring task that gets executed outside the scope of a wrapped {@link Future}. We therefore wrap it with
-     * an empty {@link AtomicReference} for the {@link Future} and an {@link AtomicBoolean} defaulting to {@code true}
-     * for its pending status.<br>
-     * <br>
+     * This method does the same as {@link #wrapTask(Callable, TaskDetails, Future)} but defaults to a task that is not
+     * associated to a user accessible {@link Future}.<br />
+     * <br />
      * This method is used whenever the {@link Future} is not returned by the underlying method so we don't need to wrap
-     * it.
+     * it.<br />
      *
      * @param task the raw task that shall be wrapped with the resource freeing logic
+     * @param taskDetails metadata holding the relevant information of the task
      * @param <V> the return type of the task
      * @return a wrapped task that cleans up its reserved resources upon completion
      */
-    private <V> Callable<V> wrapTask(Callable<V> task) {
-        return wrapTask(task, false, new AtomicBoolean(true), new AtomicReference<>());
+    private <V> Callable<V> wrapTask(Callable<V> task, TaskDetails taskDetails) {
+        return wrapTask(task, taskDetails, null);
     }
 
     /**
-     * This method wraps the passed in task to automatically free its reserved resources when it finishes its
-     * execution.<br>
-     * <br>
-     * We first check if the task is still pending (was not cancelled during it's launch) and then call it. If the task
-     * crashed (raised an Exception), is a non-recurring task or was executed outside the scope of a {@link Future} we
-     * clean up its reserved resources. If it is however an recurring task that didn't get cancelled we maintain the
-     * reservation for its next run and mark it as pending again.
+     * This method wraps the passed in task to automatically call the callbacks for its lifecycle.<br />
+     * <br />
+     * The lifecycle methods are for example used to manage the resources that are reserved for this task.<br />
      *
      * @param task the raw task that shall be wrapped with the resource freeing logic
-     * @param recurringTask a flag indicating if this task is scheduled to run periodically
-     * @param taskScheduledForExecution a flag indicating if this task is pending - it is used to synchronize the
-     *                                  cleaning up of the resources with the corresponding {@link Future}
-     * @param futureReference an atomic reference to the {@link Future} that this task belongs to - it allows us to
-     *                        check if it was cancelled
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param future the wrapped {@link Future} that this task belongs to - it allows us to check if the task was
+     *               cancelled from the outside
      * @param <V> the return type of the task
      * @return a wrapped task that cleans up its reserved resources upon completion
      */
-    private <V> Runnable wrapTask(Runnable task, boolean recurringTask, AtomicBoolean taskScheduledForExecution,
-            AtomicReference<Future<V>> futureReference) {
+    private <V> Runnable wrapTask(Runnable task, TaskDetails taskDetails, Future<V> future) {
+        onScheduleTask(taskDetails);
 
         return () -> {
-            if (taskScheduledForExecution.compareAndSet(true, false)) {
-                Future<?> future = futureReference.get();
-
-                boolean crashed = false;
+            if (taskDetails.getScheduledForExecution().compareAndSet(true, false)) {
+                Throwable error = null;
                 try {
+                    onStartTask(taskDetails);
+                    taskDetails.getExecutionCount().incrementAndGet();
+
                     task.run();
                 } catch (Exception e) {
-                    crashed = true;
+                    error = e;
 
                     throw e;
                 } finally {
-                    if (!recurringTask || crashed || future == null || future.isCancelled()) {
-                        tasksQueued.decrementAndGet();
+                    onFinishTask(taskDetails, error);
+
+                    if (taskDetails.getInterval() == null || error != null || future == null || future.isCancelled() ||
+                            delegate.isShutdown()) {
+
+                        onCompleteTask(taskDetails, error);
                     } else {
-                        taskScheduledForExecution.set(true);
+                        taskDetails.getScheduledForExecution().set(true);
                     }
                 }
             }
@@ -669,79 +761,152 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
     }
 
     /**
-     * This method does the same as {@link #wrapTask(Runnable, boolean, AtomicBoolean, AtomicReference)} but defaults to
-     * a non-recurring task that gets executed outside the scope of a wrapped {@link Future}. We therefore wrap it with
-     * an empty {@link AtomicReference} for the {@link Future} and an {@link AtomicBoolean} defaulting to {@code true}
-     * for its pending status.<br>
-     * <br>
+     * This method does the same as {@link #wrapTask(Runnable, TaskDetails, Future)} but defaults to a task that is not
+     * associated to a user accessible {@link Future}.<br />
+     * <br />
      * This method is used whenever the {@link Future} is not returned by the underlying method so we don't need to wrap
-     * it.
+     * it.<br />
      *
      * @param task the raw task that shall be wrapped with the resource freeing logic
+     * @param taskDetails metadata holding the relevant information of the task
      * @return a wrapped task that cleans up its reserved resources upon completion
      */
-    private Runnable wrapTask(Runnable task) {
-        return wrapTask(task, false, new AtomicBoolean(true), new AtomicReference<>());
+    private Runnable wrapTask(Runnable task, TaskDetails taskDetails) {
+        return wrapTask(task, taskDetails, null);
     }
 
-    private <V> ScheduledFuture<V> wrapScheduledFuture(FutureFactory<ScheduledFuture<V>, Callable<V>> scheduledFutureFactory, Callable<V> callable) {
-        final AtomicBoolean taskScheduledForExecution = new AtomicBoolean(true);
-        final AtomicReference<Future<V>> futureReference = new AtomicReference<>();
+    /**
+     * This is a utility method that wraps the task and the resulting {@link Future} in a single call.<br />
+     * <br />
+     * It creates the {@link WrappedFuture} and the wrapped task and starts the execution of the task by delegating
+     * the launch through the {@link FutureFactory}.<br />
+     *
+     * @param futureFactory the lambda that returns the original "unwrapped" future from the wrapped task
+     * @param task the task that shall be wrapped to clean up its reserved resources upon completion
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param <V> the return type of the task
+     * @return the {@link WrappedFuture} that allows to interact with the task
+     */
+    private <V> Future<V> wrapFuture(FutureFactory<Future<V>, Callable<V>> futureFactory, Callable<V> task,
+            TaskDetails taskDetails) {
 
-        Callable<V> wrappedCallable = wrapTask(callable, true, taskScheduledForExecution, futureReference);
-        WrappedScheduledFuture<V> wrappedScheduledFuture = new WrappedScheduledFuture<>(taskScheduledForExecution);
-
-        futureReference.set(wrappedScheduledFuture);
-
-        return wrappedScheduledFuture.delegate(scheduledFutureFactory.create(wrappedCallable));
-    }
-
-    private <V> ScheduledFuture<V> wrapScheduledFuture(FutureFactory<ScheduledFuture<V>, Runnable> scheduledFutureFactory, Runnable command) {
-        return wrapScheduledFuture(scheduledFutureFactory, command, false);
-    }
-
-    private <V> ScheduledFuture<V> wrapScheduledFuture(FutureFactory<ScheduledFuture<V>, Runnable> scheduledFutureFactory, Runnable command, boolean recurringTask) {
-        final AtomicBoolean taskScheduledForExecution = new AtomicBoolean(true);
-        final AtomicReference<Future<V>> scheduledFutureReference = new AtomicReference<>();
-
-        Runnable wrappedRunnable = wrapTask(command, recurringTask, taskScheduledForExecution, scheduledFutureReference);
-        WrappedScheduledFuture<V> wrappedScheduledFuture = new WrappedScheduledFuture<>(taskScheduledForExecution);
-
-        scheduledFutureReference.set(wrappedScheduledFuture);
-
-        return wrappedScheduledFuture.delegate(scheduledFutureFactory.create(wrappedRunnable));
-    }
-
-    private <V> Future<V> wrapFuture(FutureFactory<Future<V>, Callable<V>> futureFactory, Callable<V> command) {
-        final AtomicBoolean taskScheduledForExecution = new AtomicBoolean(true);
-        final AtomicReference<Future<V>> futureReference = new AtomicReference<>();
-
-        Callable<V> wrappedCallable = wrapTask(command, false, taskScheduledForExecution, futureReference);
-        WrappedFuture<V> wrappedFuture = new WrappedFuture<>(taskScheduledForExecution);
-
-        futureReference.set(wrappedFuture);
+        WrappedFuture<V> wrappedFuture = new WrappedFuture<>(taskDetails);
+        Callable<V> wrappedCallable = wrapTask(task, taskDetails, wrappedFuture);
 
         return wrappedFuture.delegate(futureFactory.create(wrappedCallable));
     }
 
-    private <V> Future<V> wrapFuture(FutureFactory<Future<V>, Runnable> futureFactory, Runnable task) {
-        final AtomicBoolean taskScheduledForExecution = new AtomicBoolean(true);
-        final AtomicReference<Future<V>> futureReference = new AtomicReference<>();
+    /**
+     * This is a utility method that wraps the task and the resulting {@link Future} in a single call.<br />
+     * <br />
+     * It creates the {@link WrappedFuture} and the wrapped task and starts the execution of the task by delegating
+     * the launch through the {@link FutureFactory}.<br />
+     *
+     * @param futureFactory the lambda that returns the original "unwrapped" future from the wrapped task
+     * @param task the task that shall be wrapped to clean up its reserved resources upon completion
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param <V> the return type of the task
+     * @return the {@link WrappedFuture} that allows to interact with the task
+     */
+    private <V> Future<V> wrapFuture(FutureFactory<Future<V>, Runnable> futureFactory, Runnable task,
+            TaskDetails taskDetails) {
 
-        Runnable wrappedTask = wrapTask(task, false, taskScheduledForExecution, futureReference);
-        WrappedFuture<V> wrappedFuture = new WrappedFuture<>(taskScheduledForExecution);
-
-        futureReference.set(wrappedFuture);
+        WrappedFuture<V> wrappedFuture = new WrappedFuture<>(taskDetails);
+        Runnable wrappedTask = wrapTask(task, taskDetails, wrappedFuture);
 
         return wrappedFuture.delegate(futureFactory.create(wrappedTask));
     }
 
     /**
+     * This is a utility method that wraps the task and the resulting {@link ScheduledFuture} in a single call.<br />
+     * <br />
+     * It creates the {@link WrappedScheduledFuture} and the wrapped task and starts the execution of the task by
+     * delegating the launch through the {@link FutureFactory}.<br />
+     *
+     * @param futureFactory the lambda that returns the original "unwrapped" future from the wrapped task
+     * @param task the task that shall be wrapped to clean up its reserved resources upon completion
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param <V> the return type of the task
+     * @return the {@link WrappedFuture} that allows to interact with the task
+     */
+    private <V> ScheduledFuture<V> wrapScheduledFuture(FutureFactory<ScheduledFuture<V>, Callable<V>> futureFactory,
+            Callable<V> task, TaskDetails taskDetails) {
+
+        WrappedScheduledFuture<V> wrappedFuture = new WrappedScheduledFuture<>(taskDetails);
+        Callable<V> wrappedCallable = wrapTask(task, taskDetails, wrappedFuture);
+
+        return wrappedFuture.delegate(futureFactory.create(wrappedCallable));
+    }
+
+    /**
+     * This is a utility method that wraps the task and the resulting {@link ScheduledFuture} in a single call.<br />
+     * <br />
+     * It creates the {@link WrappedScheduledFuture} and the wrapped task and starts the execution of the task by
+     * delegating the launch through the {@link FutureFactory}.<br />
+     *
+     * @param futureFactory the lambda that returns the original "unwrapped" future from the wrapped task
+     * @param task the task that shall be wrapped to clean up its reserved resources upon completion
+     * @param taskDetails metadata holding the relevant information of the task
+     * @param <V> the return type of the task
+     * @return the {@link WrappedFuture} that allows to interact with the task
+     */
+    private <V> ScheduledFuture<V> wrapScheduledFuture(FutureFactory<ScheduledFuture<V>, Runnable> futureFactory,
+            Runnable task, TaskDetails taskDetails) {
+
+        WrappedScheduledFuture<V> wrappedFuture = new WrappedScheduledFuture<>(taskDetails);
+        Runnable wrappedRunnable = wrapTask(task, taskDetails, wrappedFuture);
+
+        return wrappedFuture.delegate(futureFactory.create(wrappedRunnable));
+    }
+
+    /**
+     * This is a utility method that wraps a {@link Collection} of {@link Callable}s to make them free their resources
+     * upon completion.<br />
+     * <br />
+     * It simply iterates over the tasks and wraps them one by one by calling
+     * {@link #wrapTask(Callable, TaskDetails)}.<br />
+     *
+     * @param tasks list of jobs that shall be wrapped
+     * @param <T> the type of the values returned by the {@link Callable}s
+     * @return wrapped list of jobs that will free their reserved resources upon completion
+     */
+    private <T> Collection<? extends Callable<T>> wrapTasks(Collection<? extends Callable<T>> tasks,
+            TaskDetails taskDetails) {
+
+        List<Callable<T>> wrappedTasks = new ArrayList<>(tasks.size());
+        for (Callable<T> task : tasks) {
+            wrappedTasks.add(wrapTask(task, taskDetails));
+        }
+
+        return wrappedTasks;
+    }
+
+    /**
+     * This method checks if we have enough resources to schedule the given amount of tasks and reserves the space if
+     * the check is successful.<br />
+     * <br />
+     * The reserved resources will be freed again once the tasks finish their execution or when they are cancelled
+     * through their corresponding {@link Future}.<br />
+     *
+     * @param requestedJobCount the amount of tasks that shall be scheduled
+     * @return true if we could reserve the given space and false otherwise
+     */
+    private boolean reserveCapacity(int requestedJobCount) {
+        if (tasksQueued.addAndGet(requestedJobCount) <= capacity) {
+            return true;
+        } else {
+            tasksQueued.addAndGet(-requestedJobCount);
+
+            return false;
+        }
+    }
+
+    /**
      * This method is a utility method that simply checks the passed in object for being {@code null} and throws a
-     * {@link RejectedExecutionException} if it is.<br>
-     * <br>
+     * {@link RejectedExecutionException} if it is.<br />
+     * <br />
      * It is used to turn the silent methods into non-silent ones and conform with the {@link ScheduledExecutorService}
-     * interface.
+     * interface.<br />
      *
      * @param result the object that shall be checked for being null (the result of a "silent" method call)
      * @param <V> the type of the result
@@ -755,4 +920,6 @@ public class BoundedScheduledExecutorService implements SilentScheduledExecutorS
 
         return result;
     }
+
+    //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
 }

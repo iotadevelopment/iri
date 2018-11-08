@@ -5,27 +5,36 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class DedicatedScheduledExecutorServiceTest {
     private static final Logger logger = LoggerFactory.getLogger(MilestoneSolidifier.class);
 
     private static final BoundedScheduledExecutorService executorService =
-            new BoundedScheduledExecutorService(1);
+            new DedicatedScheduledExecutorService("Milestone Solidifier", logger);
 
     @Test
     public void testSubmit() {
-        executorService.silentScheduleAtFixedRate(this::solidificationThread, 0, 2000, TimeUnit.MILLISECONDS).cancel(true);
-        System.out.println(executorService.silentScheduleAtFixedRate(() -> {
-            System.out.println("TUST");
-        }, 0, 2000, TimeUnit.MILLISECONDS));
+        /*
+        ScheduledFuture future = executorService.silentScheduleAtFixedRate(this::solidificationThread, 0, 2000, TimeUnit.MILLISECONDS);
 
-        ThreadUtils.sleep(5000);
+        ThreadUtils.sleep(100);
+
+        future.cancel(true);
+        future.cancel(true);
+        */
+
+        // recurring tasks get cancelled by shutdown -> non recurring ones not
+
+
+        executorService.silentScheduleWithFixedDelay(() -> {
+            logger.info("I get executed every 500 milliseconds");
+
+            throw new RuntimeException("huch");
+        }, 100, 500, TimeUnit.MILLISECONDS);
+
+        ThreadUtils.sleep(2000);
 
         executorService.shutdownNow();
     }
