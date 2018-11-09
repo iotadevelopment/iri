@@ -13,13 +13,11 @@ public class TransactionTestUtils {
     public static void setCurrentIndex(TransactionViewModel tx, long currentIndex) {
         Converter.copyTrits(currentIndex, tx.trits(), TransactionViewModel.CURRENT_INDEX_TRINARY_OFFSET,
                 TransactionViewModel.CURRENT_INDEX_TRINARY_SIZE);
-        tx.transaction.currentIndex = currentIndex;
     }
 
     public static void setLastIndex(TransactionViewModel tx, long lastIndex) {
         Converter.copyTrits(lastIndex, tx.trits(), TransactionViewModel.LAST_INDEX_TRINARY_OFFSET,
                 TransactionViewModel.LAST_INDEX_TRINARY_SIZE);
-        tx.transaction.lastIndex = lastIndex;
     }
 
     public static void setTimestamp(TransactionViewModel tx, long timestamp) {

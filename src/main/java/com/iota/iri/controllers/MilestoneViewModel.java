@@ -80,7 +80,7 @@ public class MilestoneViewModel {
         Pair<Indexable, Persistable> milestonePair = tangle.previous(Milestone.class, this.milestone.index);
         if(milestonePair != null && milestonePair.hi != null) {
             Milestone milestone = (Milestone) milestonePair.hi;
-            return new MilestoneViewModel(milestone);
+            return new MilestoneViewModel((Milestone) milestone);
         }
         return null;
     }
@@ -89,7 +89,7 @@ public class MilestoneViewModel {
         Pair<Indexable, Persistable> milestonePair = tangle.next(Milestone.class, this.milestone.index);
         if(milestonePair != null && milestonePair.hi != null) {
             Milestone milestone = (Milestone) milestonePair.hi;
-            return new MilestoneViewModel(milestone);
+            return new MilestoneViewModel((Milestone) milestone);
         }
         return null;
     }

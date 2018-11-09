@@ -153,10 +153,6 @@ public class TransactionValidator {
      * @throws Exception if anything goes wrong while trying to solidify the transaction
      */
     public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions) throws Exception {
-        return checkSolidity(hash, milestone, maxProcessedTransactions, false);
-    }
-
-    public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions, boolean debug) throws Exception {
         TransactionViewModel transactionToSolidify = fromHash(tangle, hash);
         if(transactionToSolidify.isSolid()) {
             return true;
@@ -169,7 +165,6 @@ public class TransactionValidator {
         boolean solid = true;
         final Queue<Hash> nonAnalyzedTransactions = new LinkedList<>(Collections.singleton(hash));
         Hash hashPointer;
-        int txCount = 0;
         while ((hashPointer = nonAnalyzedTransactions.poll()) != null) {
             if (analyzedHashes.add(hashPointer)) {
                 if(analyzedHashes.size() >= maxProcessedTransactions) {
@@ -178,13 +173,6 @@ public class TransactionValidator {
 
                 final TransactionViewModel transaction = fromHash(tangle, hashPointer);
                 if(!transaction.isSolid()) {
-                    if (debug && txCount < 50) {
-                        if (transaction.getTimestamp() < transactionToSolidify.getTimestamp() - 172800) {
-                            System.out.println("DIFF: " + transaction.getTimestamp() + " / " + transactionToSolidify.getTimestamp() + " = " + (transactionToSolidify.getTimestamp() - transaction.getTimestamp()));
-                        }
-                        System.out.println(" => " + hashPointer.toString());
-                        txCount++;
-                    }
                     if (transaction.getType() == PREFILLED_SLOT && !initialSnapshot.hasSolidEntryPoint(hashPointer)) {
                         solid = false;
 

@@ -18,14 +18,9 @@ import com.iota.iri.utils.Pair;
 
 import java.util.*;
 
-public class TransactionViewModel implements Cacheable {
-    public Hash getId() {
-        return hash;
-    }
+public class TransactionViewModel {
 
-    private static Cache<TransactionViewModel> cache = new Cache<>();
-
-    public final Transaction transaction;
+    private final Transaction transaction;
 
     public static final int SIZE = 1604;
     private static final int TAG_SIZE_IN_BYTES = 17; // = ceil(81 TRITS / 5 TRITS_PER_BYTE)
@@ -82,15 +77,8 @@ public class TransactionViewModel implements Cacheable {
     }
 
     public static TransactionViewModel fromHash(Tangle tangle, final Hash hash) throws Exception {
-        TransactionViewModel transactionViewModel = cache.get(hash);
-        if (true || transactionViewModel == null) {
-            transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
-            fillMetadata(tangle, transactionViewModel);
-
-            if (transactionViewModel.getType() != PREFILLED_SLOT) {
-                cache.add(transactionViewModel);
-            }
-        }
+        TransactionViewModel transactionViewModel = new TransactionViewModel((Transaction) tangle.load(Transaction.class, hash), hash);
+        fillMetadata(tangle, transactionViewModel);
 
         return transactionViewModel;
     }
@@ -101,7 +89,7 @@ public class TransactionViewModel implements Cacheable {
 
     public TransactionViewModel(final Transaction transaction, Hash hash) {
         this.transaction = transaction == null || transaction.bytes == null ? new Transaction(): transaction;
-        this.hash = hash == null ? Hash.NULL_HASH : hash;
+        this.hash = hash == null? Hash.NULL_HASH: hash;
         weightMagnitude = this.hash.trailingZeros();
     }
 
@@ -142,8 +130,6 @@ public class TransactionViewModel implements Cacheable {
         if(initialSnapshot.hasSolidEntryPoint(hash)) {
             return false;
         }
-
-        cache.add(this);
 
         return tangle.update(transaction, hash, item);
     }
@@ -226,8 +212,6 @@ public class TransactionViewModel implements Cacheable {
         if (exists(tangle, hash)) {
             return false;
         }
-
-        cache.add(this);
 
         return tangle.saveBatch(batch);
     }
