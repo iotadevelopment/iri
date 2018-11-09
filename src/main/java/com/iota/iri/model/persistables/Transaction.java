@@ -103,7 +103,6 @@ public class Transaction implements Persistable {
         flags |= milestone ? IS_MILESTONE_BITMASK : 0;
         buffer.put(flags);
 
-        // store the milestone relates members
         buffer.put(Serializer.serialize(snapshot));
         buffer.put(sender.getBytes());
         return buffer.array();

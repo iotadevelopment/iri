@@ -153,11 +153,9 @@ public class TransactionValidator {
      * @throws Exception if anything goes wrong while trying to solidify the transaction
      */
     public boolean checkSolidity(Hash hash, boolean milestone, int maxProcessedTransactions) throws Exception {
-        TransactionViewModel transactionToSolidify = fromHash(tangle, hash);
-        if(transactionToSolidify.isSolid()) {
+        if(fromHash(tangle, hash).isSolid()) {
             return true;
         }
-
         Set<Hash> analyzedHashes = new HashSet<>(initialSnapshot.getSolidEntryPoints().keySet());
         if(maxProcessedTransactions != Integer.MAX_VALUE) {
             maxProcessedTransactions += analyzedHashes.size();
