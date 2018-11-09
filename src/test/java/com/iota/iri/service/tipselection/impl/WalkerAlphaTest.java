@@ -38,19 +38,20 @@ public class WalkerAlphaTest {
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
-        dbFolder.delete();
         snapshotProvider.shutdown();
+        dbFolder.delete();
+        logFolder.delete();
     }
 
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
         walker = new WalkerAlpha((Optional::of), tangle, messageQ, new Random(1), new MainnetConfig());

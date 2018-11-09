@@ -30,17 +30,17 @@ public class WalkValidatorImplTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
+    private static SnapshotProvider snapshotProvider;
     private TipSelConfig config = new MainnetConfig();
     @Mock
     private LedgerValidator ledgerValidator;
 
-    private static SnapshotProvider snapshotProvider;
-
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
-        dbFolder.delete();
         snapshotProvider.shutdown();
+        dbFolder.delete();
+        logFolder.delete();
     }
 
     @BeforeClass

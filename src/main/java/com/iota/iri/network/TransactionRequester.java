@@ -34,8 +34,8 @@ public class TransactionRequester {
 
     public TransactionRequester(Tangle tangle, Snapshot initialSnapshot, MessageQ messageQ) {
         this.tangle = tangle;
-        this.messageQ = messageQ;
         this.initialSnapshot = initialSnapshot;
+        this.messageQ = messageQ;
     }
 
     public void init(double pRemoveRequest) {

@@ -27,26 +27,27 @@ public class MilestoneTrackerTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static MilestoneTracker milestoneTracker;
     private static SnapshotProvider snapshotProvider;
+    private static MilestoneTracker milestoneTracker;
 
 
     @AfterClass
     public static void tearDown() throws Exception {
         tangle.shutdown();
-        dbFolder.delete();
         snapshotProvider.shutdown();
+        dbFolder.delete();
+        logFolder.delete();
     }
 
     @BeforeClass
     public static void beforeClass() throws Exception {
         tangle = new Tangle();
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
     }
 
     private static void initializeMilestoneTracker(String coordinator, int keys, int MWM) {

@@ -14,7 +14,6 @@ import com.iota.iri.storage.Tangle;
 public class EntryPointSelectorImpl implements EntryPointSelector {
 
     private final Tangle tangle;
-
     private final SnapshotProvider snapshotProvider;
 
     public EntryPointSelectorImpl(Tangle tangle, SnapshotProvider snapshotProvider) {

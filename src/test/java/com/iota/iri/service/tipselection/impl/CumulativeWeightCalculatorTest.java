@@ -30,9 +30,9 @@ public class CumulativeWeightCalculatorTest {
     private static final String TX_CUMULATIVE_WEIGHT_IS_NOT_AS_EXPECTED_FORMAT =
             "tx%d cumulative weight is not as expected";
     private static Tangle tangle;
+    private static SnapshotProvider snapshotProvider;
     private static CumulativeWeightCalculator cumulativeWeightCalculator;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
-    private static SnapshotProvider snapshotProvider;
 
     @AfterClass
     public static void tearDown() throws Exception {
@@ -45,12 +45,12 @@ public class CumulativeWeightCalculatorTest {
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
+        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
         cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
     }
 

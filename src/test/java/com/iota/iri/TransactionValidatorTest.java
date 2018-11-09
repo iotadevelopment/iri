@@ -53,6 +53,7 @@ public class TransactionValidatorTest {
   @AfterClass
   public static void tearDown() throws Exception {
     tangle.shutdown();
+    snapshotProvider.shutdown();
     dbFolder.delete();
     logFolder.delete();
   }

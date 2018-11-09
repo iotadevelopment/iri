@@ -124,7 +124,7 @@ public class TransactionViewModel {
         getObsoleteTagValue();
         setAttachmentData();
         setMetadata();
-        if(initialSnapshot.hasSolidEntryPoint(hash)) {
+        if (initialSnapshot.hasSolidEntryPoint(hash)) {
             return false;
         }
         return tangle.update(transaction, hash, item);
@@ -417,6 +417,7 @@ public class TransactionViewModel {
      * accordingly. It first checks if the value has actually changed and then issues a database update.
      *
      * @param tangle Tangle instance which acts as a database interface
+     * @param initialSnapshot the snapshot representing the starting point of our ledger
      * @param isMilestone true if the transaction is a milestone and false otherwise
      * @throws Exception if something goes wrong while saving the changes to the database
      */

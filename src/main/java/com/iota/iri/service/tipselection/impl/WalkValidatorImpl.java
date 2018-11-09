@@ -27,9 +27,9 @@ import java.util.*;
 public class WalkValidatorImpl implements WalkValidator {
 
     private final Tangle tangle;
+    private final SnapshotProvider snapshotProvider;
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
     private final LedgerValidator ledgerValidator;
-    private final SnapshotProvider snapshotProvider;
     private final TipSelConfig config;
 
 
@@ -39,8 +39,8 @@ public class WalkValidatorImpl implements WalkValidator {
 
     public WalkValidatorImpl(Tangle tangle, SnapshotProvider snapshotProvider, LedgerValidator ledgerValidator, TipSelConfig config) {
         this.tangle = tangle;
-        this.ledgerValidator = ledgerValidator;
         this.snapshotProvider = snapshotProvider;
+        this.ledgerValidator = ledgerValidator;
         this.config = config;
 
         maxDepthOkMemoization = new HashSet<>();
