@@ -212,7 +212,12 @@ public class SnapshotProviderImpl implements SnapshotProvider {
                 throw new SnapshotException("failed to validate the signature of the builtin snapshot file", e);
             }
 
-            SnapshotState snapshotState = readSnapshotStateFromJAR(config.getSnapshotFile());
+            SnapshotState snapshotState;
+            try {
+                snapshotState = readSnapshotStateFromJAR(config.getSnapshotFile());
+            } catch (SnapshotException e) {
+                snapshotState = readSnapshotStatefromFile(config.getSnapshotFile());
+            }
             if (!snapshotState.hasCorrectSupply()) {
                 throw new SnapshotException("the snapshot state file has an invalid supply");
             }
