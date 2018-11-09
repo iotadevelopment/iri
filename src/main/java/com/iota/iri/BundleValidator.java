@@ -19,6 +19,7 @@ public class BundleValidator {
 
         List<List<TransactionViewModel>> transactions = new LinkedList<>();
         final Map<Hash, TransactionViewModel> bundleTransactions = loadTransactionsFromTangle(tangle, tail);
+
         for (TransactionViewModel transactionViewModel : bundleTransactions.values()) {
 
             if (transactionViewModel.getCurrentIndex() == 0 && transactionViewModel.getValidity() >= 0) {
