@@ -240,11 +240,7 @@ public class DedicatedScheduledExecutorService extends BoundedScheduledExecutorS
             printStartedMessage(taskDetails);
         }
 
-        if (threadName != null) {
-            Thread.currentThread().setName(threadName);
-        } else {
-            Thread.currentThread().setName(getPrintableThreadName(taskDetails));
-        }
+        Thread.currentThread().setName(getPrintableThreadName(taskDetails));
     }
 
     /**
