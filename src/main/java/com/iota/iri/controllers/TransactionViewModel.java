@@ -127,7 +127,6 @@ public class TransactionViewModel {
         if(initialSnapshot.hasSolidEntryPoint(hash)) {
             return false;
         }
-
         return tangle.update(transaction, hash, item);
     }
 
@@ -209,7 +208,6 @@ public class TransactionViewModel {
         if (exists(tangle, hash)) {
             return false;
         }
-
         return tangle.saveBatch(batch);
     }
 

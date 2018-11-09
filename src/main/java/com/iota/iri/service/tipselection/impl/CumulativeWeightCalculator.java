@@ -43,7 +43,6 @@ public class CumulativeWeightCalculator implements RatingCalculator{
         log.debug("Start calculating cw starting with tx hash {}", entryPoint);
 
         LinkedHashSet<Hash> txHashesToRate = sortTransactionsInTopologicalOrder(entryPoint);
-        System.out.println(txHashesToRate.toString());
         return calculateCwInOrder(txHashesToRate);
     }
 

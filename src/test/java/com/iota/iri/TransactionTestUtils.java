@@ -20,11 +20,6 @@ public class TransactionTestUtils {
                 TransactionViewModel.LAST_INDEX_TRINARY_SIZE);
     }
 
-    public static void setTimestamp(TransactionViewModel tx, long timestamp) {
-        Converter.copyTrits(timestamp, tx.trits(), TransactionViewModel.TIMESTAMP_TRINARY_OFFSET,
-                TransactionViewModel.TIMESTAMP_TRINARY_SIZE);
-    }
-
     public static TransactionViewModel createBundleHead(int index) {
         TransactionViewModel tx = new TransactionViewModel(TransactionViewModelTest.getRandomTransactionTrits(), TransactionViewModelTest.getRandomTransactionHash());
         setLastIndex(tx, index);
