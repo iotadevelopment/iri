@@ -30,7 +30,6 @@ public class TransactionValidatorTest {
   private static final TemporaryFolder logFolder = new TemporaryFolder();
   private static Tangle tangle;
   private static SnapshotProvider snapshotProvider;
-  private static MilestoneTracker milestoneTracker;
   private static TransactionValidator txValidator;
 
   @BeforeClass
@@ -48,8 +47,7 @@ public class TransactionValidatorTest {
     TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
     txValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, txRequester);
     txValidator.setMwm(false, MAINNET_MWM);
-    milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, new SnapshotServiceImpl(), txValidator, Mockito.mock(TransactionRequester.class), messageQ, new MainnetConfig());
-    txValidator.init(false, MAINNET_MWM, milestoneTracker);
+    txValidator.init(false, MAINNET_MWM);
   }
 
   @AfterClass
@@ -61,10 +59,10 @@ public class TransactionValidatorTest {
 
   @Test
   public void testMinMwm() throws InterruptedException {
-    txValidator.init(false, 5, milestoneTracker);
+    txValidator.init(false, 5);
     assertTrue(txValidator.getMinWeightMagnitude() == 13);
     txValidator.shutdown();
-    txValidator.init(false, MAINNET_MWM, milestoneTracker);
+    txValidator.init(false, MAINNET_MWM);
   }
 
   @Test
@@ -190,7 +188,6 @@ public class TransactionValidatorTest {
     grandParent.updateSolid(false);
     grandParent.store(tangle, snapshotProvider.getInitialSnapshot());
 
-    txValidator.milestone = milestoneTracker;
     txValidator.addSolidTransaction(leftChildLeaf.getHash());
     while (!txValidator.isNewSolidTxSetsEmpty()) {
       txValidator.propagateSolidTransactions();

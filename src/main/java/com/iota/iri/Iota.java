@@ -103,7 +103,7 @@ public class Iota {
             tangle.clearMetadata(com.iota.iri.model.persistables.Transaction.class);
         }
         milestoneTracker.init(ledgerValidator);
-        transactionValidator.init(configuration.isTestnet(), configuration.getMwm(), milestoneTracker);
+        transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
         transactionRequester.init(configuration.getpRemoveRequest());
         udpReceiver.init();

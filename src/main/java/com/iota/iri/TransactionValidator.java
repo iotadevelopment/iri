@@ -44,9 +44,7 @@ public class TransactionValidator {
         this.transactionRequester = transactionRequester;
     }
 
-    public void init(boolean testnet, int mwm, MilestoneTracker milestone) {
-        this.milestone = milestone;
-
+    public void init(boolean testnet, int mwm) {
         setMwm(testnet, mwm);
 
         newSolidThread = new Thread(spawnSolidTransactionsPropagation(), "Solid TX cascader");
@@ -285,11 +283,6 @@ public class TransactionValidator {
             if(solid) {
                 transactionViewModel.updateSolid(true);
                 transactionViewModel.updateHeights(tangle, initialSnapshot);
-
-                if(milestone.analyzeMilestoneCandidate(transactionViewModel) == MilestoneTracker.Validity.VALID) {
-                    // do some other milestone specific updates (check for latestSolidMilestone)
-                }
-
                 return true;
             }
         }
