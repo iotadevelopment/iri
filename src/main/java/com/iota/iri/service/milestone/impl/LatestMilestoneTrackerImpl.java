@@ -155,7 +155,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
     }
 
     @Override
-    public boolean isInitialized() {
+    public boolean initialScanComplete() {
         return initialized;
     }
 
@@ -199,7 +199,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
                 Hash candidateTransactionHash = milestoneCandidatesToAnalyze.pollFirst();
                 if(analyzeMilestoneCandidate(candidateTransactionHash) == INCOMPLETE) {
-                    milestoneCandidatesToAnalyze.addLast(candidateTransactionHash);
+                    seenMilestoneCandidates.remove(candidateTransactionHash);
                 }
             }
 

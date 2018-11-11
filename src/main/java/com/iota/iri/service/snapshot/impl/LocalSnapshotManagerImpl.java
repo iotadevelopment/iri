@@ -14,8 +14,6 @@ import com.iota.iri.utils.thread.ThreadUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
-
 /**
  * Implements the basic contract of the {@link LocalSnapshotManager}.
  */
@@ -114,7 +112,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      */
     private void monitorThread(LatestMilestoneTracker latestMilestoneTracker) {
         while (!Thread.currentThread().isInterrupted()) {
-            int localSnapshotInterval = latestMilestoneTracker.isInitialized() &&
+            int localSnapshotInterval = latestMilestoneTracker.initialScanComplete() &&
                     snapshotProvider.getLatestSnapshot().getIndex() == latestMilestoneTracker.getLatestMilestoneIndex()
                     ? config.getLocalSnapshotsIntervalSynced()
                     : config.getLocalSnapshotsIntervalUnsynced();

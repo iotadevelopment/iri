@@ -20,7 +20,7 @@ public interface LatestMilestoneTracker {
      * Since the {@link LatestMilestoneTracker} currently scans all milestone candidates whenever IRI restarts, this flag
      * @return
      */
-    boolean isInitialized();
+    boolean initialScanComplete();
 
     void start();
 
