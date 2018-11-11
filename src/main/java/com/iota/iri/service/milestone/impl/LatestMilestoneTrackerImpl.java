@@ -15,10 +15,11 @@ import com.iota.iri.service.milestone.MilestoneValidity;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.log.Logger;
+import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
 import com.iota.iri.utils.thread.SilentScheduledExecutorService;
 import com.iota.iri.zmq.MessageQ;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
@@ -36,10 +37,10 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     private static final int RESCAN_INTERVAL = 5000;
 
-    private static final Logger log = LoggerFactory.getLogger(LatestMilestoneTrackerImpl.class);
+    private static final IntervalLogger log = new IntervalLogger(LatestMilestoneTrackerImpl.class);
 
     private final SilentScheduledExecutorService lastMilestoneTrackerExecutorService =
-            new DedicatedScheduledExecutorService("Latest Milestone Tracker", log);
+            new DedicatedScheduledExecutorService("Latest Milestone Tracker", LoggerFactory.getLogger(LatestMilestoneTrackerImpl.class));
 
     private final Tangle tangle;
 
@@ -118,7 +119,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                 case VALID:
                     if (milestoneIndex > latestMilestoneIndex) {
                         messageQ.publish("lmi %d %d", latestMilestoneIndex, milestoneIndex);
-                        log.info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + milestoneIndex);
+                        log.delegate().info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + milestoneIndex);
 
                         latestMilestoneHash = potentialMilestoneTransaction.getHash();
                         latestMilestoneIndex = milestoneIndex;
@@ -126,7 +127,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                         MilestoneViewModel latestMilestoneViewModel = MilestoneViewModel.latest(tangle);
                         if (latestMilestoneViewModel.index() > latestMilestoneIndex) {
                             messageQ.publish("lmi %d %d", latestMilestoneIndex, latestMilestoneViewModel.index());
-                            log.info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + latestMilestoneViewModel.index());
+                            log.delegate().info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + latestMilestoneViewModel.index());
 
                             latestMilestoneHash = latestMilestoneViewModel.getHash();
                             latestMilestoneIndex = latestMilestoneViewModel.index();
