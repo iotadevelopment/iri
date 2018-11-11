@@ -1,7 +1,7 @@
 package com.iota.iri.service.snapshot.impl;
 
-import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.SnapshotConfig;
+import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.SnapshotException;
@@ -60,7 +60,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      * Holds a reference to the {@link ThreadIdentifier} for the monitor thread.
      *
      * Using a {@link ThreadIdentifier} for spawning the thread allows the {@link ThreadUtils} to spawn exactly one
-     * thread for this instance even when we call the {@link #start(MilestoneTracker)} method multiple times.
+     * thread for this instance even when we call the {@link #start(LatestMilestoneTracker)} method multiple times.
      */
     private ThreadIdentifier monitorThreadIdentifier = new ThreadIdentifier("Local Snapshots Monitor");
 
@@ -89,8 +89,8 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      * {@inheritDoc}
      */
     @Override
-    public void start(MilestoneTracker milestoneTracker) {
-        ThreadUtils.spawnThread(() -> monitorThread(milestoneTracker), monitorThreadIdentifier);
+    public void start(LatestMilestoneTracker latestMilestoneTracker) {
+        ThreadUtils.spawnThread(() -> monitorThread(latestMilestoneTracker), monitorThreadIdentifier);
     }
 
     /**
@@ -107,15 +107,15 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      * It periodically checks if a new {@link com.iota.iri.service.snapshot.Snapshot} has to be taken until the
      * {@link Thread} is terminated. If it detects that a {@link com.iota.iri.service.snapshot.Snapshot} is due it
      * triggers the creation of the {@link com.iota.iri.service.snapshot.Snapshot} by calling
-     * {@link SnapshotService#takeLocalSnapshot(Tangle, SnapshotProvider, SnapshotConfig, MilestoneTracker,
+     * {@link SnapshotService#takeLocalSnapshot(Tangle, SnapshotProvider, SnapshotConfig, LatestMilestoneTracker,
      * TransactionPruner)}.
      *
-     * @param milestoneTracker tracker for the milestones to determine when a new local snapshot is due
+     * @param latestMilestoneTracker tracker for the milestones to determine when a new local snapshot is due
      */
-    private void monitorThread(MilestoneTracker milestoneTracker) {
+    private void monitorThread(LatestMilestoneTracker latestMilestoneTracker) {
         while (!Thread.currentThread().isInterrupted()) {
-            int localSnapshotInterval = milestoneTracker.getStatus() == INITIALIZED &&
-                    snapshotProvider.getLatestSnapshot().getIndex() == milestoneTracker.latestMilestoneIndex
+            int localSnapshotInterval = latestMilestoneTracker.isInitialized() &&
+                    snapshotProvider.getLatestSnapshot().getIndex() == latestMilestoneTracker.getLatestMilestoneIndex()
                     ? config.getLocalSnapshotsIntervalSynced()
                     : config.getLocalSnapshotsIntervalUnsynced();
 
@@ -124,7 +124,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
 
             if (latestSnapshotIndex - initialSnapshotIndex > config.getLocalSnapshotsDepth() + localSnapshotInterval) {
                 try {
-                    snapshotService.takeLocalSnapshot(tangle, snapshotProvider, config, milestoneTracker,
+                    snapshotService.takeLocalSnapshot(tangle, snapshotProvider, config, latestMilestoneTracker,
                             transactionPruner);
                 } catch (SnapshotException e) {
                     log.error("error while taking local snapshot", e);

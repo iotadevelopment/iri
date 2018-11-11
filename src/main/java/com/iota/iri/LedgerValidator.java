@@ -3,6 +3,7 @@ package com.iota.iri;
 import com.iota.iri.controllers.*;
 import com.iota.iri.model.Hash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
@@ -20,16 +21,16 @@ public class LedgerValidator {
     private final Tangle tangle;
     private final SnapshotProvider snapshotProvider;
     private final SnapshotService snapshotService;
-    private final MilestoneTracker milestoneTracker;
+    private final MilestoneService milestoneService;
     private final TransactionRequester transactionRequester;
     private final MessageQ messageQ;
     private volatile int numberOfConfirmedTransactions;
 
-    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService, MilestoneTracker milestoneTracker, TransactionRequester transactionRequester, MessageQ messageQ) {
+    public LedgerValidator(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService, MilestoneService milestoneService, TransactionRequester transactionRequester, MessageQ messageQ) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.snapshotService = snapshotService;
-        this.milestoneTracker = milestoneTracker;
+        this.milestoneService = milestoneService;
         this.transactionRequester = transactionRequester;
         this.messageQ = messageQ;
     }
@@ -186,7 +187,7 @@ public class LedgerValidator {
         }
 
         for (int resettedMilestoneIndex : resettedMilestones) {
-            milestoneTracker.resetCorruptedMilestone(resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
+            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
         }
     }
 
@@ -213,7 +214,7 @@ public class LedgerValidator {
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
-                milestoneTracker.resetCorruptedMilestone(milestoneVM.index(), "updateMilestoneTransaction");
+                milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, milestoneVM.index(), "updateMilestoneTransaction");
             }
 
             snapshotProvider.getLatestSnapshot().lockRead();
