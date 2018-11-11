@@ -1,33 +1,25 @@
 package com.iota.iri;
 
 import com.iota.iri.conf.IotaConfig;
-import com.iota.iri.controllers.AddressViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
-import com.iota.iri.service.milestone.MilestoneValidity;
 import com.iota.iri.service.milestone.impl.MilestoneServiceImpl;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.zmq.MessageQ;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-
-import static com.iota.iri.MilestoneTracker.Status.INITIALIZED;
-import static com.iota.iri.service.milestone.MilestoneValidity.*;
 
 public class MilestoneTracker {
     private static final Logger log = LoggerFactory.getLogger(MilestoneTracker.class);
@@ -186,8 +178,7 @@ public class MilestoneTracker {
             // advance to the next milestone if we were able to update the ledger state
             if (ledgerValidator.applyMilestoneToLedger(nextMilestone)) {
                 if(nextMilestone.index() > latestMilestoneTracker.getLatestMilestoneIndex()) {
-                    latestMilestoneTracker.setLatestMilestoneIndex(nextMilestone.index());
-                    latestMilestoneTracker.setLatestMilestoneHash(nextMilestone.getHash());
+                    latestMilestoneTracker.setLatestMilestone(nextMilestone.getHash(), nextMilestone.index());
                 }
 
                 Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();

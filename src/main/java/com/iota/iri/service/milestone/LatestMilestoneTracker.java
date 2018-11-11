@@ -4,11 +4,9 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 
 public interface LatestMilestoneTracker {
-    void setLatestMilestoneIndex(int latestMilestoneIndex);
+    void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex);
 
     int getLatestMilestoneIndex();
-
-    void setLatestMilestoneHash(Hash latestMilestoneHash);
 
     Hash getLatestMilestoneHash();
 

@@ -15,7 +15,6 @@ import com.iota.iri.service.milestone.MilestoneValidity;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;
-import com.iota.iri.utils.log.Logger;
 import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
 import com.iota.iri.utils.thread.SilentScheduledExecutorService;
@@ -66,38 +65,51 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     private Hash latestMilestoneHash;
 
+    private boolean firstRun = true;
+
     /**
      * The current status of the {@link MilestoneTracker}.
      */
     private boolean initialized = false;
 
-    public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService, MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ, IotaConfig config) {
-        this.tangle = tangle;
-        this.snapshotProvider = snapshotProvider;
-        this.snapshotService = snapshotService;
-        this.milestoneService = milestoneService;
-        this.milestoneSolidifier = milestoneSolidifier;
-        this.messageQ = messageQ;
-        this.config = config;
-        coordinatorAddress = HashFactory.ADDRESS.create(config.getCoordinator());
+    public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+            MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ,
+            IotaConfig config) {
 
-        this.latestMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex();
-        this.latestMilestoneHash = snapshotProvider.getLatestSnapshot().getHash();
+         this.tangle = tangle;
+         this.snapshotProvider = snapshotProvider;
+         this.snapshotService = snapshotService;
+         this.milestoneService = milestoneService;
+         this.milestoneSolidifier = milestoneSolidifier;
+         this.messageQ = messageQ;
+         this.config = config;
+
+         coordinatorAddress = HashFactory.ADDRESS.create(config.getCoordinator());
+         latestMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex();
+         latestMilestoneHash = snapshotProvider.getLatestSnapshot().getHash();
+
+         // faster bootstrap
+         try {
+            MilestoneViewModel lastMilestoneInDatabase = MilestoneViewModel.latest(tangle);
+            if (lastMilestoneInDatabase != null && lastMilestoneInDatabase.index() > latestMilestoneIndex) {
+                latestMilestoneIndex = lastMilestoneInDatabase.index();
+                latestMilestoneHash = lastMilestoneInDatabase.getHash();
+            }
+         } catch (Exception e) {
+             // just continue with the previously set latest milestone
+         }
+
     }
 
     @Override
-    public void setLatestMilestoneIndex(int latestMilestoneIndex) {
+    public void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex) {
+        this.latestMilestoneHash = latestMilestoneHash;
         this.latestMilestoneIndex = latestMilestoneIndex;
     }
 
     @Override
     public int getLatestMilestoneIndex() {
         return latestMilestoneIndex;
-    }
-
-    @Override
-    public void setLatestMilestoneHash(Hash latestMilestoneHash) {
-        this.latestMilestoneHash = latestMilestoneHash;
     }
 
     @Override
@@ -172,7 +184,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     private void latestMilestoneTrackerThread() {
         try {
-            // log how many milestone candidates are remaining to be analyzed
+            // will not fire on the first run because we have an empty list
             if (milestoneCandidatesToAnalyze.size() > 1) {
                 log.info("Processing milestone candidates (" + milestoneCandidatesToAnalyze.size() + " remaining) ...");
             }
@@ -185,7 +197,17 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                 }
 
                 if (seenMilestoneCandidates.add(hash)) {
-                    milestoneCandidatesToAnalyze.addLast(hash);
+                    // we add at the beginning to process newly received milestones first
+                    milestoneCandidatesToAnalyze.addFirst(hash);
+                }
+            }
+
+            // log how many milestone candidates are remaining to be analyzed
+            if (firstRun) {
+                firstRun = false;
+
+                if (milestoneCandidatesToAnalyze.size() > 1) {
+                    log.info("Processing milestone candidates (" + milestoneCandidatesToAnalyze.size() + " remaining) ...");
                 }
             }
 
@@ -206,6 +228,8 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
             // once all candidates have been processed we set the milestone tracker to initialized
             if (milestoneCandidatesToAnalyze.size() == 0 && !initialized) {
                 initialized = true;
+
+                log.info("Processing milestone candidates ... [DONE]").triggerOutput(true);
             }
         } catch (Exception e) {
             log.error("error while analyzing the milestone candidates", e);
