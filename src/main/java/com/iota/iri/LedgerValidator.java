@@ -187,7 +187,7 @@ public class LedgerValidator {
         }
 
         for (int resettedMilestoneIndex : resettedMilestones) {
-            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
+            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, resettedMilestoneIndex, "updateSnapshotIndexOfMilestoneTransactions");
         }
     }
 
@@ -214,7 +214,7 @@ public class LedgerValidator {
             // if the snapshotIndex of our transaction was set already, we have processed our milestones in
             // the wrong order (i.e. while rescanning the db)
             if(transactionSnapshotIndex != 0) {
-                milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, milestoneVM.index(), "updateMilestoneTransaction");
+                milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, milestoneVM.index(), "updateMilestoneTransaction");
             }
 
             snapshotProvider.getLatestSnapshot().lockRead();

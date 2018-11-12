@@ -35,10 +35,15 @@ import static com.iota.iri.service.milestone.MilestoneValidity.VALID;
 public class MilestoneServiceImpl implements MilestoneService {
     private final static Logger log = LoggerFactory.getLogger(MilestoneServiceImpl.class);
 
+    private final SnapshotService snapshotService;
+
+    public MilestoneServiceImpl(SnapshotService snapshotService) {
+        this.snapshotService = snapshotService;
+    }
+
     @Override
-    public MilestoneValidity validateMilestone(Tangle tangle, SnapshotProvider snapshotProvider,
-            SnapshotService snapshotService, IotaConfig config, TransactionViewModel transactionViewModel, SpongeFactory.Mode mode,
-            int securityLevel) throws Exception {
+    public MilestoneValidity validateMilestone(Tangle tangle, SnapshotProvider snapshotProvider, IotaConfig config,
+            TransactionViewModel transactionViewModel, SpongeFactory.Mode mode, int securityLevel) throws Exception {
 
         int milestoneIndex = getMilestoneIndex(transactionViewModel);
         if (milestoneIndex < 0 || milestoneIndex >= 0x200000) {
@@ -109,8 +114,10 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     @Override
-    public void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService, int milestoneIndex, String identifier) {
-        resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, milestoneIndex, identifier, new HashSet<>());
+    public void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, int milestoneIndex,
+            String identifier) {
+
+        resetCorruptedMilestone(tangle, snapshotProvider, milestoneIndex, identifier, new HashSet<>());
     }
 
     @Override
@@ -133,9 +140,8 @@ public class MilestoneServiceImpl implements MilestoneService {
                 .allMatch(branchTransactionHash -> branchTransactionHash.equals(headTransactionHash));
     }
 
-    private void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider,
-            SnapshotService snapshotService, int milestoneIndex, String identifier,
-            HashSet<Hash> processedTransactions) {
+    private void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, int milestoneIndex,
+            String identifier, HashSet<Hash> processedTransactions) {
 
         if(milestoneIndex <= snapshotProvider.getInitialSnapshot().getIndex()) {
             return;
@@ -153,7 +159,7 @@ public class MilestoneServiceImpl implements MilestoneService {
                             milestoneToRepair.index());
                 }
 
-                resetMilestoneIndexOfMilestoneTransactions(tangle, snapshotProvider, snapshotService, milestoneToRepair, processedTransactions);
+                resetMilestoneIndexOfMilestoneTransactions(tangle, snapshotProvider, milestoneToRepair, processedTransactions);
                 tangle.delete(StateDiff.class, milestoneToRepair.getHash());
             }
         } catch (Exception e) {
@@ -173,7 +179,7 @@ public class MilestoneServiceImpl implements MilestoneService {
      * @throws Exception if something goes wrong while accessing the database
      */
     public void resetMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
-            SnapshotService snapshotService, MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) {
+            MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) {
 
         try {
             Set<Integer> resettedMilestones = new HashSet<>();
@@ -190,7 +196,7 @@ public class MilestoneServiceImpl implements MilestoneService {
             );
 
             for(int resettedMilestoneIndex : resettedMilestones) {
-                resetCorruptedMilestone(tangle, snapshotProvider, snapshotService, resettedMilestoneIndex, "resetMilestoneIndexOfMilestoneTransactions", processedTransactions);
+                resetCorruptedMilestone(tangle, snapshotProvider, resettedMilestoneIndex, "resetMilestoneIndexOfMilestoneTransactions", processedTransactions);
             }
         } catch(Exception e) {
             log.error("failed to reset the transactions belonging to " + currentMilestone, e);
@@ -199,11 +205,11 @@ public class MilestoneServiceImpl implements MilestoneService {
 
     private void resetMilestoneIndexOfSingleTransaction(Tangle tangle, SnapshotProvider snapshotProvider,
             TransactionViewModel currentTransaction, MilestoneViewModel currentMilestone,
-            Set<Integer> resettedMilestones) {
+            Set<Integer> resetedMilestones) {
 
         try {
             if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-                resettedMilestones.add(currentTransaction.snapshotIndex());
+                resetedMilestones.add(currentTransaction.snapshotIndex());
             }
 
             currentTransaction.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), 0);

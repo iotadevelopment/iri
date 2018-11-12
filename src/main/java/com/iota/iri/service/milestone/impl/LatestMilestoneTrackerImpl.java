@@ -20,7 +20,6 @@ import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
 import com.iota.iri.utils.thread.SilentScheduledExecutorService;
 import com.iota.iri.zmq.MessageQ;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -39,14 +38,9 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     private static final IntervalLogger log = new IntervalLogger(LatestMilestoneTrackerImpl.class);
 
-    private final SilentScheduledExecutorService lastMilestoneTrackerExecutorService =
-            new DedicatedScheduledExecutorService("Latest Milestone Tracker", LoggerFactory.getLogger(LatestMilestoneTrackerImpl.class));
-
     private final Tangle tangle;
 
     private final SnapshotProvider snapshotProvider;
-
-    private final SnapshotService snapshotService;
 
     private final MilestoneService milestoneService;
 
@@ -56,15 +50,17 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     private final IotaConfig config;
 
+    private final SilentScheduledExecutorService executorService;
+
     private final Hash coordinatorAddress;
-
-    private final Set<Hash> seenMilestoneCandidates = new HashSet<>();
-
-    private final Deque<Hash> milestoneCandidatesToAnalyze = new ArrayDeque<>();
 
     private int latestMilestoneIndex;
 
     private Hash latestMilestoneHash;
+
+    private final Set<Hash> seenMilestoneCandidates = new HashSet<>();
+
+    private final Deque<Hash> milestoneCandidatesToAnalyze = new ArrayDeque<>();
 
     private boolean firstRun = true;
 
@@ -79,12 +75,12 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
-        this.snapshotService = snapshotService;
         this.milestoneService = milestoneService;
         this.milestoneSolidifier = milestoneSolidifier;
         this.messageQ = messageQ;
         this.config = config;
 
+        executorService = new DedicatedScheduledExecutorService("Latest Milestone Tracker", log.delegate());
         coordinatorAddress = HashFactory.ADDRESS.create(config.getCoordinator());
 
         // bootstrap with the latest snapshot first
@@ -94,9 +90,8 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         // check if we have a bigger milestone as the last in our DB (faster bootstrap)
         try {
             MilestoneViewModel lastMilestoneInDatabase = MilestoneViewModel.latest(tangle);
-            if (lastMilestoneInDatabase != null && lastMilestoneInDatabase.index() > latestMilestoneIndex) {
-                latestMilestoneIndex = lastMilestoneInDatabase.index();
-                latestMilestoneHash = lastMilestoneInDatabase.getHash();
+            if (lastMilestoneInDatabase != null && lastMilestoneInDatabase.index() > getLatestMilestoneIndex()) {
+                setLatestMilestone(lastMilestoneInDatabase.getHash(), lastMilestoneInDatabase.index());
             }
         } catch (Exception e) {
              // just continue with the previously set latest milestone
@@ -105,6 +100,9 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     @Override
     public void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex) {
+        messageQ.publish("lmi %d %d", this.latestMilestoneIndex, latestMilestoneIndex);
+        log.delegate().info("Latest milestone has changed from #" + this.latestMilestoneIndex + " to #" + latestMilestoneIndex);
+
         this.latestMilestoneHash = latestMilestoneHash;
         this.latestMilestoneIndex = latestMilestoneIndex;
     }
@@ -129,17 +127,13 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         if (coordinatorAddress.equals(potentialMilestoneTransaction.getAddressHash()) && potentialMilestoneTransaction.getCurrentIndex() == 0) {
             int milestoneIndex = milestoneService.getMilestoneIndex(potentialMilestoneTransaction);
 
-            switch (milestoneService.validateMilestone(tangle, snapshotProvider, snapshotService, config, potentialMilestoneTransaction, SpongeFactory.Mode.CURLP27, 1)) {
+            switch (milestoneService.validateMilestone(tangle, snapshotProvider, config, potentialMilestoneTransaction, SpongeFactory.Mode.CURLP27, 1)) {
                 case VALID:
                     if (milestoneIndex > latestMilestoneIndex) {
-                        messageQ.publish("lmi %d %d", latestMilestoneIndex, milestoneIndex);
-                        log.delegate().info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + milestoneIndex);
-
-                        latestMilestoneHash = potentialMilestoneTransaction.getHash();
-                        latestMilestoneIndex = milestoneIndex;
+                        setLatestMilestone(potentialMilestoneTransaction.getHash(), milestoneIndex);
                     } else {
                         MilestoneViewModel latestMilestoneViewModel = MilestoneViewModel.latest(tangle);
-                        if (latestMilestoneViewModel.index() > latestMilestoneIndex) {
+                        if (latestMilestoneViewModel != null && latestMilestoneViewModel.index() > latestMilestoneIndex) {
                             messageQ.publish("lmi %d %d", latestMilestoneIndex, latestMilestoneViewModel.index());
                             log.delegate().info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + latestMilestoneViewModel.index());
 
@@ -175,13 +169,13 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
 
     @Override
     public void start() {
-        lastMilestoneTrackerExecutorService.silentScheduleWithFixedDelay(this::latestMilestoneTrackerThread, 0,
-                RESCAN_INTERVAL, TimeUnit.MILLISECONDS);
+        executorService.silentScheduleWithFixedDelay(this::latestMilestoneTrackerThread, 0, RESCAN_INTERVAL,
+                TimeUnit.MILLISECONDS);
     }
 
     @Override
     public void shutdown() {
-        lastMilestoneTrackerExecutorService.shutdownNow();
+        executorService.shutdownNow();
     }
 
     private void latestMilestoneTrackerThread() {
