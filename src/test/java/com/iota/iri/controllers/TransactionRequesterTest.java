@@ -19,7 +19,7 @@ import static org.junit.Assert.*;
 public class TransactionRequesterTest {
     private static Tangle tangle = new Tangle();
     private static SnapshotProvider snapshotProvider;
-    private MessageQ mq = null;
+    private MessageQ mq;
 
     @Before
     public void setUp() throws Exception {
@@ -27,7 +27,7 @@ public class TransactionRequesterTest {
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws Exception {
         snapshotProvider.shutdown();
     }
 

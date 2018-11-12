@@ -6,6 +6,7 @@ import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.crypto.Curl;
 import com.iota.iri.crypto.Sponge;
 import com.iota.iri.crypto.SpongeFactory;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
@@ -69,7 +70,7 @@ public class TransactionValidator {
     }
 
     private boolean hasInvalidTimestamp(TransactionViewModel transactionViewModel) {
-        // ignore invalid timestamps for transactions that where requested by our node while solidifying a milestone
+        // ignore invalid timestamps for transactions that were requested by our node while solidifying a milestone
         if(transactionRequester.isTransactionRequested(transactionViewModel.getHash(), true)) {
             return false;
         }

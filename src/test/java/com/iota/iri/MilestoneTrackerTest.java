@@ -66,9 +66,14 @@ public class MilestoneTrackerTest {
         configuration.parseConfigFromArgs(args);
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
+<<<<<<< HEAD
         TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
         TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), new TipsViewModel(), txRequester);
         milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, new SnapshotServiceImpl(), transactionValidator, txRequester, messageQ, configuration);
+=======
+        TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), new TipsViewModel(), new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ));
+        milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, messageQ, Snapshot.init(configuration).clone(), configuration);
+>>>>>>> b19fec078eb0702f94ca43a43cfec2a0b98ca276
     }
 
     @Test

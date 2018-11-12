@@ -1,6 +1,5 @@
 package com.iota.iri.service.milestone.impl;
 
-import com.iota.iri.MilestoneTracker;
 import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.controllers.AddressViewModel;
 import com.iota.iri.controllers.MilestoneViewModel;
@@ -65,7 +64,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
     private boolean firstRun = true;
 
     /**
-     * The current status of the {@link MilestoneTracker}.
+     * Flag which indicates if this tracker was fully initialized.
      */
     private boolean initialized = false;
 

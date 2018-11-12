@@ -58,7 +58,6 @@ public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
     public final LedgerValidator ledgerValidator;
-    public final MilestoneTracker milestoneTracker;
     public final LatestMilestoneTracker latestMilestoneTracker;
     public final LatestSolidMilestoneTracker latestSolidMilestoneTracker;
     public final MilestoneService milestoneService;
@@ -80,33 +79,32 @@ public class Iota {
     public final TipSelector tipsSelector;
 
     public Iota(IotaConfig configuration) throws SnapshotException, TransactionPruningException {
-            this.configuration = configuration;
+        this.configuration = configuration;
 
-            // initialize services (least amount of dependencies)
-            snapshotService = new SnapshotServiceImpl();
-            milestoneService = new MilestoneServiceImpl(snapshotService);
+        // initialize services (least amount of dependencies)
+        snapshotService = new SnapshotServiceImpl();
+        milestoneService = new MilestoneServiceImpl(snapshotService);
 
-            // initialize remaining
-            tangle = new Tangle();
-            messageQ = MessageQ.createWith(configuration);
-            tipsViewModel = new TipsViewModel();
-            snapshotProvider = new SnapshotProviderImpl(configuration);
-            transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
-            transactionPruner.restoreState();
-            localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);
-            transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
-            transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
-            milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
-            ledgerValidator = new LedgerValidator(tangle, snapshotProvider, snapshotService, milestoneService, transactionRequester, messageQ);
-            tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
-            tipsSelector = createTipSelector(configuration);
-            latestMilestoneTracker = new LatestMilestoneTrackerImpl(tangle, snapshotProvider, snapshotService, milestoneService, milestoneSolidifier, messageQ, configuration);
-            latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, latestMilestoneTracker, ledgerValidator, messageQ);
-            milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, milestoneService, latestMilestoneTracker, transactionRequester, messageQ);
-            node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, latestMilestoneTracker, messageQ,
-                    configuration);
-            replicator = new Replicator(node, configuration);
-            udpReceiver = new UDPReceiver(node, configuration);
+        // initialize remaining
+        tangle = new Tangle();
+        messageQ = MessageQ.createWith(configuration);
+        tipsViewModel = new TipsViewModel();
+        snapshotProvider = new SnapshotProviderImpl(configuration);
+        transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
+        transactionPruner.restoreState();
+        localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);
+        transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
+        transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
+        milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
+        ledgerValidator = new LedgerValidator(tangle, snapshotProvider, snapshotService, milestoneService, transactionRequester, messageQ);
+        tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
+        tipsSelector = createTipSelector(configuration);
+        latestMilestoneTracker = new LatestMilestoneTrackerImpl(tangle, snapshotProvider, snapshotService, milestoneService, milestoneSolidifier, messageQ, configuration);
+        latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, latestMilestoneTracker, ledgerValidator, messageQ);
+        node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, latestMilestoneTracker, messageQ,
+                configuration);
+        replicator = new Replicator(node, configuration);
+        udpReceiver = new UDPReceiver(node, configuration);
     }
 
     public void init() throws Exception {
@@ -124,7 +122,6 @@ public class Iota {
         }
         latestMilestoneTracker.start();
         latestSolidMilestoneTracker.start();
-        milestoneTracker.start(ledgerValidator);
         milestoneSolidifier.start();
         transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
@@ -169,7 +166,6 @@ public class Iota {
     public void shutdown() throws Exception {
         latestMilestoneTracker.shutdown();
         latestSolidMilestoneTracker.shutdown();
-        milestoneTracker.shutDown();
         milestoneSolidifier.shutdown();
         tipsSolidifier.shutdown();
         node.shutdown();
