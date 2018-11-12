@@ -2,7 +2,7 @@ package com.iota.iri.service.milestone;
 
 import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.hash.SpongeFactory;
+import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;

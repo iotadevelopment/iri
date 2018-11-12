@@ -1,8 +1,8 @@
 package com.iota.iri;
 
 import com.iota.iri.conf.MainnetConfig;
-import com.iota.iri.hash.SpongeFactory;
 import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
