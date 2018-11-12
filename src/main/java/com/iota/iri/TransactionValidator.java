@@ -37,7 +37,7 @@ public class TransactionValidator {
     private final Set<Hash> newSolidTransactionsOne = new LinkedHashSet<>();
     private final Set<Hash> newSolidTransactionsTwo = new LinkedHashSet<>();
 
-    public TransactionValidator(Tangle tangle, Snapshot initialSnapshot, TipsViewModel tipsViewModel, TransactionRequester transactionRequester) {
+    TransactionValidator(Tangle tangle, Snapshot initialSnapshot, TipsViewModel tipsViewModel, TransactionRequester transactionRequester) {
         this.tangle = tangle;
         this.initialSnapshot = initialSnapshot;
         this.tipsViewModel = tipsViewModel;

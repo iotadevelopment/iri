@@ -61,14 +61,41 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      */
     private final LedgerValidator ledgerValidator;
 
+    /**
+     * Holds a reference to the ZeroMQ interface that allows us to emit messages for external recipients.<br />
+     */
     private final MessageQ messageQ;
 
-    private final SilentScheduledExecutorService executorService;
+    /**
+     * Holds a reference to the manager of the background worker.<br />
+     */
+    private final SilentScheduledExecutorService executorService = new DedicatedScheduledExecutorService(
+            "Latest Solid Milestone Tracker", log.delegate());;
 
+    /**
+     * Holds the milestone index of the milestone caused the repair logic to get started.<br />
+     */
     private int errorCausingMilestoneIndex = Integer.MAX_VALUE;
 
+    /**
+     * Counter for the backoff repair strategy (see {@link #revertPrecedingMilestones(MilestoneViewModel)}.<br />
+     */
     private int repairBackoffCounter = 0;
 
+    /**
+     * Creates a manager that keeps track of the latest solid milestones and that triggers the application of these
+     * milestones and their corresponding balance changes to the latest {@link Snapshot} by incorporating a background
+     * worker that periodically checks for new solid milestones.<br />
+     * <br />
+     * We simply store the passed in dependencies in their corresponding properties.<br />
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
+     * @param milestoneService the class that contains the important business logic when dealing with milestones
+     * @param latestMilestoneTracker the manager that keeps track of the latest milestone
+     * @param ledgerValidator the manager for
+     * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
+     */
     public LatestSolidMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, LatestMilestoneTracker latestMilestoneTracker,
             LedgerValidator ledgerValidator, MessageQ messageQ) {
@@ -79,8 +106,6 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         this.latestMilestoneTracker = latestMilestoneTracker;
         this.ledgerValidator = ledgerValidator;
         this.messageQ = messageQ;
-
-        executorService = new DedicatedScheduledExecutorService("Latest Solid Milestone Tracker", log.delegate());
     }
 
     @Override
@@ -95,10 +120,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method contains the logic of the solid milestone tracker thread that gets executed periodically.<br />
-     * <br />
-     * It simply tries to find a solid milestone that follows our current latest milestone and apply it to the ledger
-     * state.<br />
+     * {@inheritDoc}
      * <br />
      * In addition to applying the found milestones to the ledger state it also issues log messages and keeps the
      * {@link LatestMilestoneTracker} in sync (if we happen to process a new latest milestone faster).<br />
@@ -129,8 +151,8 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * This method tries to apply the given milestone to the ledger.<br />
      * <br />
      * If the application of the milestone fails, we start a repair routine which will revert the milestones preceding
-     * our current milestone (and consequently try to reapply them in the next iteration of the
-     * {@link #checkForNewLatestSolidMilestones()} until the problem is solved).<br />
+     * our current milestone and consequently try to reapply them in the next iteration of the
+     * {@link #checkForNewLatestSolidMilestones()} method (until the problem is solved).<br />
      *
      * @param milestoneViewModel the milestone that shall be applied to the ledger state
      * @throws Exception if anything unexpected goes wrong while applying the milestone to the ledger
@@ -146,8 +168,8 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     /**
      * This method resets the internal variables that are used to keep track of the repair process.<br />
      * <br />
-     * It gets called whenever we advance to a milestone that is higher than the milestone that initially caused the
-     * repair routine to kick in (see {@link #revertPrecedingMilestones(MilestoneViewModel)}.<br />
+     * It gets called whenever we advance to a milestone that has a higher milestone index than the milestone that
+     * initially caused the repair routine to kick in (see {@link #revertPrecedingMilestones(MilestoneViewModel)}.<br />
      *
      * @param processedMilestone the milestone that currently gets processed
      */
@@ -163,7 +185,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * current progress.<br />
      * <br />
      * Since the {@link LatestMilestoneTracker} scans all old milestones during its startup (which can take a while to
-     * finish) it can happen that we see a newer latest milestone faster.<br />
+     * finish) it can happen that we see a newer latest milestone faster than this manager.<br />
      * <br />
      * Note: This method ensures that the latest milestone index is always bigger or equals the latest solid milestone
      *       index.
@@ -180,7 +202,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * This method emits a log message whenever the latest solid milestone changes.<br />
      * <br />
      * It simply compares the current latest milestone index against the previous milestone index and emits the log
-     * messages using the {@link #log} and the {@link #messageQ} instances.
+     * messages using the {@link #log} and the {@link #messageQ} instances if it differs.<br />
      *
      * @param prevSolidMilestoneIndex the milestone index before the change
      */
@@ -211,7 +233,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * the problem was fixed.<br />
      * <br />
      * To be able to tell when the problem is fixed and the {@link #repairBackoffCounter} can be reset, we store the
-     * milestone index that caused the problem the first time we call this method.
+     * milestone index that caused the problem the first time we call this method.<br />
      *
      * @param errorCausingMilestone the milestone that failed to be applied
      */
