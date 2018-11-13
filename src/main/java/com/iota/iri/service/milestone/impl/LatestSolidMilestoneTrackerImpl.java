@@ -70,7 +70,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * Holds a reference to the manager of the background worker.<br />
      */
     private final SilentScheduledExecutorService executorService = new DedicatedScheduledExecutorService(
-            "Latest Solid Milestone Tracker", log.delegate());;
+            "Latest Solid Milestone Tracker", log.delegate());
 
     /**
      * Holds the milestone index of the milestone caused the repair logic to get started.<br />

@@ -13,10 +13,12 @@ import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.milestone.LatestSolidMilestoneTracker;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
+import com.iota.iri.service.milestone.SeenMilestonesRetriever;
 import com.iota.iri.service.milestone.impl.LatestMilestoneTrackerImpl;
 import com.iota.iri.service.milestone.impl.LatestSolidMilestoneTrackerImpl;
 import com.iota.iri.service.milestone.impl.MilestoneServiceImpl;
 import com.iota.iri.service.milestone.impl.MilestoneSolidifierImpl;
+import com.iota.iri.service.milestone.impl.SeenMilestonesRetrieverImpl;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotProvider;
@@ -63,6 +65,7 @@ public class Iota {
     public final MilestoneService milestoneService;
     public final MilestoneSolidifier milestoneSolidifier;
     public final Tangle tangle;
+    public final SeenMilestonesRetriever seenMilestonesRetriever;
     public final SnapshotService snapshotService;
     public final SnapshotProvider snapshotProvider;
     public final TransactionPruner transactionPruner;
@@ -87,13 +90,15 @@ public class Iota {
 
         // initialize remaining
         tangle = new Tangle();
-        messageQ = MessageQ.createWith(configuration);
         tipsViewModel = new TipsViewModel();
+
+        messageQ = MessageQ.createWith(configuration);
         snapshotProvider = new SnapshotProviderImpl(configuration);
         transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
         transactionPruner.restoreState();
         localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);
         transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
+        seenMilestonesRetriever = new SeenMilestonesRetrieverImpl(tangle, snapshotProvider, transactionRequester);
         transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
         milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
         ledgerValidator = new LedgerValidator(tangle, snapshotProvider, snapshotService, milestoneService, transactionRequester, messageQ);
@@ -122,6 +127,7 @@ public class Iota {
         }
         latestMilestoneTracker.start();
         latestSolidMilestoneTracker.start();
+        seenMilestonesRetriever.start();
         milestoneSolidifier.start();
         transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
@@ -166,6 +172,7 @@ public class Iota {
     public void shutdown() throws Exception {
         latestMilestoneTracker.shutdown();
         latestSolidMilestoneTracker.shutdown();
+        seenMilestonesRetriever.shutdown();
         milestoneSolidifier.shutdown();
         tipsSolidifier.shutdown();
         node.shutdown();
