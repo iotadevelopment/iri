@@ -32,11 +32,27 @@ import static com.iota.iri.service.milestone.MilestoneValidity.INCOMPLETE;
 import static com.iota.iri.service.milestone.MilestoneValidity.INVALID;
 import static com.iota.iri.service.milestone.MilestoneValidity.VALID;
 
+/**
+ * Implements the basic contract of the {@link MilestoneService}.
+ */
 public class MilestoneServiceImpl implements MilestoneService {
+    /**
+     * Holds the logger of this class (gets used to issue error messages).<br />
+     */
     private final static Logger log = LoggerFactory.getLogger(MilestoneServiceImpl.class);
 
+    /**
+     * Holds a reference to the service instance of the snapshot package that allows us to rollback ledger states.<br />
+     */
     private final SnapshotService snapshotService;
 
+    /**
+     * Creates a service instance that allows us to interact with the milestones.<br />
+     * <br />
+     * It simply stores the passed in dependencies in the internal properties.<br />
+     *
+     * @param snapshotService service instance of the snapshot package that allows us to rollback ledger states
+     */
     public MilestoneServiceImpl(SnapshotService snapshotService) {
         this.snapshotService = snapshotService;
     }
@@ -57,10 +73,8 @@ public class MilestoneServiceImpl implements MilestoneService {
         final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash());
         if (bundleTransactions.size() == 0) {
             return INCOMPLETE;
-        }
-        else {
+        } else {
             for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
-
                 final TransactionViewModel tail = bundleTransactionViewModels.get(0);
                 if (tail.getHash().equals(transactionViewModel.getHash())) {
                     //the signed transaction - which references the confirmed transactions and contains
@@ -113,6 +127,13 @@ public class MilestoneServiceImpl implements MilestoneService {
         return INVALID;
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * We redirect the call to {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, int, String, HashSet)} while
+     * initiating the set of {@code processedTransactions} with an empty {@link HashSet} which will ensure that we reset
+     * all found transactions.<br />
+     */
     @Override
     public void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, int milestoneIndex,
             String identifier) {
@@ -125,10 +146,19 @@ public class MilestoneServiceImpl implements MilestoneService {
         return (int) Converter.longValue(milestoneTransaction.trits(), OBSOLETE_TAG_TRINARY_OFFSET, 15);
     }
 
-    //trunks of bundles are checked in Bundle validation - no need to check again.
-    // bundleHash equality is checked in BundleValidator.validate() (loadTransactionsFromTangle)
-    @Override
-    public boolean isMilestoneBundleStructureValid(List<TransactionViewModel> bundleTransactions, int securityLevel) {
+    /**
+     * This method is a utility method that checks if the transactions belonging to the potential milestone bundle have
+     * a valid structure (used during the validation of milestones).<br />
+     * <br />
+     * It first checks if the bundle has enough transactions to conform to the given {@code securityLevel} and then
+     * verifies that the {@code branchTransactionsHash}es are pointing to the {@code trunkTransactionHash} of the head
+     * transactions.<br />
+     *
+     * @param bundleTransactions all transactions belonging to the milestone
+     * @param securityLevel the security level used for the signature
+     * @return {@code true} if the basic structure is valid and {@code false} otherwise
+     */
+    private boolean isMilestoneBundleStructureValid(List<TransactionViewModel> bundleTransactions, int securityLevel) {
         if (bundleTransactions.size() <= securityLevel) {
             return false;
         }
@@ -140,6 +170,24 @@ public class MilestoneServiceImpl implements MilestoneService {
                 .allMatch(branchTransactionHash -> branchTransactionHash.equals(headTransactionHash));
     }
 
+    /**
+     * This method does the same as {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, int, String)} but
+     * additionally receives a set of {@code processedTransactions} that will allow us to not process the same
+     * transactions over and over again while resetting additional milestones in recursive calls.<br />
+     * <br />
+     * It first checks if the desired {@code milestoneIndex} is reachable by this node and then triggers the
+     * reset by:<br />
+     * <br />
+     * 1. resetting the ledger state if it addresses a milestone before the current latest solid milestone<br />
+     * 2. resetting the {@code milestoneIndex} of all transactions that were confirmed by the current milestone<br />
+     * 3. deleting the corresponding {@link StateDiff} entry from the database
+     *
+     * @param tangle Tangle object which acts as a database interface [dependency]
+     * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots [dependency]
+     * @param milestoneIndex milestone index that shall
+     * @param identifier string identifier for debug messages
+     * @param processedTransactions a set of transactions that have been processed already
+     */
     private void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, int milestoneIndex,
             String identifier, HashSet<Hash> processedTransactions) {
 
@@ -147,13 +195,11 @@ public class MilestoneServiceImpl implements MilestoneService {
             return;
         }
 
-        System.out.println("REPAIRING: " + snapshotProvider.getLatestSnapshot().getIndex() + " <=> " + milestoneIndex + " => " + identifier);
+        log.info("resetting corrupted milestone #" + milestoneIndex + " (source: " + identifier + ")");
 
         try {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
-
             if(milestoneToRepair != null) {
-                // reset the ledger to the state before the erroneous milestone appeared
                 if(milestoneToRepair.index() <= snapshotProvider.getLatestSnapshot().getIndex()) {
                     snapshotService.rollBackMilestones(tangle, snapshotProvider.getLatestSnapshot(),
                             milestoneToRepair.index());
@@ -168,53 +214,76 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     /**
-     * This method resets the snapshotIndex of all transactions that "belong" to a milestone.
+     * This method resets the {@code milestoneIndex} of all transactions that "belong" to a milestone.<br />
+     * <br />
+     * While traversing the graph we use the {@code milestoneIndex} value to check if it still belongs to the given
+     * milestone and ignore all transactions that were referenced by a previous one. Since we check if the
+     * {@code milestoneIndex} is bigger or equal to the one of the target milestone, we can ignore the case that a
+     * previous milestone was not processed, yet since it's milestoneIndex would still be 0.<br />
+     * <br />
+     * If we found inconsistencies in the {@code milestoneIndex} we recursively reset the milestones that referenced
+     * them.<br />
      *
-     * While traversing the graph we use the snapshotIndex value to check if it still belongs to the given milestone and
-     * ignore all transactions that where referenced by a previous ones. Since we check if the snapshotIndex is bigger
-     * or equal to the one of the targetMilestone, we can ignore the case that a previous milestone was not processed,
-     * yet since it's milestoneIndex would still be 0.
-     *
-     * @param currentMilestone the milestone that shall have its confirmed transactions reset
-     * @throws Exception if something goes wrong while accessing the database
+     * @param tangle Tangle object which acts as a database interface [dependency]
+     * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots [dependency]
+     * @param targetMilestone the milestone that shall have his transactions reset
+     * @param processedTransactions a set of transactions that have been processed already
      */
-    public void resetMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
-            MilestoneViewModel currentMilestone, HashSet<Hash> processedTransactions) {
+    private void resetMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
+            MilestoneViewModel targetMilestone, HashSet<Hash> processedTransactions) {
 
         try {
-            Set<Integer> resettedMilestones = new HashSet<>();
+            Set<Integer> inconsistentMilestones = new HashSet<>();
 
-            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-            resetMilestoneIndexOfSingleTransaction(tangle, snapshotProvider, milestoneTransaction, currentMilestone, resettedMilestones);
-            processedTransactions.add(milestoneTransaction.getHash());
+            TransactionViewModel milestoneTx = TransactionViewModel.fromHash(tangle, targetMilestone.getHash());
+            processedTransactions.add(milestoneTx.getHash());
+            resetMilestoneIndexOfSingleTransaction(tangle, snapshotProvider, milestoneTx, targetMilestone,
+                    inconsistentMilestones);
 
             DAGHelper.get(tangle).traverseApprovees(
-                currentMilestone.getHash(),
-                currentTransaction -> currentTransaction.snapshotIndex() >= currentMilestone.index() || currentTransaction.snapshotIndex() == 0,
-                currentTransaction -> resetMilestoneIndexOfSingleTransaction(tangle, snapshotProvider, currentTransaction, currentMilestone, resettedMilestones),
+                targetMilestone.getHash(),
+                currentTransaction -> currentTransaction.snapshotIndex() >= targetMilestone.index() ||
+                                              currentTransaction.snapshotIndex() == 0,
+                currentTransaction -> resetMilestoneIndexOfSingleTransaction(tangle, snapshotProvider,
+                                              currentTransaction, targetMilestone, inconsistentMilestones),
                 processedTransactions
             );
 
-            for(int resettedMilestoneIndex : resettedMilestones) {
-                resetCorruptedMilestone(tangle, snapshotProvider, resettedMilestoneIndex, "resetMilestoneIndexOfMilestoneTransactions", processedTransactions);
+            for(int resettedMilestoneIndex : inconsistentMilestones) {
+                resetCorruptedMilestone(tangle, snapshotProvider, resettedMilestoneIndex,
+                        "resetMilestoneIndexOfMilestoneTransactions", processedTransactions);
             }
         } catch(Exception e) {
-            log.error("failed to reset the transactions belonging to " + currentMilestone, e);
+            log.error("failed to reset the transactions belonging to " + targetMilestone, e);
         }
     }
 
+    /**
+     * This method resets the {@code milestoneIndex} of a single transaction.<br />
+     * <br />
+     * If the {@code milestoneIndex} is bigger than the expected one, we collect the {@code milestoneIndex} so the
+     * milestone wrongly referencing this transaction can recursively be repaired as well (if milestones got processed
+     * in the wrong order).<br />
+     *
+     * @param tangle Tangle object which acts as a database interface [dependency]
+     * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots [dependency]
+     * @param currentTransaction the transaction that shall have its {@code milestoneIndex} reset
+     * @param targetMilestone the milestone that this transaction belongs to
+     * @param inconsistentMilestones a mutable object that is used to collect inconsistencies
+     */
     private void resetMilestoneIndexOfSingleTransaction(Tangle tangle, SnapshotProvider snapshotProvider,
-            TransactionViewModel currentTransaction, MilestoneViewModel currentMilestone,
-            Set<Integer> resetedMilestones) {
+            TransactionViewModel currentTransaction, MilestoneViewModel targetMilestone,
+            Set<Integer> inconsistentMilestones) {
 
         try {
-            if(currentTransaction.snapshotIndex() > currentMilestone.index()) {
-                resetedMilestones.add(currentTransaction.snapshotIndex());
+            if(currentTransaction.snapshotIndex() > targetMilestone.index()) {
+                inconsistentMilestones.add(currentTransaction.snapshotIndex());
             }
 
             currentTransaction.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), 0);
         } catch(Exception e) {
-            log.error("failed to reset the snapshotIndex of " + currentTransaction + " while trying to repair " + currentMilestone, e);
+            log.error("failed to reset the snapshotIndex of " + currentTransaction + " while trying to repair " +
+                    targetMilestone, e);
         }
     }
 }

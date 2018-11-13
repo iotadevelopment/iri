@@ -88,12 +88,14 @@ public class Iota {
         snapshotService = new SnapshotServiceImpl();
         milestoneService = new MilestoneServiceImpl(snapshotService);
 
-        // initialize remaining
+        // initialize instances with 1 dependency
         tangle = new Tangle();
         tipsViewModel = new TipsViewModel();
 
-        messageQ = MessageQ.createWith(configuration);
+        // initialize instances with 2 dependency
         snapshotProvider = new SnapshotProviderImpl(configuration);
+        messageQ = MessageQ.createWith(configuration);
+
         transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
         transactionPruner.restoreState();
         localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);

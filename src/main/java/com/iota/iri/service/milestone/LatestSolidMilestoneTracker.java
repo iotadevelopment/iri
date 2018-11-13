@@ -22,13 +22,13 @@ public interface LatestSolidMilestoneTracker {
     void checkForNewLatestSolidMilestones();
 
     /**
-     * This method starts the background worker, that automatically calls {@link #checkForNewLatestSolidMilestones()}
+     * This method starts the background worker that automatically calls {@link #checkForNewLatestSolidMilestones()}
      * periodically to keep the latest solid milestone up to date.<br />
      */
     void start();
 
     /**
-     * This method stops the background worker, that automatically updates the latest solid milestone.<br />
+     * This method stops the background worker that automatically updates the latest solid milestone.<br />
      */
     void shutdown();
 }
