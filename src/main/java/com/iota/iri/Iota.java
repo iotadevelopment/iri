@@ -9,6 +9,8 @@ import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
+import com.iota.iri.service.ledger.LedgerService;
+import com.iota.iri.service.ledger.impl.LedgerServiceImpl;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.milestone.LatestSolidMilestoneTracker;
 import com.iota.iri.service.milestone.MilestoneService;
@@ -45,6 +47,7 @@ import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.ZmqPublishProvider;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Pair;
+import com.iota.iri.utils.dependencyinjection.Injector;
 import com.iota.iri.zmq.MessageQ;
 import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
@@ -59,7 +62,7 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
-    public final LedgerValidator ledgerValidator;
+    public final LedgerService ledgerService;
     public final LatestMilestoneTracker latestMilestoneTracker;
     public final LatestSolidMilestoneTracker latestSolidMilestoneTracker;
     public final MilestoneService milestoneService;
@@ -87,6 +90,7 @@ public class Iota {
         // initialize services (least amount of dependencies)
         snapshotService = new SnapshotServiceImpl();
         milestoneService = new MilestoneServiceImpl(snapshotService);
+        ledgerService = new LedgerServiceImpl(snapshotService, milestoneService);
 
         // initialize instances with 1 dependency
         tangle = new Tangle();
@@ -103,11 +107,10 @@ public class Iota {
         seenMilestonesRetriever = new SeenMilestonesRetrieverImpl(tangle, snapshotProvider, transactionRequester);
         transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, transactionRequester);
         milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
-        ledgerValidator = new LedgerValidator(tangle, snapshotProvider, snapshotService, milestoneService, transactionRequester, messageQ);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(configuration);
-        latestMilestoneTracker = new LatestMilestoneTrackerImpl(tangle, snapshotProvider, snapshotService, milestoneService, milestoneSolidifier, messageQ, configuration);
-        latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, latestMilestoneTracker, ledgerValidator, messageQ);
+        latestMilestoneTracker = new LatestMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, milestoneSolidifier, messageQ, configuration);
+        latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, ledgerService, latestMilestoneTracker, messageQ);
         node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, latestMilestoneTracker, messageQ,
                 configuration);
         replicator = new Replicator(node, configuration);
@@ -217,7 +220,7 @@ public class Iota {
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
-        return new TipSelectorImpl(tangle, snapshotProvider, ledgerValidator, entryPointSelector, ratingCalculator,
+        return new TipSelectorImpl(tangle, snapshotProvider, ledgerService, entryPointSelector, ratingCalculator,
                 walker, config);
     }
 }

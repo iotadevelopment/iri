@@ -13,7 +13,6 @@ import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.milestone.MilestoneValidity;
 import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotProvider;
-import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
@@ -68,7 +67,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      */
     private boolean initialized = false;
 
-    public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+    public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ,
             IotaConfig config) {
 
@@ -126,7 +125,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         if (coordinatorAddress.equals(potentialMilestoneTransaction.getAddressHash()) && potentialMilestoneTransaction.getCurrentIndex() == 0) {
             int milestoneIndex = milestoneService.getMilestoneIndex(potentialMilestoneTransaction);
 
-            switch (milestoneService.validateMilestone(tangle, snapshotProvider, config, potentialMilestoneTransaction, SpongeFactory.Mode.CURLP27, 1)) {
+            switch (milestoneService.validateMilestone(tangle, snapshotProvider, messageQ, config, potentialMilestoneTransaction, SpongeFactory.Mode.CURLP27, 1)) {
                 case VALID:
                     if (milestoneIndex > latestMilestoneIndex) {
                         setLatestMilestone(potentialMilestoneTransaction.getHash(), milestoneIndex);

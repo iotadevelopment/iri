@@ -523,7 +523,7 @@ public class API {
         if (state) {
             instance.snapshotProvider.getLatestSnapshot().lockRead();
             try {
-                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotProvider, instance.ledgerValidator,
+                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotProvider, instance.ledgerService,
                         instance.configuration);
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
@@ -1091,7 +1091,7 @@ public class API {
                 if (!TransactionViewModel.exists(instance.tangle, tip)) {
                     return ErrorResponse.create("Tip not found: " + tip.toString());
                 }
-                if (!instance.ledgerValidator.updateDiff(visitedHashes, diff, tip)) {
+                if (!instance.ledgerService.isBalanceDiffConsistent(instance.tangle, instance.snapshotProvider, visitedHashes, diff, tip)) {
                     return ErrorResponse.create("Tips are not consistent");
                 }
             }

@@ -1,9 +1,9 @@
 package com.iota.iri.service.milestone.impl;
 
-import com.iota.iri.LedgerValidator;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.ledger.LedgerService;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.LatestSolidMilestoneTracker;
@@ -56,10 +56,10 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     private final LatestMilestoneTracker latestMilestoneTracker;
 
     /**
-     * Holds a reference to the {@link LedgerValidator} that takes care of applying milestones to the ledger
+     * Holds a reference to the {@link LedgerService} that contains the logic for applying milestones to the ledger
      * state.<br />
      */
-    private final LedgerValidator ledgerValidator;
+    private final LedgerService ledgerService;
 
     /**
      * Holds a reference to the ZeroMQ interface that allows us to emit messages for external recipients.<br />
@@ -93,18 +93,18 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
      * @param milestoneService the class that contains the important business logic when dealing with milestones
      * @param latestMilestoneTracker the manager that keeps track of the latest milestone
-     * @param ledgerValidator the manager for
+     * @param ledgerService the manager for
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
      */
     public LatestSolidMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
-            MilestoneService milestoneService, LatestMilestoneTracker latestMilestoneTracker,
-            LedgerValidator ledgerValidator, MessageQ messageQ) {
+            MilestoneService milestoneService, LedgerService ledgerService,
+            LatestMilestoneTracker latestMilestoneTracker, MessageQ messageQ) {
 
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.milestoneService = milestoneService;
+        this.ledgerService = ledgerService;
         this.latestMilestoneTracker = latestMilestoneTracker;
-        this.ledgerValidator = ledgerValidator;
         this.messageQ = messageQ;
     }
 
@@ -158,7 +158,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * @throws Exception if anything unexpected goes wrong while applying the milestone to the ledger
      */
     private void applySolidMilestoneToLedger(MilestoneViewModel milestoneViewModel) throws Exception {
-        if (!ledgerValidator.applyMilestoneToLedger(milestoneViewModel)) {
+        if (!ledgerService.applyMilestoneToLedger(tangle, snapshotProvider, messageQ, milestoneViewModel)) {
             revertPrecedingMilestones(milestoneViewModel);
         } else {
             resetRepairBackoffCounterIfProblemSolved(milestoneViewModel);
@@ -243,7 +243,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         }
 
         for (int i = errorCausingMilestone.index(); i > errorCausingMilestone.index() - repairBackoffCounter; i--) {
-            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, i, "updateLatestSolidSubtangleMilestone");
+            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, messageQ, i, "updateLatestSolidSubtangleMilestone");
         }
      }
 }
