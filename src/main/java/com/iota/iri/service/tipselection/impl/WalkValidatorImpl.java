@@ -66,7 +66,7 @@ public class WalkValidatorImpl implements WalkValidator {
                 snapshotProvider.getLatestSnapshot().getIndex() - config.getMaxDepth())) {
             log.debug("Validation failed: {} is below max depth", transactionHash);
             return false;
-        } else if (!ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, myApprovedHashes, myDiff, transactionViewModel.getHash())) {
+        } else if (!ledgerService.isBalanceDiffConsistent(myApprovedHashes, myDiff, transactionViewModel.getHash())) {
             log.debug("Validation failed: {} is not consistent", transactionHash);
             return false;
         }

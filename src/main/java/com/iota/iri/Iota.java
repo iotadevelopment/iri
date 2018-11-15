@@ -87,18 +87,25 @@ public class Iota {
     public Iota(IotaConfig configuration) throws SnapshotException, TransactionPruningException {
         this.configuration = configuration;
 
-        // initialize services (least amount of dependencies)
-        snapshotService = new SnapshotServiceImpl();
-        milestoneService = new MilestoneServiceImpl(snapshotService);
-        ledgerService = new LedgerServiceImpl(snapshotService, milestoneService);
+        // initialize instances with 0 dependency
+        tangle = new Tangle();
 
         // initialize instances with 1 dependency
-        tangle = new Tangle();
+        snapshotProvider = new SnapshotProviderImpl(configuration);
+        messageQ = MessageQ.createWith(configuration);
+
+        // initialize instances with 3 dependencies
+        snapshotService = new SnapshotServiceImpl(tangle, snapshotProvider, configuration);
+
+        // initialize instances with 5 dependencies
+        milestoneService = new MilestoneServiceImpl(tangle, snapshotProvider, snapshotService, messageQ, configuration);
+        ledgerService = new LedgerServiceImpl(tangle, snapshotProvider, snapshotService, milestoneService);
+
+
         tipsViewModel = new TipsViewModel();
 
         // initialize instances with 2 dependency
-        snapshotProvider = new SnapshotProviderImpl(configuration);
-        messageQ = MessageQ.createWith(configuration);
+
 
         transactionPruner = new AsyncTransactionPruner(tangle, tipsViewModel, snapshotProvider.getInitialSnapshot(), configuration);
         transactionPruner.restoreState();

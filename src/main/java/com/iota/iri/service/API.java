@@ -1091,7 +1091,7 @@ public class API {
                 if (!TransactionViewModel.exists(instance.tangle, tip)) {
                     return ErrorResponse.create("Tip not found: " + tip.toString());
                 }
-                if (!instance.ledgerService.isBalanceDiffConsistent(instance.tangle, instance.snapshotProvider, visitedHashes, diff, tip)) {
+                if (!instance.ledgerService.isBalanceDiffConsistent(visitedHashes, diff, tip)) {
                     return ErrorResponse.create("Tips are not consistent");
                 }
             }

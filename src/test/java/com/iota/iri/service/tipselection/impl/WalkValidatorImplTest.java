@@ -64,7 +64,7 @@ public class WalkValidatorImplTest {
         tx.updateSolid(true);
         tx.store(tangle, snapshotProvider.getInitialSnapshot());
         Hash hash = tx.getHash();
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(depth);
 
@@ -79,7 +79,7 @@ public class WalkValidatorImplTest {
         tx.store(tangle, snapshotProvider.getInitialSnapshot());
         Hash hash = tx.getTrunkTransactionHash();
         tx.updateSolid(true);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(depth);
 
@@ -93,7 +93,7 @@ public class WalkValidatorImplTest {
         tx.store(tangle, snapshotProvider.getInitialSnapshot());
         Hash hash = tx.getHash();
         tx.updateSolid(true);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
 
@@ -107,7 +107,7 @@ public class WalkValidatorImplTest {
         tx.store(tangle, snapshotProvider.getInitialSnapshot());
         Hash hash = tx.getHash();
         tx.updateSolid(false);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
 
@@ -123,7 +123,7 @@ public class WalkValidatorImplTest {
         tx.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), 2);
         Hash hash = tx.getHash();
         tx.updateSolid(true);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService,
@@ -146,7 +146,7 @@ public class WalkValidatorImplTest {
             hash = tx.getHash();
             tx.store(tangle, snapshotProvider.getInitialSnapshot());
         }
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(100);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
@@ -170,7 +170,7 @@ public class WalkValidatorImplTest {
             tx.updateSolid(true);
             tx.store(tangle, snapshotProvider.getInitialSnapshot());
         }
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(100);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
@@ -191,7 +191,7 @@ public class WalkValidatorImplTest {
             hash = tx.getHash();
             tx.store(tangle, snapshotProvider.getInitialSnapshot());
         }
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), tx.getHash()))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), tx.getHash()))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(15);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
@@ -214,7 +214,7 @@ public class WalkValidatorImplTest {
             tx.store(tangle, snapshotProvider.getInitialSnapshot());
             hash = tx.getHash();
         }
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), tx.getHash()))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), tx.getHash()))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(17);
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
@@ -229,7 +229,7 @@ public class WalkValidatorImplTest {
         tx.store(tangle, snapshotProvider.getInitialSnapshot());
         Hash hash = tx.getHash();
         tx.updateSolid(true);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), hash))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(false);
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
 
@@ -270,9 +270,9 @@ public class WalkValidatorImplTest {
         tx4.updateSolid(true);
         tx4.store(tangle, snapshotProvider.getInitialSnapshot());
 
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), tx4.getHash()))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), tx4.getHash()))
                 .thenReturn(true);
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), tx2.getHash()))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), tx2.getHash()))
                 .thenReturn(true);
 
         snapshotProvider.getLatestSnapshot().setIndex(100);
@@ -315,7 +315,7 @@ public class WalkValidatorImplTest {
         tx4.updateSolid(true);
         tx4.store(tangle, snapshotProvider.getInitialSnapshot());
 
-        Mockito.when(ledgerService.isBalanceDiffConsistent(tangle, snapshotProvider, new HashSet<>(), new HashMap<>(), tx4.getHash()))
+        Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), tx4.getHash()))
                 .thenReturn(true);
 
         snapshotProvider.getLatestSnapshot().setIndex(100);

@@ -92,7 +92,7 @@ public class TipSelectorImpl implements TipSelector {
             tips.add(tip);
 
             //validate
-            if (!ledgerService.tipsConsistent(tangle, snapshotProvider, tips)) {
+            if (!ledgerService.tipsConsistent(tips)) {
                 throw new IllegalStateException(TIPS_NOT_CONSISTENT);
             }
 
