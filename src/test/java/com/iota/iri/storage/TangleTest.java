@@ -45,7 +45,7 @@ public class TangleTest {
     }
 
     @Test
-    public void save() {
+    public void save() throws Exception {
     }
 
     @Test
@@ -58,7 +58,7 @@ public class TangleTest {
     }
 
     @Test
-    public void get() {
+    public void get() throws Exception {
     }
 
     public static byte[] getRandomTransactionTrits() {

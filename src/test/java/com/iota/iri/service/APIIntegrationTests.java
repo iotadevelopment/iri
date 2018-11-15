@@ -84,7 +84,7 @@ public class APIIntegrationTests {
             ixi = new IXI(iota);
             api = new API(iota, ixi);
 
-            //start
+            //init
             try {
                 iota.init();
                 iota.snapshotProvider.getInitialSnapshot().setTimestamp(0);
