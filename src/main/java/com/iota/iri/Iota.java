@@ -4,15 +4,26 @@ import com.iota.iri.conf.IotaConfig;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.network.Node;
 import com.iota.iri.network.TransactionRequester;
 import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
+import com.iota.iri.service.ledger.LedgerService;
+import com.iota.iri.service.ledger.impl.LedgerServiceImpl;
+import com.iota.iri.service.milestone.LatestMilestoneTracker;
+import com.iota.iri.service.milestone.LatestSolidMilestoneTracker;
+import com.iota.iri.service.milestone.MilestoneService;
+import com.iota.iri.service.milestone.MilestoneSolidifier;
+import com.iota.iri.service.milestone.impl.LatestMilestoneTrackerImpl;
+import com.iota.iri.service.milestone.impl.LatestSolidMilestoneTrackerImpl;
+import com.iota.iri.service.milestone.impl.MilestoneServiceImpl;
+import com.iota.iri.service.milestone.impl.MilestoneSolidifierImpl;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
+import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
+import com.iota.iri.service.snapshot.impl.SnapshotServiceImpl;
 import com.iota.iri.service.tipselection.EntryPointSelector;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.service.tipselection.TailFinder;
@@ -44,8 +55,9 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
-    public final LedgerValidator ledgerValidator;
-    public final MilestoneTracker milestoneTracker;
+    public final LedgerService ledgerService;
+    public final LatestMilestoneTracker latestMilestoneTracker;
+    public final LatestSolidMilestoneTracker latestSolidMilestoneTracker;
     public final Tangle tangle;
     public final SnapshotProvider snapshotProvider;
     public final TransactionValidator transactionValidator;
@@ -58,10 +70,12 @@ public class Iota {
     public final TipsViewModel tipsViewModel;
     public final MessageQ messageQ;
     public final TipSelector tipsSelector;
+    public final SnapshotService snapshotService;
+    public final MilestoneService milestoneService;
+    public final MilestoneSolidifier milestoneSolidifier;
 
     public Iota(IotaConfig configuration) throws SnapshotException, IOException {
         this.configuration = configuration;
-        Snapshot initialSnapshot = Snapshot.init(configuration).clone();
         tangle = new Tangle();
         messageQ = MessageQ.createWith(configuration);
         tipsViewModel = new TipsViewModel();
@@ -69,12 +83,16 @@ public class Iota {
         transactionRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
         transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel,
                 transactionRequester);
-        milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, messageQ, initialSnapshot, configuration);
-        node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, milestoneTracker, messageQ,
+        snapshotService = new SnapshotServiceImpl();
+        milestoneService = new MilestoneServiceImpl(snapshotService);
+        ledgerService = new LedgerServiceImpl(snapshotService, milestoneService);
+        milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
+        latestMilestoneTracker = new LatestMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, milestoneSolidifier, messageQ, configuration);
+        latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl(tangle, snapshotProvider, milestoneService, ledgerService, latestMilestoneTracker, messageQ);
+        node = new Node(tangle, snapshotProvider.getInitialSnapshot(), transactionValidator, transactionRequester, tipsViewModel, latestMilestoneTracker, messageQ,
                 configuration);
         replicator = new Replicator(node, configuration);
         udpReceiver = new UDPReceiver(node, configuration);
-        ledgerValidator = new LedgerValidator(tangle, snapshotProvider, milestoneTracker, transactionRequester, messageQ);
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(configuration);
     }
@@ -92,7 +110,7 @@ public class Iota {
             tangle.clearColumn(com.iota.iri.model.StateDiff.class);
             tangle.clearMetadata(com.iota.iri.model.persistables.Transaction.class);
         }
-        milestoneTracker.init(SpongeFactory.Mode.CURLP27, 1, ledgerValidator);
+        latestMilestoneTracker.start();
         transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
         transactionRequester.init(configuration.getpRemoveRequest());
@@ -127,7 +145,7 @@ public class Iota {
     }
 
     public void shutdown() throws Exception {
-        milestoneTracker.shutDown();
+        latestMilestoneTracker.shutdown();
         tipsSolidifier.shutdown();
         node.shutdown();
         udpReceiver.shutdown();
@@ -156,11 +174,11 @@ public class Iota {
     }
 
     private TipSelector createTipSelector(TipSelConfig config) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider, milestoneTracker);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
-        return new TipSelectorImpl(tangle, snapshotProvider, ledgerValidator, entryPointSelector, ratingCalculator,
-                walker, milestoneTracker, config);
+        return new TipSelectorImpl(tangle, snapshotProvider, ledgerService, entryPointSelector, ratingCalculator,
+                walker, config);
     }
 }

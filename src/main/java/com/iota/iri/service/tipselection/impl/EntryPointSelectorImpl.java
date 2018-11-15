@@ -1,6 +1,5 @@
 package com.iota.iri.service.tipselection.impl;
 
-import com.iota.iri.MilestoneTracker;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.SnapshotProvider;
@@ -16,24 +15,22 @@ public class EntryPointSelectorImpl implements EntryPointSelector {
 
     private final Tangle tangle;
     private final SnapshotProvider snapshotProvider;
-    private final MilestoneTracker milestoneTracker;
 
-    public EntryPointSelectorImpl(Tangle tangle, SnapshotProvider snapshotProvider, MilestoneTracker milestoneTracker) {
+    public EntryPointSelectorImpl(Tangle tangle, SnapshotProvider snapshotProvider) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
-        this.milestoneTracker = milestoneTracker;
     }
 
     @Override
     public Hash getEntryPoint(int depth) throws Exception {
-        int milestoneIndex = Math.max(milestoneTracker.latestSolidSubtangleMilestoneIndex - depth - 1,
+        int milestoneIndex = Math.max(snapshotProvider.getLatestSnapshot().getIndex() - depth - 1,
                 snapshotProvider.getInitialSnapshot().getIndex());
         MilestoneViewModel milestoneViewModel = MilestoneViewModel.findClosestNextMilestone(tangle, milestoneIndex,
-                milestoneTracker.latestMilestoneIndex);
+                snapshotProvider.getLatestSnapshot().getIndex());
         if (milestoneViewModel != null && milestoneViewModel.getHash() != null) {
             return milestoneViewModel.getHash();
         }
 
-        return milestoneTracker.latestSolidSubtangleMilestone;
+        return snapshotProvider.getLatestSnapshot().getHash();
     }
 }

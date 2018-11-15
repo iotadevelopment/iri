@@ -26,8 +26,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class EntryPointSelectorImplTest {
 
     @Mock
-    private MilestoneTracker milestoneTracker;
-    @Mock
     private Tangle tangle;
     private static SnapshotProvider snapshotProvider;
 
@@ -43,7 +41,7 @@ public class EntryPointSelectorImplTest {
         mockTangleBehavior(milestoneHash);
         mockMilestoneTrackerBehavior(snapshotProvider.getInitialSnapshot().getIndex() + 1, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider, milestoneTracker);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the milestone in the Tangle", milestoneHash, entryPoint);
@@ -53,7 +51,7 @@ public class EntryPointSelectorImplTest {
     public void testEntryPointAWithoutTangleData() throws Exception {
         mockMilestoneTrackerBehavior(0, Hash.NULL_HASH);
 
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider, milestoneTracker);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
         Hash entryPoint = entryPointSelector.getEntryPoint(10);
 
         Assert.assertEquals("The entry point should be the last tracked solid milestone", Hash.NULL_HASH, entryPoint);
@@ -61,18 +59,14 @@ public class EntryPointSelectorImplTest {
 
 
     private void mockMilestoneTrackerBehavior(int latestSolidSubtangleMilestoneIndex, Hash latestSolidSubtangleMilestone) {
-        milestoneTracker.latestSolidSubtangleMilestoneIndex = latestSolidSubtangleMilestoneIndex;
-        milestoneTracker.latestMilestoneIndex = latestSolidSubtangleMilestoneIndex;
-        milestoneTracker.latestSolidSubtangleMilestone = latestSolidSubtangleMilestone;
-        milestoneTracker.latestMilestone = latestSolidSubtangleMilestone;
+        snapshotProvider.getLatestSnapshot().setIndex(latestSolidSubtangleMilestoneIndex);
+        snapshotProvider.getLatestSnapshot().setHash(latestSolidSubtangleMilestone);
     }
 
     private void mockTangleBehavior(Hash milestoneModelHash) throws Exception {
         com.iota.iri.model.persistables.Milestone milestoneModel = new com.iota.iri.model.persistables.Milestone();
         milestoneModel.index = new IntegerIndex(snapshotProvider.getInitialSnapshot().getIndex() + 1);
         milestoneModel.hash = milestoneModelHash;
-        Mockito.when(milestoneTracker.getMilestoneStartIndex()).thenReturn(0);
-        milestoneTracker.latestMilestoneIndex = 1;
         Mockito.when(tangle.load(com.iota.iri.model.persistables.Milestone.class, milestoneModel.index))
                 .thenReturn(milestoneModel);
     }

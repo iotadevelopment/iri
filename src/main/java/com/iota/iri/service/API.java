@@ -457,10 +457,10 @@ public class API {
         }
 
         if (state) {
-            instance.milestoneTracker.latestSnapshot.rwlock.readLock().lock();
+            instance.snapshotProvider.getLatestSnapshot().lockRead();
             try {
-                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotProvider, instance.ledgerValidator,
-                        instance.milestoneTracker, instance.configuration);
+                WalkValidatorImpl walkValidator = new WalkValidatorImpl(instance.tangle, instance.snapshotProvider, instance.ledgerService,
+                        instance.configuration);
                 for (Hash transaction : transactions) {
                     if (!walkValidator.isValid(transaction)) {
                         state = false;
@@ -469,7 +469,7 @@ public class API {
                     }
                 }
             } finally {
-                instance.milestoneTracker.latestSnapshot.rwlock.readLock().unlock();
+                instance.snapshotProvider.getLatestSnapshot().unlockRead();
             }
         }
 
@@ -537,7 +537,7 @@ public class API {
     }
 
     public boolean invalidSubtangleStatus() {
-        return (instance.milestoneTracker.latestSolidSubtangleMilestoneIndex == milestoneStartIndex);
+        return (instance.snapshotProvider.getLatestSnapshot().getIndex() == milestoneStartIndex);
     }
 
     /**
@@ -721,9 +721,9 @@ public class API {
         String name = instance.configuration.isTestnet() ? IRI.TESTNET_NAME : IRI.MAINNET_NAME;
         return GetNodeInfoResponse.create(name, IRI.VERSION, Runtime.getRuntime().availableProcessors(),
                 Runtime.getRuntime().freeMemory(), System.getProperty("java.version"), Runtime.getRuntime().maxMemory(),
-                Runtime.getRuntime().totalMemory(), instance.milestoneTracker.latestMilestone, instance.milestoneTracker
-                        .latestMilestoneIndex,
-                instance.milestoneTracker.latestSolidSubtangleMilestone, instance.milestoneTracker.latestSolidSubtangleMilestoneIndex, instance.milestoneTracker.milestoneStartIndex,
+                Runtime.getRuntime().totalMemory(), instance.latestMilestoneTracker.getLatestMilestoneHash(), instance.latestMilestoneTracker
+                        .getLatestMilestoneIndex(),
+                instance.snapshotProvider.getLatestSnapshot().getHash(), instance.snapshotProvider.getLatestSnapshot().getIndex(), instance.snapshotProvider.getInitialSnapshot().getIndex(),
                 instance.node.howManyNeighbors(), instance.node.queuedTransactionsSize(),
                 System.currentTimeMillis(), instance.tipsViewModel.size(),
                 instance.transactionRequester.numberOfTransactionsToRequest(),
@@ -996,17 +996,17 @@ public class API {
                 .collect(Collectors.toCollection(LinkedList::new));
         final List<Hash> hashes;
         final Map<Hash, Long> balances = new HashMap<>();
-        instance.milestoneTracker.latestSnapshot.rwlock.readLock().lock();
-        final int index = instance.milestoneTracker.latestSnapshot.index();
+        instance.snapshotProvider.getLatestSnapshot().lockRead();
+        final int index = instance.snapshotProvider.getLatestSnapshot().getIndex();
         if (tips == null || tips.size() == 0) {
-            hashes = Collections.singletonList(instance.milestoneTracker.latestSolidSubtangleMilestone);
+            hashes = Collections.singletonList(instance.snapshotProvider.getLatestSnapshot().getHash());
         } else {
             hashes = tips.stream().map(tip -> (HashFactory.TRANSACTION.create(tip)))
                     .collect(Collectors.toCollection(LinkedList::new));
         }
         try {
             for (final Hash address : addressList) {
-                Long value = instance.milestoneTracker.latestSnapshot.getBalance(address);
+                Long value = instance.snapshotProvider.getLatestSnapshot().getBalance(address);
                 if (value == null) {
                     value = 0L;
                 }
@@ -1022,13 +1022,13 @@ public class API {
                 if (!TransactionViewModel.exists(instance.tangle, tip)) {
                     return ErrorResponse.create("Tip not found: " + tip.toString());
                 }
-                if (!instance.ledgerValidator.updateDiff(visitedHashes, diff, tip)) {
+                if (!instance.ledgerService.isBalanceDiffConsistent(instance.tangle, instance.snapshotProvider, visitedHashes, diff, tip)) {
                     return ErrorResponse.create("Tips are not consistent");
                 }
             }
             diff.forEach((key, value) -> balances.computeIfPresent(key, (hash, aLong) -> value + aLong));
         } finally {
-            instance.milestoneTracker.latestSnapshot.rwlock.readLock().unlock();
+            instance.snapshotProvider.getLatestSnapshot().unlockRead();
         }
 
         final List<String> elements = addressList.stream().map(address -> balances.get(address).toString())
