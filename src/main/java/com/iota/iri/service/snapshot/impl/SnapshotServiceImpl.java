@@ -225,7 +225,6 @@ public class SnapshotServiceImpl implements SnapshotService {
      */
     @Override
     public Map<Hash, Integer> generateSolidEntryPoints(MilestoneViewModel targetMilestone) throws SnapshotException {
-
         Map<Hash, Integer> solidEntryPoints = new HashMap<>();
         solidEntryPoints.put(Hash.NULL_HASH, targetMilestone.index());
 

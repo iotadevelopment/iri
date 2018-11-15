@@ -105,8 +105,8 @@ public class LedgerServiceImpl implements LedgerService {
             return true;
         }
         Set<Hash> visitedHashes = new HashSet<>(approvedHashes);
-        Map<Hash, Long> currentState = generateBalanceDiff(visitedHashes, tip, snapshotProvider.getLatestSnapshot()
-                .getIndex());
+        Map<Hash, Long> currentState = generateBalanceDiff(visitedHashes, tip,
+                snapshotProvider.getLatestSnapshot().getIndex());
         if (currentState == null) {
             return false;
         }
