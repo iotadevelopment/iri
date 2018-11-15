@@ -248,7 +248,7 @@ public class CumulativeWeightCalculatorTest {
 
     @Test
     public void testTangleWithCircle2() throws Exception {
-        TransactionViewModel transaction, transaction1, transaction2, transaction3;
+        TransactionViewModel transaction, transaction1, transaction2, transaction3, transaction4;
         Hash randomTransactionHash2 = getRandomTransactionHash();
         transaction = new TransactionViewModel(getRandomTransactionWithTrunkAndBranch(
                 randomTransactionHash2, randomTransactionHash2), getRandomTransactionHash());

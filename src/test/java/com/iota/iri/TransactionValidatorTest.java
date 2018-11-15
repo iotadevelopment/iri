@@ -46,7 +46,6 @@ public class TransactionValidatorTest {
     TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
     txValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), tipsViewModel, txRequester);
     txValidator.setMwm(false, MAINNET_MWM);
-    txValidator.init(false, MAINNET_MWM);
   }
 
   @AfterClass
@@ -79,7 +78,7 @@ public class TransactionValidatorTest {
   }
 
   @Test
-  public void validateBytesWithNewCurl() {
+  public void validateBytesWithNewCurl() throws Exception {
     byte[] trits = getRandomTransactionTrits();
     Converter.copyTrits(0, trits, 0, trits.length);
     byte[] bytes = Converter.allocateBytesForTrits(trits.length);
