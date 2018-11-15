@@ -18,8 +18,10 @@ public interface LatestSolidMilestoneTracker {
      * <br />
      * It takes care of applying the solid milestones in the correct order by only allowing solid milestones to be
      * applied that are directly following our current latest solid milestone.<br />
+     *
+     * @throws MilestoneException if anything unexpected happens while updating the latest solid milestone
      */
-    void checkForNewLatestSolidMilestones();
+    void checkForNewLatestSolidMilestones() throws MilestoneException;
 
     /**
      * This method starts the background worker that automatically calls {@link #checkForNewLatestSolidMilestones()}

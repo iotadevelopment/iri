@@ -11,6 +11,7 @@ import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.StateDiff;
+import com.iota.iri.service.milestone.MilestoneException;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.MilestoneValidity;
 import com.iota.iri.service.snapshot.Snapshot;
@@ -33,11 +34,13 @@ import static com.iota.iri.service.milestone.MilestoneValidity.INVALID;
 import static com.iota.iri.service.milestone.MilestoneValidity.VALID;
 
 /**
- * Implements the basic contract of the {@link MilestoneService}.
+ * Represents the service that contains all the relevant business logic for interacting with milestones.<br />
+ * <br />
+ * This class is stateless and does not hold any domain specific models.<br />
  */
 public class MilestoneServiceImpl implements MilestoneService {
     /**
-     * Holds the logger of this class (gets used to issue error messages).<br />
+     * Holds the logger of this class.<br />
      */
     private final static Logger log = LoggerFactory.getLogger(MilestoneServiceImpl.class);
 
@@ -61,10 +64,10 @@ public class MilestoneServiceImpl implements MilestoneService {
 
     @Override
     public void updateMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
-            MessageQ messageQ, Hash milestoneHash, int newIndex) throws Exception {
+            MessageQ messageQ, Hash milestoneHash, int newIndex) throws MilestoneException {
 
         if (newIndex <= 0) {
-            throw new Exception("the new index needs to be bigger than 0 " +
+            throw new MilestoneException("the new index needs to be bigger than 0 " +
                     "(use resetCorruptedMilestone to reset the milestone index)");
         }
 
@@ -74,87 +77,108 @@ public class MilestoneServiceImpl implements MilestoneService {
     /**
      * {@inheritDoc}
      * <br />
-     * We redirect the call to {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, MessageQ, int, String, HashSet)} while
+     * We redirect the call to {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, MessageQ, int, HashSet)} while
      * initiating the set of {@code processedTransactions} with an empty {@link HashSet} which will ensure that we reset
      * all found transactions.<br />
      */
     @Override
     public void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, MessageQ messageQ,
-            int milestoneIndex, String identifier) {
+            int milestoneIndex) throws MilestoneException {
 
-        resetCorruptedMilestone(tangle, snapshotProvider, messageQ, milestoneIndex, identifier, new HashSet<>());
+        resetCorruptedMilestone(tangle, snapshotProvider, messageQ, milestoneIndex, new HashSet<>());
     }
 
     @Override
     public MilestoneValidity validateMilestone(Tangle tangle, SnapshotProvider snapshotProvider, MessageQ messageQ,
             IotaConfig config, TransactionViewModel transactionViewModel, SpongeFactory.Mode mode, int securityLevel)
-            throws Exception {
+            throws MilestoneException {
 
         int milestoneIndex = getMilestoneIndex(transactionViewModel);
         if (milestoneIndex < 0 || milestoneIndex >= 0x200000) {
             return INVALID;
         }
 
-        if (MilestoneViewModel.get(tangle, milestoneIndex) != null) {
-            // Already validated.
-            return VALID;
-        }
-        final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle, snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash());
-        if (bundleTransactions.size() == 0) {
-            return INCOMPLETE;
-        } else {
-            for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
-                final TransactionViewModel tail = bundleTransactionViewModels.get(0);
-                if (tail.getHash().equals(transactionViewModel.getHash())) {
-                    //the signed transaction - which references the confirmed transactions and contains
-                    // the Merkle tree siblings.
-                    final TransactionViewModel siblingsTx = bundleTransactionViewModels.get(securityLevel);
+        try {
+            if (MilestoneViewModel.get(tangle, milestoneIndex) != null) {
+                // Already validated.
+                return VALID;
+            }
 
-                    if (isMilestoneBundleStructureValid(bundleTransactionViewModels, securityLevel)) {
-                        //milestones sign the normalized hash of the sibling transaction.
-                        byte[] signedHash = ISS.normalizedBundle(siblingsTx.getHash().trits());
+            final List<List<TransactionViewModel>> bundleTransactions = BundleValidator.validate(tangle,
+                    snapshotProvider.getInitialSnapshot(), transactionViewModel.getHash());
 
-                        //validate leaf signature
-                        ByteBuffer bb = ByteBuffer.allocate(Curl.HASH_LENGTH * securityLevel);
-                        byte[] digest = new byte[Curl.HASH_LENGTH];
+            if (bundleTransactions.size() == 0) {
+                return INCOMPLETE;
+            } else {
+                for (final List<TransactionViewModel> bundleTransactionViewModels : bundleTransactions) {
+                    final TransactionViewModel tail = bundleTransactionViewModels.get(0);
+                    if (tail.getHash().equals(transactionViewModel.getHash())) {
+                        //the signed transaction - which references the confirmed transactions and contains
+                        // the Merkle tree siblings.
+                        final TransactionViewModel siblingsTx = bundleTransactionViewModels.get(securityLevel);
 
-                        for (int i = 0; i < securityLevel; i++) {
-                            ISSInPlace.digest(mode, signedHash, ISS.NUMBER_OF_FRAGMENT_CHUNKS * i,
-                                    bundleTransactionViewModels.get(i).getSignature(), 0, digest);
-                            bb.put(digest);
-                        }
+                        if (isMilestoneBundleStructureValid(bundleTransactionViewModels, securityLevel)) {
+                            //milestones sign the normalized hash of the sibling transaction.
+                            byte[] signedHash = ISS.normalizedBundle(siblingsTx.getHash().trits());
 
-                        byte[] digests = bb.array();
-                        byte[] address = ISS.address(mode, digests);
+                            //validate leaf signature
+                            ByteBuffer bb = ByteBuffer.allocate(Curl.HASH_LENGTH * securityLevel);
+                            byte[] digest = new byte[Curl.HASH_LENGTH];
 
-                        //validate Merkle path
-                        byte[] merkleRoot = ISS.getMerkleRoot(mode, address,
-                                siblingsTx.trits(), 0, milestoneIndex, config.getNumberOfKeysInMilestone());
-                        if ((config.isTestnet() && config.isDontValidateTestnetMilestoneSig()) || (HashFactory.ADDRESS.create(merkleRoot)).equals(HashFactory.ADDRESS.create(config.getCoordinator()))) {
-                            MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(milestoneIndex, transactionViewModel.getHash());
-                            newMilestoneViewModel.store(tangle);
-
-                            // if we find a NEW milestone that should have been processed before our latest solid
-                            // milestone -> reset the ledger state and check the milestones again
-                            //
-                            // NOTE: this can happen if a new subtangle becomes solid before a previous one while syncing
-                            if(milestoneIndex < snapshotProvider.getLatestSnapshot().getIndex() && milestoneIndex > snapshotProvider.getInitialSnapshot().getIndex()) {
-                                resetCorruptedMilestone(tangle, snapshotProvider, messageQ, newMilestoneViewModel.index(), "validateMilestone");
+                            for (int i = 0; i < securityLevel; i++) {
+                                ISSInPlace.digest(mode, signedHash, ISS.NUMBER_OF_FRAGMENT_CHUNKS * i,
+                                        bundleTransactionViewModels.get(i).getSignature(), 0, digest);
+                                bb.put(digest);
                             }
-                            return VALID;
-                        } else {
-                            return INVALID;
+
+                            byte[] digests = bb.array();
+                            byte[] address = ISS.address(mode, digests);
+
+                            //validate Merkle path
+                            byte[] merkleRoot = ISS.getMerkleRoot(mode, address,
+                                    siblingsTx.trits(), 0, milestoneIndex, config.getNumberOfKeysInMilestone());
+                            if ((config.isTestnet() && config.isDontValidateTestnetMilestoneSig()) ||
+                                    (HashFactory.ADDRESS.create(merkleRoot)).equals(
+                                            HashFactory.ADDRESS.create(config.getCoordinator()))) {
+
+                                MilestoneViewModel newMilestoneViewModel = new MilestoneViewModel(milestoneIndex,
+                                        transactionViewModel.getHash());
+                                newMilestoneViewModel.store(tangle);
+
+                                // if we find a NEW milestone that should have been processed before our latest solid
+                                // milestone -> reset the ledger state and check the milestones again
+                                //
+                                // NOTE: this can happen if a new subtangle becomes solid before a previous one while
+                                //       syncing
+                                if (milestoneIndex < snapshotProvider.getLatestSnapshot().getIndex() &&
+                                        milestoneIndex > snapshotProvider.getInitialSnapshot().getIndex()) {
+
+                                    resetCorruptedMilestone(tangle, snapshotProvider, messageQ,
+                                            newMilestoneViewModel.index());
+                                }
+                                return VALID;
+                            } else {
+                                return INVALID;
+                            }
                         }
                     }
                 }
             }
+        } catch (Exception e) {
+            throw new MilestoneException("error while checking milestone status of " + transactionViewModel, e);
         }
+
         return INVALID;
     }
 
     @Override
     public int getMilestoneIndex(TransactionViewModel milestoneTransaction) {
         return (int) Converter.longValue(milestoneTransaction.trits(), OBSOLETE_TAG_TRINARY_OFFSET, 15);
+    }
+
+    @Override
+    public boolean transactionBelongsToMilestone(TransactionViewModel transaction, int milestoneIndex) {
+        return transaction.snapshotIndex() == 0 || transaction.snapshotIndex() >= milestoneIndex;
     }
 
     //endregion ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,40 +197,44 @@ public class MilestoneServiceImpl implements MilestoneService {
      * @param correctIndex the milestone index of the milestone that would be set if all transactions are marked
      *                     correctly
      * @param newIndex the milestone index that shall be set
-     * @throws Exception if anything unexpected happens while updating the milestone index
+     * @throws MilestoneException if anything unexpected happens while updating the milestone index
      * @param processedTransactions a set of transactions that have been processed already (for the recursive calls)
      */
     private void updateMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
             MessageQ messageQ, Hash milestoneHash, int correctIndex, int newIndex, HashSet<Hash> processedTransactions)
-            throws Exception {
+            throws MilestoneException {
 
         processedTransactions.add(milestoneHash);
 
         Set<Integer> inconsistentMilestones = new HashSet<>();
         Set<TransactionViewModel> transactionsToUpdate = new HashSet<>();
 
-        prepareMilestoneIndexUpdate(TransactionViewModel.fromHash(tangle, milestoneHash), correctIndex, newIndex,
-                inconsistentMilestones, transactionsToUpdate);
+        try {
+            prepareMilestoneIndexUpdate(TransactionViewModel.fromHash(tangle, milestoneHash), correctIndex, newIndex,
+                    inconsistentMilestones, transactionsToUpdate);
 
-        DAGHelper.get(tangle).traverseApprovees(
-            milestoneHash,
-            currentTransaction -> {
-                if (transactionBelongsToMilestone(currentTransaction, correctIndex)) {
-                    return true;
-                } else {
-                    patchSolidEntryPointsIfNecessary(snapshotProvider.getInitialSnapshot(), currentTransaction);
+            DAGHelper.get(tangle).traverseApprovees(
+                milestoneHash,
+                currentTransaction -> {
+                    if (transactionBelongsToMilestone(currentTransaction, correctIndex)) {
+                        return true;
+                    } else {
+                        patchSolidEntryPointsIfNecessary(snapshotProvider.getInitialSnapshot(), currentTransaction);
 
-                    return false;
-                }
-            },
-            currentTransaction -> prepareMilestoneIndexUpdate(currentTransaction, correctIndex, newIndex,
-                    inconsistentMilestones, transactionsToUpdate),
-            processedTransactions
-        );
+                        return false;
+                    }
+                },
+                currentTransaction -> prepareMilestoneIndexUpdate(currentTransaction, correctIndex, newIndex,
+                        inconsistentMilestones, transactionsToUpdate),
+                processedTransactions
+            );
+        } catch (Exception e) {
+            throw new MilestoneException("error while updating the milestone index", e);
+        }
 
         for(int inconsistentMilestoneIndex : inconsistentMilestones) {
             resetCorruptedMilestone(tangle, snapshotProvider, messageQ, inconsistentMilestoneIndex,
-                    "updateMilestoneIndexOfMilestoneTransactions", processedTransactions);
+                    processedTransactions);
         }
 
         for (TransactionViewModel transactionToUpdate : transactionsToUpdate) {
@@ -225,12 +253,16 @@ public class MilestoneServiceImpl implements MilestoneService {
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients [dependency]
      * @param transaction the transaction that shall have its {@code milestoneIndex} reset
      * @param newIndex the milestone index that is set for the given transaction
-     * @throws Exception if anything unexpected happens while updating the transaction
+     * @throws MilestoneException if anything unexpected happens while updating the transaction
      */
     private void updateMilestoneIndexOfSingleTransaction(Tangle tangle, SnapshotProvider snapshotProvider,
-            MessageQ messageQ, TransactionViewModel transaction, int newIndex) throws Exception {
+            MessageQ messageQ, TransactionViewModel transaction, int newIndex) throws MilestoneException {
 
-        transaction.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), newIndex);
+        try {
+            transaction.setSnapshot(tangle, snapshotProvider.getInitialSnapshot(), newIndex);
+        } catch (Exception e) {
+            throw new MilestoneException("error while updating the snapshotIndex of " + transaction, e);
+        }
 
         messageQ.publish("%s %s %d sn", transaction.getAddressHash(), transaction.getHash(), newIndex);
         messageQ.publish("sn %d %s %s %s %s %s", newIndex, transaction.getHash(), transaction.getAddressHash(),
@@ -287,22 +319,6 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     /**
-     * This method checks if the given transaction "belongs" to the milestone with the given index.<br />
-     * <br />
-     * We determine if a transaction still belongs to the milestone with the given index by examining its
-     * {@code snapshotIndex} value. For this method to work we require that the previous milestones have been processed
-     * already (which is enforce by the {@link com.iota.iri.service.milestone.LatestSolidMilestoneTracker} which applies
-     * the milestones in the order that they are issued by the coordinator).<br />
-     *
-     * @param transaction the transaction that shall be examined
-     * @param milestoneIndex the milestone index that we want to check against
-     * @return {@code true} if the transaction belongs to the milestone and {@code false} otherwise
-     */
-    private boolean transactionBelongsToMilestone(TransactionViewModel transaction, int milestoneIndex) {
-        return transaction.snapshotIndex() == 0 || transaction.snapshotIndex() >= milestoneIndex;
-    }
-
-    /**
      * This method is a utility method that checks if the transactions belonging to the potential milestone bundle have
      * a valid structure (used during the validation of milestones).<br />
      * <br />
@@ -327,7 +343,7 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     /**
-     * This method does the same as {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, MessageQ, int, String)} but
+     * This method does the same as {@link #resetCorruptedMilestone(Tangle, SnapshotProvider, MessageQ, int)} but
      * additionally receives a set of {@code processedTransactions} that will allow us to not process the same
      * transactions over and over again while resetting additional milestones in recursive calls.<br />
      * <br />
@@ -342,17 +358,17 @@ public class MilestoneServiceImpl implements MilestoneService {
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots [dependency]
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients [dependency]
      * @param milestoneIndex milestone index that shall
-     * @param identifier string identifier for debug messages
      * @param processedTransactions a set of transactions that have been processed already
+     * @throws MilestoneException if anything goes wrong while resetting the corrupted milestone
      */
     private void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, MessageQ messageQ,
-            int milestoneIndex, String identifier, HashSet<Hash> processedTransactions) {
+            int milestoneIndex, HashSet<Hash> processedTransactions) throws MilestoneException {
 
         if(milestoneIndex <= snapshotProvider.getInitialSnapshot().getIndex()) {
             return;
         }
 
-        log.info("resetting corrupted milestone #" + milestoneIndex + " (source: " + identifier + ")");
+        log.info("resetting corrupted milestone #" + milestoneIndex);
 
         try {
             MilestoneViewModel milestoneToRepair = MilestoneViewModel.get(tangle, milestoneIndex);
@@ -362,11 +378,12 @@ public class MilestoneServiceImpl implements MilestoneService {
                             milestoneToRepair.index());
                 }
 
-                updateMilestoneIndexOfMilestoneTransactions(tangle, snapshotProvider, messageQ, milestoneToRepair.getHash(), milestoneToRepair.index(), 0, processedTransactions);
+                updateMilestoneIndexOfMilestoneTransactions(tangle, snapshotProvider, messageQ,
+                        milestoneToRepair.getHash(), milestoneToRepair.index(), 0, processedTransactions);
                 tangle.delete(StateDiff.class, milestoneToRepair.getHash());
             }
         } catch (Exception e) {
-            log.error("failed to repair corrupted milestone with index #" + milestoneIndex, e);
+            throw new MilestoneException("failed to repair corrupted milestone with index #" + milestoneIndex, e);
         }
     }
 

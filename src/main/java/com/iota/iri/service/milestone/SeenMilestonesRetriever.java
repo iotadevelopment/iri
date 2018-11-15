@@ -5,7 +5,7 @@ package com.iota.iri.service.milestone;
  * the local snapshots file.<br />
  * <br />
  * The manager incorporates a background worker that proactively requests the missing milestones until all defined
- * milestones as known. After all milestones have been retrieved the manager shuts down automatically (to free the
+ * milestones are known. After all milestones have been retrieved the manager shuts down automatically (to free the
  * unused resources).<br />
  * <br />
  * Note: When we bootstrap a node with a local snapshot file, we are provided with a list of all seen milestones that

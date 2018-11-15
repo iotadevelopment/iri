@@ -28,11 +28,11 @@ public interface MilestoneService {
      * @param mode mode that gets used for the signature verification
      * @param securityLevel security level that gets used for the signature verification
      * @return validity status of the transaction regarding its role as a milestone
-     * @throws Exception if anything unexpected goes wrong while validating the milestone transaction
+     * @throws MilestoneException if anything unexpected goes wrong while validating the milestone transaction
      */
     MilestoneValidity validateMilestone(Tangle tangle, SnapshotProvider snapshotProvider, MessageQ messageQ,
             IotaConfig config, TransactionViewModel transactionViewModel, SpongeFactory.Mode mode, int securityLevel)
-            throws Exception;
+            throws MilestoneException;
 
     /**
      * This method updates the milestone index of all transactions that belong to a milestone.<br />
@@ -58,10 +58,10 @@ public interface MilestoneService {
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients [dependency]
      * @param milestoneHash the hash of the transaction
      * @param newIndex the milestone index that shall be set
-     * @throws Exception if anything unexpected happens while updating the milestone index
+     * @throws MilestoneException if anything unexpected happens while updating the milestone index
      */
     void updateMilestoneIndexOfMilestoneTransactions(Tangle tangle, SnapshotProvider snapshotProvider,
-            MessageQ messageQ, Hash milestoneHash, int newIndex) throws Exception;
+            MessageQ messageQ, Hash milestoneHash, int newIndex) throws MilestoneException;
 
     /**
      * This method resets all milestone related information of the transactions that were "confirmed" by the given
@@ -78,10 +78,24 @@ public interface MilestoneService {
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots [dependency]
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients [dependency]
      * @param milestoneIndex milestone index that shall
-     * @param identifier string identifier for debug messages
+     * @throws MilestoneException if anything goes wrong while resetting the corrupted milestone
      */
     void resetCorruptedMilestone(Tangle tangle, SnapshotProvider snapshotProvider, MessageQ messageQ,
-            int milestoneIndex, String identifier);
+            int milestoneIndex) throws MilestoneException;
+
+    /**
+     * This method checks if the given transaction "belongs" to the milestone with the given index.<br />
+     * <br />
+     * We determine if a transaction still belongs to the milestone with the given index by examining its
+     * {@code snapshotIndex} value. For this method to work we require that the previous milestones have been processed
+     * already (which is enforce by the {@link com.iota.iri.service.milestone.LatestSolidMilestoneTracker} which applies
+     * the milestones in the order that they are issued by the coordinator).<br />
+     *
+     * @param transaction the transaction that shall be examined
+     * @param milestoneIndex the milestone index that we want to check against
+     * @return {@code true} if the transaction belongs to the milestone and {@code false} otherwise
+     */
+    boolean transactionBelongsToMilestone(TransactionViewModel transaction, int milestoneIndex);
 
     /**
      * This method retrieves the milestone index of the given transaction by decoding the {@code OBSOLETE_TAG}.<br />

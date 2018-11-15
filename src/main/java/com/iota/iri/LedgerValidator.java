@@ -186,7 +186,7 @@ public class LedgerValidator {
         return successfullyProcessed;
     }
 
-    public boolean checkTipConsistency(List<Hash> hashes) throws Exception {
+    public boolean tipsConsistent(List<Hash> hashes) throws Exception {
         Set<Hash> visitedHashes = new HashSet<>();
         Map<Hash, Long> diff = new HashMap<>();
         for (Hash hash : hashes) {

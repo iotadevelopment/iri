@@ -5,6 +5,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.ledger.LedgerService;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
+import com.iota.iri.service.milestone.MilestoneException;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.LatestSolidMilestoneTracker;
 import com.iota.iri.service.snapshot.Snapshot;
@@ -46,7 +47,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     private final SnapshotProvider snapshotProvider;
 
     /**
-     * Service class containing the business logic of the milestone package.<br />
+     * Holds a reference to the service instance containing the business logic of the milestone package.<br />
      */
     private final MilestoneService milestoneService;
 
@@ -56,8 +57,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     private final LatestMilestoneTracker latestMilestoneTracker;
 
     /**
-     * Holds a reference to the {@link LedgerService} that contains the logic for applying milestones to the ledger
-     * state.<br />
+     * Holds a reference to the service that contains the logic for applying milestones to the ledger state.<br />
      */
     private final LedgerService ledgerService;
 
@@ -73,7 +73,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
             "Latest Solid Milestone Tracker", log.delegate());
 
     /**
-     * Holds the milestone index of the milestone caused the repair logic to get started.<br />
+     * Holds the milestone index of the milestone that caused the repair logic to get started.<br />
      */
     private int errorCausingMilestoneIndex = Integer.MAX_VALUE;
 
@@ -91,7 +91,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
-     * @param milestoneService the class that contains the important business logic when dealing with milestones
+     * @param milestoneService contains the important business logic when dealing with milestones
      * @param latestMilestoneTracker the manager that keeps track of the latest milestone
      * @param ledgerService the manager for
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
@@ -110,7 +110,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
 
     @Override
     public void start() {
-        executorService.silentScheduleWithFixedDelay(this::checkForNewLatestSolidMilestones, 0, RESCAN_INTERVAL,
+        executorService.silentScheduleWithFixedDelay(this::latestSolidMilestoneTrackerThread, 0, RESCAN_INTERVAL,
                 TimeUnit.MILLISECONDS);
     }
 
@@ -126,7 +126,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * {@link LatestMilestoneTracker} in sync (if we happen to process a new latest milestone faster).<br />
      */
     @Override
-    public void checkForNewLatestSolidMilestones() {
+    public void checkForNewLatestSolidMilestones() throws MilestoneException {
         try {
             int currentSolidMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex();
             if (currentSolidMilestoneIndex < latestMilestoneTracker.getLatestMilestoneIndex()) {
@@ -135,7 +135,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
                         (nextMilestone = MilestoneViewModel.get(tangle, currentSolidMilestoneIndex + 1)) != null &&
                         TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
 
-                    updateLatestMilestoneTracker(nextMilestone);
+                    syncLatestMilestoneTracker(nextMilestone);
                     applySolidMilestoneToLedger(nextMilestone);
                     logChange(currentSolidMilestoneIndex);
 
@@ -143,6 +143,20 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
                 }
             }
         } catch (Exception e) {
+            throw new MilestoneException(e);
+        }
+    }
+
+    /**
+     * This method contains the logic for the background worker.<br />
+     * <br />
+     * It simply calls {@link #checkForNewLatestSolidMilestones()} and wraps with a log handler that prevents the {@link
+     * MilestoneException} to crash the worker.<br />
+     */
+    private void latestSolidMilestoneTrackerThread() {
+        try {
+            checkForNewLatestSolidMilestones();
+        } catch (MilestoneException e) {
             log.error("error while updating the solid milestone", e);
         }
     }
@@ -192,7 +206,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      *
      * @param processedMilestone the milestone that currently gets processed
      */
-    private void updateLatestMilestoneTracker(MilestoneViewModel processedMilestone) {
+    private void syncLatestMilestoneTracker(MilestoneViewModel processedMilestone) {
         if(processedMilestone.index() > latestMilestoneTracker.getLatestMilestoneIndex()) {
             latestMilestoneTracker.setLatestMilestone(processedMilestone.getHash(), processedMilestone.index());
         }
@@ -236,14 +250,15 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * milestone index that caused the problem the first time we call this method.<br />
      *
      * @param errorCausingMilestone the milestone that failed to be applied
+     * @throws MilestoneException if we failed to reset the corrupted milestone
      */
-    private void revertPrecedingMilestones(MilestoneViewModel errorCausingMilestone) {
+    private void revertPrecedingMilestones(MilestoneViewModel errorCausingMilestone) throws MilestoneException {
         if(repairBackoffCounter++ == 0) {
             errorCausingMilestoneIndex = errorCausingMilestone.index();
         }
 
         for (int i = errorCausingMilestone.index(); i > errorCausingMilestone.index() - repairBackoffCounter; i--) {
-            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, messageQ, i, "updateLatestSolidSubtangleMilestone");
+            milestoneService.resetCorruptedMilestone(tangle, snapshotProvider, messageQ, i);
         }
      }
 }

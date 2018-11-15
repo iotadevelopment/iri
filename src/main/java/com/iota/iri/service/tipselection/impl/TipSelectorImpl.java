@@ -1,6 +1,5 @@
 package com.iota.iri.service.tipselection.impl;
 
-import com.iota.iri.LedgerValidator;
 import com.iota.iri.conf.TipSelConfig;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
@@ -93,7 +92,7 @@ public class TipSelectorImpl implements TipSelector {
             tips.add(tip);
 
             //validate
-            if (!ledgerService.checkTipConsistency(tangle, snapshotProvider, tips)) {
+            if (!ledgerService.tipsConsistent(tangle, snapshotProvider, tips)) {
                 throw new IllegalStateException(TIPS_NOT_CONSISTENT);
             }
 

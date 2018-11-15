@@ -8,6 +8,7 @@ import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
+import com.iota.iri.service.milestone.MilestoneException;
 import com.iota.iri.service.milestone.MilestoneService;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.milestone.MilestoneValidity;
@@ -29,44 +30,119 @@ import static com.iota.iri.service.milestone.MilestoneValidity.INCOMPLETE;
 import static com.iota.iri.service.milestone.MilestoneValidity.INVALID;
 import static com.iota.iri.service.milestone.MilestoneValidity.VALID;
 
+/**
+ * This class implements the basic contract of the {@link LatestMilestoneTracker} that keeps track of the latest
+ * milestone by incorporating a background worker that periodically checks if new milestones have arrived.<br />
+ * <br />
+ * Knowing about the latest milestone and being able to compare it to the latest solid milestone allows us to determine
+ * if our node is "in sync".<br />
+ */
 public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
-    private static final int MAX_CANDIDATES_TO_ANALYZE = 1000;
+    /**
+     * Holds the amount of milestone candidates that will be analyzed per iteration of the background worker.<br />
+     */
+    private static final int MAX_CANDIDATES_TO_ANALYZE = 5000;
 
-    private static final int RESCAN_INTERVAL = 5000;
+    /**
+     * Holds the time (in milliseconds) between iterations of the background worker.<br />
+     */
+    private static final int RESCAN_INTERVAL = 1000;
 
+    /**
+     * Holds the logger of this class (a rate limited logger than doesn't spam the CLI output).<br />
+     */
     private static final IntervalLogger log = new IntervalLogger(LatestMilestoneTrackerImpl.class);
 
+    /**
+     * Holds the Tangle object which acts as a database interface.<br />
+     */
     private final Tangle tangle;
 
+    /**
+     * The snapshot provider which gives us access to the relevant snapshots that the node uses (for faster
+     * bootstrapping).<br />
+     */
     private final SnapshotProvider snapshotProvider;
 
+    /**
+     * Service class containing the business logic of the milestone package.<br />
+     */
     private final MilestoneService milestoneService;
 
+    /**
+     * Holds a reference to the manager that takes care of solidifying milestones.<br />
+     */
     private final MilestoneSolidifier milestoneSolidifier;
 
+    /**
+     * Holds a reference to the ZeroMQ interface that allows us to emit messages for external recipients.<br />
+     */
     private final MessageQ messageQ;
 
+    /**
+     * Holds the configuration object which allows us to determine the important config parameters of the node.<br />
+     */
     private final IotaConfig config;
 
-    private final SilentScheduledExecutorService executorService;
+    /**
+     * Holds a reference to the manager of the background worker.<br />
+     */
+    private final SilentScheduledExecutorService executorService = new DedicatedScheduledExecutorService(
+            "Latest Milestone Tracker", log.delegate());
 
+    /**
+     * Holds the coordinator address which is used to filter possible milestone candidates.<br />
+     */
     private final Hash coordinatorAddress;
 
+    /**
+     * Holds the milestone index of the latest milestone that we have seen / processed.<br />
+     */
     private int latestMilestoneIndex;
 
+    /**
+     * Holds the transaction hash of the latest milestone that we have seen / processed.<br />
+     */
     private Hash latestMilestoneHash;
 
+    /**
+     * A set that allows us to keep track of the candidates that have been seen and added to the {@link
+     * #milestoneCandidatesToAnalyze} already.<br />
+     */
     private final Set<Hash> seenMilestoneCandidates = new HashSet<>();
 
+    /**
+     * A list of milestones that still have to be analyzed.<br />
+     */
     private final Deque<Hash> milestoneCandidatesToAnalyze = new ArrayDeque<>();
 
+    /**
+     * A flag that allows us to detect if the background worker is in its first iteration (for different log
+     * handling).<br />
+     */
     private boolean firstRun = true;
 
     /**
-     * Flag which indicates if this tracker was fully initialized.
+     * Flag which indicates if this tracker has finished its initial scan of all old milestone candidates.<br />
      */
     private boolean initialized = false;
 
+    /**
+     * Creates a tracker that automatically detects new milestones by incorporating a background worker that
+     * periodically checks all transactions that are originating from the coordinator address and that exposes the found
+     * latest milestone via getters.<br />
+     * <br />
+     * It can be used to determine the sync-status of the node by comparing these values against the latest solid
+     * milestone. It simply stores the passed in parameters in their corresponding properties and bootstraps the
+     * tracker with values for the latest milestone that can be found quickly.<br />
+     *
+     * @param tangle Tangle object which acts as a database interface
+     * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
+     * @param milestoneService contains the important business logic when dealing with milestones
+     * @param milestoneSolidifier manager that takes care of solidifying milestones
+     * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
+     * @param config configuration object which allows us to determine the important config parameters of the node
+     */
     public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ,
             IotaConfig config) {
@@ -78,28 +154,22 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         this.messageQ = messageQ;
         this.config = config;
 
-        executorService = new DedicatedScheduledExecutorService("Latest Milestone Tracker", log.delegate());
         coordinatorAddress = HashFactory.ADDRESS.create(config.getCoordinator());
 
-        // bootstrap with the latest snapshot first
-        Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
-        setLatestMilestone(latestSnapshot.getHash(), latestSnapshot.getIndex());
-
-        // check if we have a bigger milestone as the last in our DB (faster bootstrap)
-        try {
-            MilestoneViewModel lastMilestoneInDatabase = MilestoneViewModel.latest(tangle);
-            if (lastMilestoneInDatabase != null && lastMilestoneInDatabase.index() > getLatestMilestoneIndex()) {
-                setLatestMilestone(lastMilestoneInDatabase.getHash(), lastMilestoneInDatabase.index());
-            }
-        } catch (Exception e) {
-             // just continue with the previously set latest milestone
-        }
+        bootstrapLatestMilestoneValue();
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * In addition to setting the internal properties, we also issue a log message and publish the change to the ZeroMQ
+     * message processor so external receivers get informed about this change.<br />
+     */
     @Override
     public void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex) {
         messageQ.publish("lmi %d %d", this.latestMilestoneIndex, latestMilestoneIndex);
-        log.delegate().info("Latest milestone has changed from #" + this.latestMilestoneIndex + " to #" + latestMilestoneIndex);
+        log.delegate().info("Latest milestone has changed from #" + this.latestMilestoneIndex + " to #" +
+                latestMilestoneIndex);
 
         this.latestMilestoneHash = latestMilestoneHash;
         this.latestMilestoneIndex = latestMilestoneIndex;
@@ -116,48 +186,59 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
     }
 
     @Override
-    public MilestoneValidity analyzeMilestoneCandidate(Hash candidateTransactionHash) throws Exception {
-        return analyzeMilestoneCandidate(TransactionViewModel.fromHash(tangle, candidateTransactionHash));
+    public MilestoneValidity analyzeMilestoneCandidate(Hash transactionHash) throws MilestoneException {
+        try {
+            return analyzeMilestoneCandidate(TransactionViewModel.fromHash(tangle, transactionHash));
+        } catch (Exception e) {
+            throw new MilestoneException("unexpected error while analyzing the transaction " + transactionHash, e);
+        }
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * If we detect a milestone that is either {@code INCOMPLETE} or not solid, yet we hand it over to the
+     * {@link MilestoneSolidifier} that takes care of requesting the missing parts of the milestone bundle.<br />
+     */
     @Override
-    public MilestoneValidity analyzeMilestoneCandidate(TransactionViewModel potentialMilestoneTransaction) throws Exception {
-        if (coordinatorAddress.equals(potentialMilestoneTransaction.getAddressHash()) && potentialMilestoneTransaction.getCurrentIndex() == 0) {
-            int milestoneIndex = milestoneService.getMilestoneIndex(potentialMilestoneTransaction);
+    public MilestoneValidity analyzeMilestoneCandidate(TransactionViewModel transaction)
+            throws MilestoneException {
 
-            switch (milestoneService.validateMilestone(tangle, snapshotProvider, messageQ, config, potentialMilestoneTransaction, SpongeFactory.Mode.CURLP27, 1)) {
-                case VALID:
-                    if (milestoneIndex > latestMilestoneIndex) {
-                        setLatestMilestone(potentialMilestoneTransaction.getHash(), milestoneIndex);
-                    } else {
-                        MilestoneViewModel latestMilestoneViewModel = MilestoneViewModel.latest(tangle);
-                        if (latestMilestoneViewModel != null && latestMilestoneViewModel.index() > latestMilestoneIndex) {
-                            messageQ.publish("lmi %d %d", latestMilestoneIndex, latestMilestoneViewModel.index());
-                            log.delegate().info("Latest milestone has changed from #" + latestMilestoneIndex + " to #" + latestMilestoneViewModel.index());
+        try {
+            if (coordinatorAddress.equals(transaction.getAddressHash()) &&
+                    transaction.getCurrentIndex() == 0) {
 
-                            latestMilestoneHash = latestMilestoneViewModel.getHash();
-                            latestMilestoneIndex = latestMilestoneViewModel.index();
+                int milestoneIndex = milestoneService.getMilestoneIndex(transaction);
+
+                switch (milestoneService.validateMilestone(tangle, snapshotProvider, messageQ, config,
+                        transaction, SpongeFactory.Mode.CURLP27, 1)) {
+
+                    case VALID:
+                        if (milestoneIndex > latestMilestoneIndex) {
+                            setLatestMilestone(transaction.getHash(), milestoneIndex);
                         }
-                    }
 
-                    if(!potentialMilestoneTransaction.isSolid()) {
-                        milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
-                    }
+                        if (!transaction.isSolid()) {
+                            milestoneSolidifier.add(transaction.getHash(), milestoneIndex);
+                        }
 
-                    potentialMilestoneTransaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
+                        transaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
 
-                    return VALID;
+                        return VALID;
 
-                case INCOMPLETE:
-                    milestoneSolidifier.add(potentialMilestoneTransaction.getHash(), milestoneIndex);
+                    case INCOMPLETE:
+                        milestoneSolidifier.add(transaction.getHash(), milestoneIndex);
 
-                    potentialMilestoneTransaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
+                        transaction.isMilestone(tangle, snapshotProvider.getInitialSnapshot(), true);
 
-                    return INCOMPLETE;
+                        return INCOMPLETE;
+                }
             }
-        }
 
-        return INVALID;
+            return INVALID;
+        } catch (Exception e) {
+            throw new MilestoneException("unexpected error while analyzing the " + transaction, e);
+        }
     }
 
     @Override
@@ -165,6 +246,14 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         return initialized;
     }
 
+    /**
+     * {@inheritDoc}
+     * <br />
+     * We repeatedly call {@link #latestMilestoneTrackerThread()} to actively look for new milestones in our database.
+     * This is a bit inefficient and should at some point maybe be replaced with a check on transaction arrival, but
+     * this would required adjustments in the whole way IRI handles transactions and is therefore postponed for
+     * now.<br />
+     */
     @Override
     public void start() {
         executorService.silentScheduleWithFixedDelay(this::latestMilestoneTrackerThread, 0, RESCAN_INTERVAL,
@@ -176,6 +265,19 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         executorService.shutdownNow();
     }
 
+    /**
+     * This method contains the logic for scanning for new latest milestones that gets executed in a background
+     * worker.<br />
+     * <br />
+     * It first collects all candidates in the {@link #milestoneCandidatesToAnalyze} set by retrieving all transactions
+     * that are originating from the coordinator address and then analyzes them in chunks of {@link
+     * #MAX_CANDIDATES_TO_ANALYZE}. This allows us to stop after the given amount and find and process newly arrived
+     * milestones in the next iteration of this background worker without having to process all old transactions
+     * first (which allows this tracker to have the correct values for {@link #getLatestMilestoneIndex()} and {@link
+     * #getLatestMilestoneHash()} faster than if we would process all old transactions before terminating.<br />
+     * <br />
+     * Once all candidates have been analyzed we set the {@link #initialized} flag to {@code true}.
+     */
     private void latestMilestoneTrackerThread() {
         try {
             // will not fire on the first run because we have an empty list
@@ -183,20 +285,17 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                 log.info("Processing milestone candidates (" + milestoneCandidatesToAnalyze.size() + " remaining) ...");
             }
 
-            // add all new milestone candidates to the list of candidates that need to be analyzed
             for(Hash hash: AddressViewModel.load(tangle, coordinatorAddress).getHashes()) {
-                // allow the thread to be interrupted
                 if (Thread.currentThread().isInterrupted()) {
                     return;
                 }
 
                 if (seenMilestoneCandidates.add(hash)) {
-                    // we add at the beginning to process newly received milestones first
                     milestoneCandidatesToAnalyze.addFirst(hash);
                 }
             }
 
-            // log how many milestone candidates are remaining to be analyzed
+            // will only fire on the first run to indicate how many milestones need to be processed in total
             if (firstRun) {
                 firstRun = false;
 
@@ -205,10 +304,8 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                 }
             }
 
-            // analyze
             int candidatesToAnalyze = Math.min(milestoneCandidatesToAnalyze.size(), MAX_CANDIDATES_TO_ANALYZE);
             for (int i = 0; i < candidatesToAnalyze; i++) {
-                // allow the thread to be interrupted
                 if (Thread.currentThread().isInterrupted()) {
                     return;
                 }
@@ -219,7 +316,6 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
                 }
             }
 
-            // once all candidates have been processed we set the milestone tracker to initialized
             if (milestoneCandidatesToAnalyze.size() == 0 && !initialized) {
                 initialized = true;
 
@@ -230,4 +326,25 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         }
     }
 
+    /**
+     * This method bootstraps this tracker with the latest milestone values that can easily be retrieved without
+     * analyzing any transactions (for faster startup).<br />
+     * <br />
+     * It first sets the latest milestone to the values found in the latest snapshot and then check if there is a younger
+     * milestone at the end of our database. While this last entry in the database doesn't necessarily have to be the
+     * latest one we know it at least gives a reasonable value most of the times.<br />
+     */
+    private void bootstrapLatestMilestoneValue() {
+        Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
+        setLatestMilestone(latestSnapshot.getHash(), latestSnapshot.getIndex());
+
+        try {
+            MilestoneViewModel lastMilestoneInDatabase = MilestoneViewModel.latest(tangle);
+            if (lastMilestoneInDatabase != null && lastMilestoneInDatabase.index() > getLatestMilestoneIndex()) {
+                setLatestMilestone(lastMilestoneInDatabase.getHash(), lastMilestoneInDatabase.index());
+            }
+        } catch (Exception e) {
+             // just continue with the previously set latest milestone
+        }
+    }
 }
