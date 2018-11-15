@@ -44,12 +44,6 @@ public class TransactionTestUtils {
         return new TransactionViewModel(trits, TransactionHash.calculate(SpongeFactory.Mode.CURLP81, trits));
     }
 
-    public static TransactionViewModel createTransactionWithTrytes(String trytes, Hash transactionHash) {
-        String expandedTrytes  = expandTrytes(trytes);
-        byte[] trits = Converter.allocatingTritsFromTrytes(expandedTrytes);
-        return new TransactionViewModel(trits, transactionHash);
-    }
-
     public static TransactionViewModel createTransactionWithTrunkAndBranch(String trytes, Hash trunk, Hash branch) {
         String expandedTrytes = expandTrytes(trytes);
         byte[] trits =  Converter.allocatingTritsFromTrytes(expandedTrytes);
