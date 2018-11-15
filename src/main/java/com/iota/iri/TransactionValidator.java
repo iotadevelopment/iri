@@ -2,7 +2,6 @@ package com.iota.iri;
 
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
-import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.crypto.Curl;
 import com.iota.iri.crypto.Sponge;
 import com.iota.iri.crypto.SpongeFactory;

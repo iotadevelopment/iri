@@ -8,12 +8,8 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.milestone.MilestoneService;
-import com.iota.iri.service.milestone.MilestoneValidity;
-import com.iota.iri.service.milestone.impl.MilestoneServiceImpl;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
-import com.iota.iri.service.snapshot.impl.SnapshotServiceImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import com.iota.iri.utils.Converter;
@@ -25,9 +21,10 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
+import java.io.IOException;
+
 public class MilestoneTrackerTest {
-    /*
-    private static final MilestoneService milestoneService = new MilestoneServiceImpl();
+
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
@@ -54,7 +51,7 @@ public class MilestoneTrackerTest {
         tangle.init();
     }
 
-    private static void initializeMilestoneTracker(String coordinator, int keys, int MWM) {
+    private static void initializeMilestoneTracker(String coordinator, int keys, int MWM) throws IOException {
         String[] args = {
                 "--testnet-coordinator", coordinator,
                 "--mwm", String.valueOf(MWM),
@@ -66,14 +63,8 @@ public class MilestoneTrackerTest {
         configuration.parseConfigFromArgs(args);
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
-<<<<<<< HEAD
-        TransactionRequester txRequester = new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ);
-        TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), new TipsViewModel(), txRequester);
-        milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, new SnapshotServiceImpl(), transactionValidator, txRequester, messageQ, configuration);
-=======
         TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), new TipsViewModel(), new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ));
         milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, messageQ, Snapshot.init(configuration).clone(), configuration);
->>>>>>> b19fec078eb0702f94ca43a43cfec2a0b98ca276
     }
 
     @Test
@@ -95,8 +86,8 @@ public class MilestoneTrackerTest {
         transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //call validateMilestone
-        final MilestoneValidity valid = milestoneService.validateMilestone(tangle, snapshotProvider, new SnapshotServiceImpl(), new MainnetConfig(), transaction0, sigMode, securityLevel);
-        Assert.assertEquals(MilestoneValidity.VALID, valid);
+        final MilestoneTracker.Validity valid = milestoneTracker.validateMilestone(sigMode, securityLevel, transaction0, MilestoneTracker.getIndex(transaction0));
+        Assert.assertEquals(MilestoneTracker.Validity.VALID, valid);
     }
 
     @Test
@@ -117,8 +108,8 @@ public class MilestoneTrackerTest {
         transaction1.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //call validateMilestone
-        final MilestoneValidity valid = milestoneService.validateMilestone(tangle, snapshotProvider, new SnapshotServiceImpl(), new MainnetConfig(), transaction0, sigMode, securityLevel);
-        Assert.assertEquals(MilestoneValidity.VALID, valid);
+        final MilestoneTracker.Validity valid = milestoneTracker.validateMilestone(sigMode, securityLevel, transaction0, MilestoneTracker.getIndex(transaction0));
+        Assert.assertEquals(MilestoneTracker.Validity.VALID, valid);
     }
 
     @Test
@@ -145,8 +136,8 @@ public class MilestoneTrackerTest {
         transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //call validateMilestone
-        final MilestoneValidity valid = milestoneService.validateMilestone(tangle, snapshotProvider, new SnapshotServiceImpl(), new MainnetConfig(), transaction0, sigMode, securityLevel);
-        Assert.assertEquals(MilestoneValidity.VALID, valid);
+        final MilestoneTracker.Validity valid = milestoneTracker.validateMilestone(sigMode, securityLevel, transaction0, MilestoneTracker.getIndex(transaction0));
+        Assert.assertEquals(MilestoneTracker.Validity.VALID, valid);
     }
 
     @Test
@@ -173,8 +164,8 @@ public class MilestoneTrackerTest {
         transaction3.store(tangle, snapshotProvider.getInitialSnapshot());
 
         //call validateMilestone
-        final MilestoneValidity valid = milestoneService.validateMilestone(tangle, snapshotProvider, new SnapshotServiceImpl(), new MainnetConfig(), transaction0, sigMode, securityLevel);
-        Assert.assertEquals(MilestoneValidity.VALID, valid);
+        final MilestoneTracker.Validity valid = milestoneTracker.validateMilestone(sigMode, securityLevel, transaction0, MilestoneTracker.getIndex(transaction0));
+        Assert.assertEquals(MilestoneTracker.Validity.VALID, valid);
     }
-*/
+
 }
