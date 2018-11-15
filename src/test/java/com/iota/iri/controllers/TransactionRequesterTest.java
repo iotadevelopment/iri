@@ -32,47 +32,47 @@ public class TransactionRequesterTest {
     }
 
     @Test
-    public void init() {
+    public void init() throws Exception {
 
     }
 
     @Test
-    public void rescanTransactionsToRequest() {
+    public void rescanTransactionsToRequest() throws Exception {
 
     }
 
     @Test
-    public void getRequestedTransactions() {
+    public void getRequestedTransactions() throws Exception {
 
     }
 
     @Test
-    public void numberOfTransactionsToRequest() {
+    public void numberOfTransactionsToRequest() throws Exception {
 
     }
 
     @Test
-    public void clearTransactionRequest() {
+    public void clearTransactionRequest() throws Exception {
 
     }
 
     @Test
-    public void requestTransaction() {
+    public void requestTransaction() throws Exception {
 
     }
 
     @Test
-    public void transactionToRequest() {
+    public void transactionToRequest() throws Exception {
 
     }
 
     @Test
-    public void checkSolidity() {
+    public void checkSolidity() throws Exception {
 
     }
 
     @Test
-    public void instance() {
+    public void instance() throws Exception {
 
     }
 
