@@ -57,15 +57,15 @@ public class TransactionViewModelTest {
     }
 
     @Test
-    public void getBundleTransactions() {
+    public void getBundleTransactions() throws Exception {
     }
 
     @Test
-    public void getBranchTransaction() {
+    public void getBranchTransaction() throws Exception {
     }
 
     @Test
-    public void getTrunkTransaction() {
+    public void getTrunkTransaction() throws Exception {
     }
 
     @Test
@@ -98,17 +98,17 @@ public class TransactionViewModelTest {
     }
 
     @Test
-    public void fromHash() {
+    public void fromHash() throws Exception {
 
     }
 
     @Test
-    public void fromHash1() {
+    public void fromHash1() throws Exception {
 
     }
 
     @Test
-    public void update() {
+    public void update() throws Exception {
 
     }
 
@@ -143,147 +143,147 @@ public class TransactionViewModelTest {
     }
 
     @Test
-    public void getHash() {
+    public void getHash() throws Exception {
 
     }
 
     @Test
-    public void getAddress() {
+    public void getAddress() throws Exception {
 
     }
 
     @Test
-    public void getTag() {
+    public void getTag() throws Exception {
 
     }
 
     @Test
-    public void getBundleHash() {
+    public void getBundleHash() throws Exception {
 
     }
 
     @Test
-    public void getTrunkTransactionHash() {
+    public void getTrunkTransactionHash() throws Exception {
     }
 
     @Test
-    public void getBranchTransactionHash() {
-
-    }
-
-    @Test
-    public void getValue() {
+    public void getBranchTransactionHash() throws Exception {
 
     }
 
     @Test
-    public void value() {
+    public void getValue() throws Exception {
 
     }
 
     @Test
-    public void setValidity() {
+    public void value() throws Exception {
 
     }
 
     @Test
-    public void getValidity() {
+    public void setValidity() throws Exception {
 
     }
 
     @Test
-    public void getCurrentIndex() {
+    public void getValidity() throws Exception {
 
     }
 
     @Test
-    public void getLastIndex() {
+    public void getCurrentIndex() throws Exception {
 
     }
 
     @Test
-    public void mightExist() {
+    public void getLastIndex() throws Exception {
 
     }
 
     @Test
-    public void update1() {
+    public void mightExist() throws Exception {
 
     }
 
     @Test
-    public void setAnalyzed() {
+    public void update1() throws Exception {
+
+    }
+
+    @Test
+    public void setAnalyzed() throws Exception {
 
     }
 
 
     @Test
-    public void dump() {
+    public void dump() throws Exception {
 
     }
 
     @Test
-    public void store() {
+    public void store() throws Exception {
 
     }
 
     @Test
-    public void updateTips() {
+    public void updateTips() throws Exception {
 
     }
 
     @Test
-    public void updateReceivedTransactionCount() {
+    public void updateReceivedTransactionCount() throws Exception {
 
     }
 
     @Test
-    public void updateApprovers() {
+    public void updateApprovers() throws Exception {
 
     }
 
     @Test
-    public void hashesFromQuery() {
+    public void hashesFromQuery() throws Exception {
 
     }
 
     @Test
-    public void approversFromHash() {
+    public void approversFromHash() throws Exception {
 
     }
 
     @Test
-    public void fromTag() {
+    public void fromTag() throws Exception {
 
     }
 
     @Test
-    public void fromBundle() {
+    public void fromBundle() throws Exception {
 
     }
 
     @Test
-    public void fromAddress() {
+    public void fromAddress() throws Exception {
 
     }
 
     @Test
-    public void getTransactionAnalyzedFlag() {
+    public void getTransactionAnalyzedFlag() throws Exception {
 
     }
 
     @Test
-    public void getType() {
+    public void getType() throws Exception {
 
     }
 
     @Test
-    public void setArrivalTime() {
+    public void setArrivalTime() throws Exception {
 
     }
 
     @Test
-    public void getArrivalTime() {
+    public void getArrivalTime() throws Exception {
 
     }
 
@@ -385,9 +385,9 @@ public class TransactionViewModelTest {
                 hashes.removeFirst();
             }
 
-            //log.info("{}", new String(new char[(int) ((balanceChanges/ 10000))]).replace('\0', '|'));
+            //log.info("{}", new String(new char[(int) ((diff/ 10000))]).replace('\0', '|'));
             if(i % interval1 == 0) {
-                //log.info("{}", new String(new char[(int) (balanceChanges / 50000)]).replace('\0', '-'));
+                //log.info("{}", new String(new char[(int) (diff / 50000)]).replace('\0', '-'));
                 //log.info("{}", new String(new char[(int) ((subSumDiff / interval1 / 100000))]).replace('\0', '|'));
                 sumdiff += subSumDiff;
                 subSumDiff = 0;
