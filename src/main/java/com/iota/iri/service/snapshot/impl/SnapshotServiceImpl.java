@@ -70,6 +70,9 @@ public class SnapshotServiceImpl implements SnapshotService {
     private final SnapshotConfig config;
 
     /**
+     * Creates a service instance that allows us to interact with the snapshots.<br />
+     * <br />
+     * It simply stores the passed in dependencies in the internal properties.<br />
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the {@link Snapshot}s that are relevant for the node
