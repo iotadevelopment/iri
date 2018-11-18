@@ -11,6 +11,7 @@ import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.TransactionHash;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
 import org.apache.commons.lang3.StringUtils;
@@ -57,7 +58,7 @@ public class Node {
     private final ExecutorService executor = Executors.newFixedThreadPool(5);
     private final NodeConfig configuration;
     private final Tangle tangle;
-    private final Snapshot initialSnapshot;
+    private final SnapshotProvider snapshotProvider;
     private final TipsViewModel tipsViewModel;
     private final TransactionValidator transactionValidator;
     private final LatestMilestoneTracker latestMilestoneTracker;
@@ -79,11 +80,11 @@ public class Node {
     public static final ConcurrentSkipListSet<String> rejectedAddresses = new ConcurrentSkipListSet<String>();
     private DatagramSocket udpSocket;
 
-    public Node(final Tangle tangle, Snapshot initialSnapshot, final TransactionValidator transactionValidator, final TransactionRequester transactionRequester, final TipsViewModel tipsViewModel, final LatestMilestoneTracker latestMilestoneTracker, final MessageQ messageQ, final NodeConfig configuration
+    public Node(final Tangle tangle, SnapshotProvider snapshotProvider, final TransactionValidator transactionValidator, final TransactionRequester transactionRequester, final TipsViewModel tipsViewModel, final LatestMilestoneTracker latestMilestoneTracker, final MessageQ messageQ, final NodeConfig configuration
     ) {
         this.configuration = configuration;
         this.tangle = tangle;
-        this.initialSnapshot = initialSnapshot;
+        this.snapshotProvider = snapshotProvider;
         this.transactionValidator = transactionValidator;
         this.transactionRequester = transactionRequester;
         this.tipsViewModel = tipsViewModel;
@@ -367,7 +368,7 @@ public class Node {
 
         //store new transaction
         try {
-            stored = receivedTransactionViewModel.store(tangle, initialSnapshot);
+            stored = receivedTransactionViewModel.store(tangle, snapshotProvider.getInitialSnapshot());
         } catch (Exception e) {
             log.error("Error accessing persistence store.", e);
             neighbor.incInvalidTransactions();
@@ -379,7 +380,7 @@ public class Node {
             try {
                 transactionValidator.updateStatus(receivedTransactionViewModel);
                 receivedTransactionViewModel.updateSender(neighbor.getAddress().toString());
-                receivedTransactionViewModel.update(tangle, initialSnapshot, "arrivalTime|sender");
+                receivedTransactionViewModel.update(tangle, snapshotProvider.getInitialSnapshot(), "arrivalTime|sender");
             } catch (Exception e) {
                 log.error("Error updating transactions.", e);
             }

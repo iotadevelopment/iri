@@ -41,18 +41,18 @@ public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
     /**
      * Tangle object which acts as a database interface.<br />
      */
-    private final Tangle tangle;
+    private Tangle tangle;
 
     /**
      * The snapshot provider which gives us access to the relevant snapshots to calculate our range.<br />
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Holds a reference to the {@link TransactionRequester} that allows us to issue requests for the missing
      * milestones.<br />
      */
-    private final TransactionRequester transactionRequester;
+    private TransactionRequester transactionRequester;
 
     /**
      * Holds a reference to the manager of the background worker.<br />
@@ -63,7 +63,7 @@ public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
     /**
      * The list of seen milestones that need to be requested.<br />
      */
-    private final Map<Hash, Integer> seenMilestones;
+    private Map<Hash, Integer> seenMilestones;
 
     /**
      * Creates a manager that proactively requests the missing "seen milestones" (defined in the local snapshot
@@ -75,16 +75,25 @@ public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
      * Once the manager finishes to request all "seen milestones" it will automatically {@link #shutdown()} (when being
      * {@link #start()}ed before).<br />
      *
+     */
+    public SeenMilestonesRetrieverImpl() {
+
+    }
+
+    /**
+     *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots to calculate our range
      * @param transactionRequester allows us to issue requests for the missing milestones
      */
-    public SeenMilestonesRetrieverImpl(Tangle tangle, SnapshotProvider snapshotProvider, TransactionRequester transactionRequester) {
+    public SeenMilestonesRetrieverImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider, TransactionRequester transactionRequester) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.transactionRequester = transactionRequester;
 
         seenMilestones = new ConcurrentHashMap<>(snapshotProvider.getInitialSnapshot().getSeenMilestones());
+
+        return this;
     }
 
     /**

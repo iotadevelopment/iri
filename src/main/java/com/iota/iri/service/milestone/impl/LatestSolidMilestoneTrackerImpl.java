@@ -38,33 +38,33 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     /**
      * Holds the Tangle object which acts as a database interface.<br />
      */
-    private final Tangle tangle;
+    private Tangle tangle;
 
     /**
      * The snapshot provider which gives us access to the relevant snapshots that the node uses (for the ledger
      * state).<br />
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Holds a reference to the service instance containing the business logic of the milestone package.<br />
      */
-    private final MilestoneService milestoneService;
+    private MilestoneService milestoneService;
 
     /**
      * Holds a reference to the manager that keeps track of the latest milestone.<br />
      */
-    private final LatestMilestoneTracker latestMilestoneTracker;
+    private LatestMilestoneTracker latestMilestoneTracker;
 
     /**
      * Holds a reference to the service that contains the logic for applying milestones to the ledger state.<br />
      */
-    private final LedgerService ledgerService;
+    private LedgerService ledgerService;
 
     /**
      * Holds a reference to the ZeroMQ interface that allows us to emit messages for external recipients.<br />
      */
-    private final MessageQ messageQ;
+    private MessageQ messageQ;
 
     /**
      * Holds a reference to the manager of the background worker.<br />
@@ -89,6 +89,12 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * <br />
      * We simply store the passed in dependencies in their corresponding properties.<br />
      *
+     */
+    public LatestSolidMilestoneTrackerImpl() {
+    }
+
+    /**
+     *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
      * @param milestoneService contains the important business logic when dealing with milestones
@@ -96,7 +102,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * @param ledgerService the manager for
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
      */
-    public LatestSolidMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
+    public LatestSolidMilestoneTrackerImpl init(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, LedgerService ledgerService,
             LatestMilestoneTracker latestMilestoneTracker, MessageQ messageQ) {
 
@@ -106,6 +112,8 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         this.ledgerService = ledgerService;
         this.latestMilestoneTracker = latestMilestoneTracker;
         this.messageQ = messageQ;
+
+        return this;
     }
 
     @Override

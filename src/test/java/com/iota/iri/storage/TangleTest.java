@@ -5,7 +5,6 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.model.persistables.Tag;
-import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
 import org.junit.After;
@@ -22,7 +21,7 @@ public class TangleTest {
     private final TemporaryFolder dbFolder = new TemporaryFolder();
     private final TemporaryFolder logFolder = new TemporaryFolder();
     private Tangle tangle = new Tangle();
-    private static SnapshotProvider snapshotProvider;
+    private static SnapshotProviderImpl snapshotProvider;
 
     private static final Random seed = new Random();
 
@@ -35,7 +34,7 @@ public class TangleTest {
                 logFolder.getRoot().getAbsolutePath(),1000);
         tangle.addPersistenceProvider(rocksDBPersistenceProvider);
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
     }
 
     @After

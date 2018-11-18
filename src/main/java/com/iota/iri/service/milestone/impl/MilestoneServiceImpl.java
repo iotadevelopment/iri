@@ -47,40 +47,40 @@ public class MilestoneServiceImpl implements MilestoneService {
     /**
      * Holds the tangle object which acts as a database interface.<br />
      */
-    private final Tangle tangle;
+    private Tangle tangle;
 
     /**
      * Holds the snapshot provider which gives us access to the relevant snapshots.<br />
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Holds a reference to the service instance of the snapshot package that allows us to rollback ledger states.<br />
      */
-    private final SnapshotService snapshotService;
+    private SnapshotService snapshotService;
 
     /**
      * Holds the ZeroMQ interface that allows us to emit messages for external recipients.<br />
      */
-    private final MessageQ messageQ;
+    private MessageQ messageQ;
 
     /**
      * Holds the config with important milestone specific settings.<br />
      */
-    private final IotaConfig config;
+    private IotaConfig config;
 
     /**
      * Creates a service instance that allows us to interact with the milestones.<br />
      * <br />
      * It simply stores the passed in dependencies in the internal properties.<br />
      *
-     * @param tangle Tangle object which acts as a database interface
-     * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots
-     * @param snapshotService service instance of the snapshot package that allows us to rollback ledger states
-     * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
-     * @param config config with important milestone specific settings
      */
-    public MilestoneServiceImpl(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+    public MilestoneServiceImpl() {
+
+
+    }
+
+    public MilestoneServiceImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
             MessageQ messageQ, IotaConfig config) {
 
         this.tangle = tangle;
@@ -88,6 +88,8 @@ public class MilestoneServiceImpl implements MilestoneService {
         this.snapshotService = snapshotService;
         this.messageQ = messageQ;
         this.config = config;
+
+        return this;
     }
 
     //region {PUBLIC METHODS] //////////////////////////////////////////////////////////////////////////////////////////

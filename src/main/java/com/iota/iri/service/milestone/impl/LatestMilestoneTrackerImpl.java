@@ -56,28 +56,28 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
     /**
      * Holds the Tangle object which acts as a database interface.<br />
      */
-    private final Tangle tangle;
+    private Tangle tangle;
 
     /**
      * The snapshot provider which gives us access to the relevant snapshots that the node uses (for faster
      * bootstrapping).<br />
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Service class containing the business logic of the milestone package.<br />
      */
-    private final MilestoneService milestoneService;
+    private MilestoneService milestoneService;
 
     /**
      * Holds a reference to the manager that takes care of solidifying milestones.<br />
      */
-    private final MilestoneSolidifier milestoneSolidifier;
+    private MilestoneSolidifier milestoneSolidifier;
 
     /**
      * Holds a reference to the ZeroMQ interface that allows us to emit messages for external recipients.<br />
      */
-    private final MessageQ messageQ;
+    private MessageQ messageQ;
 
     /**
      * Holds a reference to the manager of the background worker.<br />
@@ -88,7 +88,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
     /**
      * Holds the coordinator address which is used to filter possible milestone candidates.<br />
      */
-    private final Hash coordinatorAddress;
+    private Hash coordinatorAddress;
 
     /**
      * Holds the milestone index of the latest milestone that we have seen / processed.<br />
@@ -131,16 +131,25 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      * milestone. It simply stores the passed in parameters in their corresponding properties and bootstraps the
      * tracker with values for the latest milestone that can be found quickly.<br />
      *
+     */
+    public LatestMilestoneTrackerImpl() {
+    }
+
+    /**
+     *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
      * @param milestoneService contains the important business logic when dealing with milestones
      * @param milestoneSolidifier manager that takes care of solidifying milestones
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
      * @param config configuration object which allows us to determine the important config parameters of the node
+     *
+     * @return
      */
-    public LatestMilestoneTrackerImpl(Tangle tangle, SnapshotProvider snapshotProvider,
+    public LatestMilestoneTrackerImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ,
             IotaConfig config) {
+
 
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
@@ -151,6 +160,8 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
         coordinatorAddress = HashFactory.ADDRESS.create(config.getCoordinator());
 
         bootstrapLatestMilestoneValue();
+
+        return this;
     }
 
     /**

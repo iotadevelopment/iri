@@ -8,7 +8,6 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
-import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -28,7 +27,7 @@ public class MilestoneTrackerTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static SnapshotProvider snapshotProvider;
+    private static SnapshotProviderImpl snapshotProvider;
     private static MilestoneTracker milestoneTracker;
 
 
@@ -43,7 +42,7 @@ public class MilestoneTrackerTest {
     @BeforeClass
     public static void beforeClass() throws Exception {
         tangle = new Tangle();
-        snapshotProvider = new SnapshotProviderImpl(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
@@ -63,7 +62,7 @@ public class MilestoneTrackerTest {
         configuration.parseConfigFromArgs(args);
 
         MessageQ messageQ = Mockito.mock(MessageQ.class);
-        TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider.getInitialSnapshot(), new TipsViewModel(), new TransactionRequester(tangle, snapshotProvider.getInitialSnapshot(), messageQ));
+        TransactionValidator transactionValidator = new TransactionValidator(tangle, snapshotProvider, new TipsViewModel(), new TransactionRequester(tangle, snapshotProvider, messageQ));
         milestoneTracker = new MilestoneTracker(tangle, snapshotProvider, transactionValidator, messageQ, Snapshot.init(configuration).clone(), configuration);
     }
 

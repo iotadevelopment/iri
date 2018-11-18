@@ -2,7 +2,7 @@ package com.iota.iri.service.transactionpruning.async;
 
 import com.iota.iri.conf.SnapshotConfig;
 import com.iota.iri.controllers.TipsViewModel;
-import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPrunerJob;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
@@ -54,14 +54,14 @@ public class AsyncTransactionPruner implements TransactionPruner {
     private final Tangle tangle;
 
     /**
+     * Data provider for the snapshots that are relevant for the node.
+     */
+    private final SnapshotProvider snapshotProvider;
+
+    /**
      * Manager for the tips (required for removing pruned transactions from this manager).
      */
     private final TipsViewModel tipsViewModel;
-
-    /**
-     * Last local or global snapshot that acts as a starting point for the state of ledger.
-     */
-    private final Snapshot snapshot;
 
     /**
      * Configuration with important snapshot related parameters.
@@ -109,16 +109,16 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * special logic for the way they are executed, we register the builtin job types here.
      *
      * @param tangle Tangle object which acts as a database interface
+     * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param tipsViewModel manager for the tips (required for removing pruned transactions from this manager)
-     * @param snapshot last local or global snapshot that acts as a starting point for the state of ledger
      * @param config Configuration with important snapshot related configuration parameters
      */
-    public AsyncTransactionPruner(Tangle tangle, TipsViewModel tipsViewModel, Snapshot snapshot,
+    public AsyncTransactionPruner(Tangle tangle, SnapshotProvider snapshotProvider, TipsViewModel tipsViewModel,
             SnapshotConfig config) {
 
         this.tangle = tangle;
+        this.snapshotProvider = snapshotProvider;
         this.tipsViewModel = tipsViewModel;
-        this.snapshot = snapshot;
         this.config = config;
 
         addJobQueue(UnconfirmedSubtanglePrunerJob.class, new SimpleJobQueue(this));
@@ -138,7 +138,7 @@ public class AsyncTransactionPruner implements TransactionPruner {
         job.setTransactionPruner(this);
         job.setTangle(tangle);
         job.setTipsViewModel(tipsViewModel);
-        job.setSnapshot(snapshot);
+        job.setSnapshot(snapshotProvider.getInitialSnapshot());
 
         // this call is "unchecked" to a "raw" JobQueue and it is intended since the matching JobQueue is defined by the
         // registered job types
