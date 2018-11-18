@@ -2,6 +2,7 @@ package com.iota.iri.network;
 
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
 import com.iota.iri.zmq.MessageQ;
 import com.iota.iri.storage.Tangle;
 import org.apache.commons.lang3.ArrayUtils;
@@ -10,11 +11,22 @@ import org.slf4j.LoggerFactory;
 
 import java.security.SecureRandom;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by paul on 3/27/17.
  */
 public class TransactionRequester {
+    /**
+     * Holds the minimum amount of transactions in the request queue that are required for the requester {@link Thread}
+     * to become active.
+     */
+    private static final int REQUESTER_THREAD_ACTIVATION_THRESHOLD = 50;
+
+     /**
+     * Holds the time in milliseconds, that the requester thread waits between its iterations.
+     */
+    private static final int REQUESTER_THREAD_INTERVAL = 100;
 
     private static final Logger log = LoggerFactory.getLogger(TransactionRequester.class);
     private final MessageQ messageQ;
@@ -30,9 +42,26 @@ public class TransactionRequester {
     private final Object syncObj = new Object();
     private final Tangle tangle;
 
+    private final DedicatedScheduledExecutorService executorService = new DedicatedScheduledExecutorService("Transaction Requester", e);
+
     public TransactionRequester(Tangle tangle, MessageQ messageQ) {
         this.tangle = tangle;
         this.messageQ = messageQ;
+    }
+
+    public void start() {
+        executorService.silentScheduleWithFixedDelay(this::requestThread, 0, REQUESTER_THREAD_INTERVAL,
+                TimeUnit.MILLISECONDS);
+    }
+
+    public void shutdown() {
+        executorService.shutdownNow();
+    }
+
+    private void requestThread() {
+        if (numberOfTransactionsToRequest() > REQUESTER_THREAD_ACTIVATION_THRESHOLD) {
+            node.get
+        }
     }
 
     public void init(double pRemoveRequest) {

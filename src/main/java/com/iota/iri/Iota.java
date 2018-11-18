@@ -91,6 +91,7 @@ public class Iota {
         transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
         transactionRequester.init(configuration.getpRemoveRequest());
+        transactionRequester.start();
         udpReceiver.init();
         replicator.init();
         node.init();
