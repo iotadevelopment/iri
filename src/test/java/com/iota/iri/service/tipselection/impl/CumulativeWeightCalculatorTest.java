@@ -51,7 +51,7 @@ public class CumulativeWeightCalculatorTest {
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder
                 .getRoot().getAbsolutePath(), 1000));
         tangle.init();
-        cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
+        cumulativeWeightCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider);
     }
 
     @Test

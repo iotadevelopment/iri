@@ -10,13 +10,11 @@ import com.iota.iri.network.UDPReceiver;
 import com.iota.iri.network.replicator.Replicator;
 import com.iota.iri.service.TipsSolidifier;
 import com.iota.iri.service.ledger.impl.LedgerServiceImpl;
-import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.milestone.impl.LatestMilestoneTrackerImpl;
 import com.iota.iri.service.milestone.impl.LatestSolidMilestoneTrackerImpl;
 import com.iota.iri.service.milestone.impl.MilestoneServiceImpl;
 import com.iota.iri.service.milestone.impl.MilestoneSolidifierImpl;
 import com.iota.iri.service.milestone.impl.SeenMilestonesRetrieverImpl;
-import com.iota.iri.service.snapshot.LocalSnapshotManager;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.impl.LocalSnapshotManagerImpl;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
@@ -31,7 +29,6 @@ import com.iota.iri.service.tipselection.impl.EntryPointSelectorImpl;
 import com.iota.iri.service.tipselection.impl.TailFinderImpl;
 import com.iota.iri.service.tipselection.impl.TipSelectorImpl;
 import com.iota.iri.service.tipselection.impl.WalkerAlpha;
-import com.iota.iri.service.transactionpruning.TransactionPruner;
 import com.iota.iri.service.transactionpruning.TransactionPruningException;
 import com.iota.iri.service.transactionpruning.async.AsyncTransactionPruner;
 import com.iota.iri.storage.Indexable;
@@ -89,7 +86,7 @@ public class Iota {
     public Iota(IotaConfig configuration) throws TransactionPruningException, SnapshotException {
         this.configuration = configuration;
 
-        // create required instances
+        // new refactored instances
         snapshotProvider = new SnapshotProviderImpl();
         snapshotService = new SnapshotServiceImpl();
         localSnapshotManager = new LocalSnapshotManagerImpl();
@@ -100,6 +97,7 @@ public class Iota {
         milestoneSolidifier = new MilestoneSolidifierImpl();
         transactionPruner = new AsyncTransactionPruner();
 
+        // legacy code
         tangle = new Tangle();
         messageQ = MessageQ.createWith(configuration);
         tipsViewModel = new TipsViewModel();
@@ -191,10 +189,6 @@ public class Iota {
     }
 
     public void shutdown() throws Exception {
-        latestMilestoneTracker.shutdown();
-        latestSolidMilestoneTracker.shutdown();
-        seenMilestonesRetriever.shutdown();
-        milestoneSolidifier.shutdown();
         tipsSolidifier.shutdown();
         node.shutdown();
         udpReceiver.shutdown();
@@ -202,13 +196,19 @@ public class Iota {
         transactionValidator.shutdown();
         tangle.shutdown();
         messageQ.shutdown();
+
+        // shutdown in reverse starting order (to not break any dependencies)
+        milestoneSolidifier.shutdown();
+        seenMilestonesRetriever.shutdown();
+        latestSolidMilestoneTracker.shutdown();
+        latestMilestoneTracker.shutdown();
         snapshotProvider.shutdown();
 
         if (configuration.getLocalSnapshotsEnabled()) {
             localSnapshotManager.shutdown();
 
             if (configuration.getLocalSnapshotsPruningEnabled()) {
-                ((AsyncTransactionPruner) transactionPruner).shutdown();
+                transactionPruner.shutdown();
             }
         }
     }
@@ -233,7 +233,7 @@ public class Iota {
 
     private TipSelector createTipSelector(TipSelConfig config) {
         EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
-        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider.getInitialSnapshot());
+        RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider);
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
         return new TipSelectorImpl(tangle, snapshotProvider, ledgerService, entryPointSelector, ratingCalculator,

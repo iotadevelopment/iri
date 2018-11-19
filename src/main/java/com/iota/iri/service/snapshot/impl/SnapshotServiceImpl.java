@@ -32,7 +32,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
- * Implements the basic contract of the {@link SnapshotService}.
+ * Creates a service instance that allows us to access the business logic for {@link Snapshot}s.<br />
+ * <br />
+ * The service instance is stateless and can be shared.<br />
  */
 public class SnapshotServiceImpl implements SnapshotService {
     /**
@@ -70,18 +72,21 @@ public class SnapshotServiceImpl implements SnapshotService {
     private SnapshotConfig config;
 
     /**
-     * Creates a service instance that allows us to interact with the snapshots.<br />
+     * This method initializes the instance and registers its dependencies.<br />
      * <br />
-     * It simply stores the passed in dependencies in the internal properties.<br />
-     */
-    public SnapshotServiceImpl() {
-    }
-
-    /**
+     * It simply stores the passed in values in their corresponding private properties and loads the snapshots.<br />
+     * <br />
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code SnapshotService snapshotService = new SnapshotServiceImpl().init(...);}
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param config important snapshot related configuration parameters
+     * @return the initialized instance itself to allow chaining
      */
     public SnapshotServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config) {
         this.tangle = tangle;
