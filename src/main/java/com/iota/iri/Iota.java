@@ -280,7 +280,8 @@ public class Iota {
     }
 
     private TipSelector createTipSelector(TipSelConfig config) {
-        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider);
+        EntryPointSelector entryPointSelector = new EntryPointSelectorImpl(tangle, snapshotProvider,
+                latestMilestoneTracker);
         RatingCalculator ratingCalculator = new CumulativeWeightCalculator(tangle, snapshotProvider);
         TailFinder tailFinder = new TailFinderImpl(tangle);
         Walker walker = new WalkerAlpha(tailFinder, tangle, messageQ, new SecureRandom(), config);
