@@ -15,11 +15,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class implements the basic contract of the {@link SeenMilestonesRetriever} by providing a manager that requests
- * milestones that are "in range" for "immediate solidification".<br />
+ * Creates a manager that proactively requests the missing "seen milestones" (defined in the local snapshot file).<br />
  * <br />
- * This means the manager does not request all missing milestones at once, but focuses on the milestones that are
- * directly following our latest solid milestone which will allow us to sync
+ * It simply stores the passed in dependencies in their corresponding properties and then makes a copy of the {@code
+ * seenMilestones} of the initial snapshot which will consequently be requested.<br />
+ * <br />
+ * Once the manager finishes to request all "seen milestones" it will automatically {@link #shutdown()} (when being
+ * {@link #start()}ed before).<br />
  */
 public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
     /**
@@ -66,25 +68,22 @@ public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
     private Map<Hash, Integer> seenMilestones;
 
     /**
-     * Creates a manager that proactively requests the missing "seen milestones" (defined in the local snapshot
-     * file).<br />
+     * This method initializes the instance and registers its dependencies.<br />
      * <br />
-     * It simply stores the passed in dependencies in their corresponding properties and then makes a copy of the
-     * {@code seenMilestones} of the initial snapshot which will consequently be requested.<br />
+     * It simply stores the passed in values in their corresponding private properties and creates a working copy of the
+     * seen milestones (which will get processed by the background worker).<br />
      * <br />
-     * Once the manager finishes to request all "seen milestones" it will automatically {@link #shutdown()} (when being
-     * {@link #start()}ed before).<br />
-     *
-     */
-    public SeenMilestonesRetrieverImpl() {
-
-    }
-
-    /**
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code seenMilestonesRetriever = new SeenMilestonesRetrieverImpl().init(...);}
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots to calculate our range
      * @param transactionRequester allows us to issue requests for the missing milestones
+     * @return the initialized instance itself to allow chaining
      */
     public SeenMilestonesRetrieverImpl init(Tangle tangle, SnapshotProvider snapshotProvider,
             TransactionRequester transactionRequester) {
