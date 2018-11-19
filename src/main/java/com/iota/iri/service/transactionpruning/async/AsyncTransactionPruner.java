@@ -21,11 +21,12 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * This class implements the contract of the {@link TransactionPruner} while executing the jobs asynchronously in the
- * background.
- *
- * To start the background processing of pruning tasks one has to make use of the additional {@link #start()} and
- * {@link #shutdown()} methods.
+ * Creates a {@link TransactionPruner} that is able to process it's jobs asynchronously in the background and persists
+ * its state in a file on the hard disk of the node.<br />
+ * <br />
+ * The asynchronous processing of the jobs is done through {@link Thread}s that are started and stopped by invoking the
+ * corresponding {@link #start()} and {@link #shutdown()} methods. Since some of the builtin jobs require a special
+ * logic for the way they are executed, we register the builtin job types here.<br />
  */
 public class AsyncTransactionPruner implements TransactionPruner {
     /**
@@ -101,25 +102,26 @@ public class AsyncTransactionPruner implements TransactionPruner {
     private boolean persistRequested = false;
 
     /**
-     * Creates a {@link TransactionPruner} that is able to process it's jobs asynchronously in the background and
-     * persists its state in a file on the hard disk of the node.
+     * This method initializes the instance and registers its dependencies.<br />
+     * <br />
+     * It simply stores the passed in values in their corresponding private properties.<br />
+     * <br />
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code asyncTransactionPruner = new AsyncTransactionPruner().init(...);}
      *
-     * The asynchronous processing of the jobs is done through {@link Thread}s that are started and stopped by invoking
-     * the corresponding {@link #start()} and {@link #shutdown()} methods. Since some of the builtin jobs require a
-     * special logic for the way they are executed, we register the builtin job types here.
-     */
-    public AsyncTransactionPruner() {
-    }
-
-    /**
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param tipsViewModel manager for the tips (required for removing pruned transactions from this manager)
      * @param config Configuration with important snapshot related configuration parameters
-     * @return
+     * @return the initialized instance itself to allow chaining
      */
     public AsyncTransactionPruner init(Tangle tangle, SnapshotProvider snapshotProvider, TipsViewModel tipsViewModel,
             SnapshotConfig config) {
+
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.tipsViewModel = tipsViewModel;
