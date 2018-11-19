@@ -28,8 +28,8 @@ import java.util.*;
 public class WalkValidatorImpl implements WalkValidator {
 
     private final Tangle tangle;
-    private final SnapshotProvider snapshotProvider;
     private final Logger log = LoggerFactory.getLogger(WalkValidator.class);
+    private final SnapshotProvider snapshotProvider;
     private final LedgerService ledgerService;
     private final TipSelConfig config;
 
