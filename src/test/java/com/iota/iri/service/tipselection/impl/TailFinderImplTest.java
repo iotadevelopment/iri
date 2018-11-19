@@ -39,7 +39,7 @@ public class TailFinderImplTest {
     @BeforeClass
     public static void setUp() throws Exception {
         tangle = new Tangle();
-        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().init(new MainnetConfig());
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder

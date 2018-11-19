@@ -54,11 +54,11 @@ import java.util.List;
 public class Iota {
     private static final Logger log = LoggerFactory.getLogger(Iota.class);
 
-    public final Tangle tangle;
-
     public final SnapshotProviderImpl snapshotProvider;
 
     public final SnapshotServiceImpl snapshotService;
+
+    public final LocalSnapshotManagerImpl localSnapshotManager;
 
     public final MilestoneServiceImpl milestoneService;
 
@@ -70,9 +70,11 @@ public class Iota {
 
     public final LedgerServiceImpl ledgerService = new LedgerServiceImpl();
 
-    public final MilestoneSolidifier milestoneSolidifier;
-    public final TransactionPruner transactionPruner;
-    public final LocalSnapshotManager localSnapshotManager;
+    public final AsyncTransactionPruner transactionPruner;
+
+    public final MilestoneSolidifierImpl milestoneSolidifier;
+
+    public final Tangle tangle;
     public final TransactionValidator transactionValidator;
     public final TipsSolidifier tipsSolidifier;
     public final TransactionRequester transactionRequester;
@@ -90,13 +92,13 @@ public class Iota {
         // create required instances
         snapshotProvider = new SnapshotProviderImpl();
         snapshotService = new SnapshotServiceImpl();
+        localSnapshotManager = new LocalSnapshotManagerImpl();
         milestoneService = new MilestoneServiceImpl();
         latestMilestoneTracker = new LatestMilestoneTrackerImpl();
         latestSolidMilestoneTracker = new LatestSolidMilestoneTrackerImpl();
         seenMilestonesRetriever = new SeenMilestonesRetrieverImpl();
-
-        // in
-        injectDependencies();
+        milestoneSolidifier = new MilestoneSolidifierImpl();
+        transactionPruner = new AsyncTransactionPruner();
 
         tangle = new Tangle();
         messageQ = MessageQ.createWith(configuration);
@@ -110,12 +112,7 @@ public class Iota {
         tipsSolidifier = new TipsSolidifier(tangle, transactionValidator, tipsViewModel);
         tipsSelector = createTipSelector(configuration);
 
-        transactionPruner = new AsyncTransactionPruner(tangle, snapshotProvider, tipsViewModel, configuration);
-        transactionPruner.restoreState();
-        localSnapshotManager = new LocalSnapshotManagerImpl(snapshotProvider, snapshotService, transactionPruner, tangle, configuration);
-
-
-        milestoneSolidifier = new MilestoneSolidifierImpl(snapshotProvider.getInitialSnapshot(), transactionValidator);
+        injectDependencies();
     }
 
     public void init() throws Exception {
@@ -131,35 +128,41 @@ public class Iota {
             tangle.clearColumn(com.iota.iri.model.StateDiff.class);
             tangle.clearMetadata(com.iota.iri.model.persistables.Transaction.class);
         }
-        latestMilestoneTracker.start();
-        latestSolidMilestoneTracker.start();
-        seenMilestonesRetriever.start();
-        milestoneSolidifier.start();
+
         transactionValidator.init(configuration.isTestnet(), configuration.getMwm());
         tipsSolidifier.init();
         transactionRequester.init(configuration.getpRemoveRequest());
         udpReceiver.init();
         replicator.init();
         node.init();
+
+        latestMilestoneTracker.start();
+        latestSolidMilestoneTracker.start();
+        seenMilestonesRetriever.start();
+        milestoneSolidifier.start();
+
         if (configuration.getLocalSnapshotsEnabled()) {
             localSnapshotManager.start(latestMilestoneTracker);
 
             if (configuration.getLocalSnapshotsPruningEnabled()) {
-                 ((AsyncTransactionPruner) transactionPruner).start();
+                 transactionPruner.start();
             }
         }
     }
 
-    private void injectDependencies() throws SnapshotException {
-        snapshotProvider.injectDependencies(configuration);
-        snapshotService.injectDependencies(tangle, snapshotProvider, configuration);
-        milestoneService.injectDependencies(tangle, snapshotProvider, snapshotService, messageQ, configuration);
-        seenMilestonesRetriever.injectDependencies(tangle, snapshotProvider, transactionRequester);
-        latestMilestoneTracker.injectDependencies(tangle, snapshotProvider, milestoneService, milestoneSolidifier,
+    private void injectDependencies() throws SnapshotException, TransactionPruningException {
+        snapshotProvider.init(configuration);
+        snapshotService.init(tangle, snapshotProvider, configuration);
+        localSnapshotManager.init(snapshotProvider, snapshotService, transactionPruner, configuration);
+        milestoneService.init(tangle, snapshotProvider, snapshotService, messageQ, configuration);
+        latestMilestoneTracker.init(tangle, snapshotProvider, milestoneService, milestoneSolidifier,
                 messageQ, configuration);
         latestSolidMilestoneTracker.init(tangle, snapshotProvider, milestoneService, ledgerService,
                 latestMilestoneTracker, messageQ);
+        seenMilestonesRetriever.init(tangle, snapshotProvider, transactionRequester);
+        milestoneSolidifier.init(snapshotProvider, transactionValidator);
         ledgerService.init(tangle, snapshotProvider, snapshotService, milestoneService);
+        transactionPruner.init(tangle, snapshotProvider, tipsViewModel, configuration).restoreState();
     }
 
     private void rescanDb() throws Exception {

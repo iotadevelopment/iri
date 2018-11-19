@@ -80,7 +80,7 @@ public class MilestoneServiceImpl implements MilestoneService {
 
     }
 
-    public MilestoneServiceImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+    public MilestoneServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
             MessageQ messageQ, IotaConfig config) {
 
         this.tangle = tangle;

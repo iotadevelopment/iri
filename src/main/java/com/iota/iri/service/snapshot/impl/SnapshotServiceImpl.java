@@ -83,7 +83,7 @@ public class SnapshotServiceImpl implements SnapshotService {
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param config important snapshot related configuration parameters
      */
-    public SnapshotServiceImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config) {
+    public SnapshotServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.config = config;

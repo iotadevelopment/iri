@@ -86,7 +86,7 @@ public class SeenMilestonesRetrieverImpl implements SeenMilestonesRetriever {
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots to calculate our range
      * @param transactionRequester allows us to issue requests for the missing milestones
      */
-    public SeenMilestonesRetrieverImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider, TransactionRequester transactionRequester) {
+    public SeenMilestonesRetrieverImpl init(Tangle tangle, SnapshotProvider snapshotProvider, TransactionRequester transactionRequester) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.transactionRequester = transactionRequester;

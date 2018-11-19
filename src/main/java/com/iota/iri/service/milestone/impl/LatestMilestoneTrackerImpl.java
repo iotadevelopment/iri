@@ -146,10 +146,9 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      *
      * @return
      */
-    public LatestMilestoneTrackerImpl injectDependencies(Tangle tangle, SnapshotProvider snapshotProvider,
+    public LatestMilestoneTrackerImpl init(Tangle tangle, SnapshotProvider snapshotProvider,
             MilestoneService milestoneService, MilestoneSolidifier milestoneSolidifier, MessageQ messageQ,
             IotaConfig config) {
-
 
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
@@ -172,7 +171,8 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      */
     @Override
     public void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex) {
-        messageQ.publish("lmi %d %d", this.latestMilestoneIndex, latestMilestoneIndex);
+        messageQ.publish("lmi %d %d", this.latestMilestoneIndex,
+                latestMilestoneIndex);
         log.delegate().info("Latest milestone has changed from #" + this.latestMilestoneIndex + " to #" +
                 latestMilestoneIndex);
 

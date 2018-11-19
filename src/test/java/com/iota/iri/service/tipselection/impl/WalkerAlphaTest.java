@@ -46,7 +46,7 @@ public class WalkerAlphaTest {
     public static void setUp() throws Exception {
         MainnetConfig config = new MainnetConfig();
         tangle = new Tangle();
-        snapshotProvider = new SnapshotProviderImpl().injectDependencies(config);
+        snapshotProvider = new SnapshotProviderImpl().init(config);
         dbFolder.create();
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder

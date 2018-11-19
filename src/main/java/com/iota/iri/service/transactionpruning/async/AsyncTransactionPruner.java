@@ -51,22 +51,22 @@ public class AsyncTransactionPruner implements TransactionPruner {
     /**
      * Tangle object which acts as a database interface.
      */
-    private final Tangle tangle;
+    private Tangle tangle;
 
     /**
      * Data provider for the snapshots that are relevant for the node.
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Manager for the tips (required for removing pruned transactions from this manager).
      */
-    private final TipsViewModel tipsViewModel;
+    private TipsViewModel tipsViewModel;
 
     /**
      * Configuration with important snapshot related parameters.
      */
-    private final SnapshotConfig config;
+    private SnapshotConfig config;
 
     /**
      * Holds a reference to the {@link ThreadIdentifier} for the cleanup thread.
@@ -107,15 +107,19 @@ public class AsyncTransactionPruner implements TransactionPruner {
      * The asynchronous processing of the jobs is done through {@link Thread}s that are started and stopped by invoking
      * the corresponding {@link #start()} and {@link #shutdown()} methods. Since some of the builtin jobs require a
      * special logic for the way they are executed, we register the builtin job types here.
-     *
+     */
+    public AsyncTransactionPruner() {
+    }
+
+    /**
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param tipsViewModel manager for the tips (required for removing pruned transactions from this manager)
      * @param config Configuration with important snapshot related configuration parameters
+     * @return
      */
-    public AsyncTransactionPruner(Tangle tangle, SnapshotProvider snapshotProvider, TipsViewModel tipsViewModel,
+    public AsyncTransactionPruner init(Tangle tangle, SnapshotProvider snapshotProvider, TipsViewModel tipsViewModel,
             SnapshotConfig config) {
-
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
         this.tipsViewModel = tipsViewModel;
@@ -126,6 +130,8 @@ public class AsyncTransactionPruner implements TransactionPruner {
 
         registerParser(MilestonePrunerJob.class, MilestonePrunerJob::parse);
         registerParser(UnconfirmedSubtanglePrunerJob.class, UnconfirmedSubtanglePrunerJob::parse);
+
+        return this;
     }
 
     /**

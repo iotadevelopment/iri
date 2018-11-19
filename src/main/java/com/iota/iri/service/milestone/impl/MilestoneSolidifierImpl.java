@@ -4,6 +4,7 @@ import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
 import com.iota.iri.service.snapshot.Snapshot;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
 import com.iota.iri.utils.thread.SilentScheduledExecutorService;
@@ -50,12 +51,12 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
     /**
      * Holds a reference to the initial Snapshot which allows us to check if milestones are still relevant.<br />
      */
-    private final Snapshot initialSnapshot;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Holds a reference to the TransactionValidator which allows us to issue solidity checks.<br />
      */
-    private final TransactionValidator transactionValidator;
+    private TransactionValidator transactionValidator;
 
     /**
      * Holds a reference to the manager of the background worker.<br />
@@ -95,12 +96,21 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
      * <br />
      * It simply stores the passed in parameters to be able to access them later on.<br />
      *
+     */
+    public MilestoneSolidifierImpl() {
+    }
+
+    /**
+     *
      * @param initialSnapshot initial Snapshot instance that is used by the node
      * @param transactionValidator TransactionValidator instance that is used by the node
+     * @return
      */
-    public MilestoneSolidifierImpl(Snapshot initialSnapshot, TransactionValidator transactionValidator) {
-        this.initialSnapshot = initialSnapshot;
+    public MilestoneSolidifierImpl init(SnapshotProvider snapshotProvider, TransactionValidator transactionValidator) {
+        this.snapshotProvider = snapshotProvider;
         this.transactionValidator = transactionValidator;
+
+        return this;
     }
 
     /**
@@ -113,7 +123,7 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
     @Override
     public void add(Hash milestoneHash, int milestoneIndex) {
         if (!unsolidMilestonesPool.containsKey(milestoneHash) && !newlyAddedMilestones.containsKey(milestoneHash) &&
-                milestoneIndex > initialSnapshot.getIndex()) {
+                milestoneIndex > snapshotProvider.getInitialSnapshot().getIndex()) {
 
             newlyAddedMilestones.put(milestoneHash, milestoneIndex);
         }
@@ -212,7 +222,7 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
 
             Map.Entry<Hash, Integer> currentEntry = iterator.next();
 
-            if (currentEntry.getValue() <= initialSnapshot.getIndex() || isSolid(currentEntry)) {
+            if (currentEntry.getValue() <= snapshotProvider.getInitialSnapshot().getIndex() || isSolid(currentEntry)) {
                 unsolidMilestonesPool.remove(currentEntry.getKey());
                 iterator.remove();
 

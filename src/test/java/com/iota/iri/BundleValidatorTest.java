@@ -30,7 +30,7 @@ public class BundleValidatorTest {
         logFolder.create();
         tangle.addPersistenceProvider(new RocksDBPersistenceProvider(dbFolder.getRoot().getAbsolutePath(), logFolder.getRoot().getAbsolutePath(),1000));
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().init(new MainnetConfig());
     }
 
     @AfterClass

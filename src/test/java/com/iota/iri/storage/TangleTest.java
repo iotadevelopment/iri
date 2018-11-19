@@ -34,7 +34,7 @@ public class TangleTest {
                 logFolder.getRoot().getAbsolutePath(),1000);
         tangle.addPersistenceProvider(rocksDBPersistenceProvider);
         tangle.init();
-        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().init(new MainnetConfig());
     }
 
     @After

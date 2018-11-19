@@ -87,7 +87,7 @@ public class SnapshotProviderImpl implements SnapshotProvider {
      * @param config Snapshot related configuration parameters
      * @throws SnapshotException if anything goes wrong while trying to read the snapshots
      */
-    public SnapshotProviderImpl injectDependencies(SnapshotConfig config) throws SnapshotException {
+    public SnapshotProviderImpl init(SnapshotConfig config) throws SnapshotException {
         this.config = config;
 
         loadSnapshots();

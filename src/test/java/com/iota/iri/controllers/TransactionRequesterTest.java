@@ -23,7 +23,7 @@ public class TransactionRequesterTest {
 
     @Before
     public void setUp() throws Exception {
-        snapshotProvider = new SnapshotProviderImpl().injectDependencies(new MainnetConfig());
+        snapshotProvider = new SnapshotProviderImpl().init(new MainnetConfig());
     }
 
     @After

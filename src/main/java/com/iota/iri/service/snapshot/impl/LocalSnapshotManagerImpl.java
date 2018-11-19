@@ -32,27 +32,22 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     /**
      * Data provider for the relevant {@link com.iota.iri.service.snapshot.Snapshot} instances.
      */
-    private final SnapshotProvider snapshotProvider;
+    private SnapshotProvider snapshotProvider;
 
     /**
      * Service that contains the logic for generating local {@link com.iota.iri.service.snapshot.Snapshot}s.
      */
-    private final SnapshotService snapshotService;
+    private SnapshotService snapshotService;
 
     /**
      * Manager for the pruning jobs that allows us to clean up old transactions.
      */
-    private final TransactionPruner transactionPruner;
-
-    /**
-     * Tangle object which acts as a database interface.
-     */
-    private final Tangle tangle;
+    private TransactionPruner transactionPruner;
 
     /**
      * Configuration with important snapshot related parameters.
      */
-    private final SnapshotConfig config;
+    private SnapshotConfig config;
 
     /**
      * Holds a reference to the {@link ThreadIdentifier} for the monitor thread.
@@ -67,20 +62,27 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      * defined intervals have passed.
      *
      * It simply stores the passed in parameters in their private properties.
+     */
+    public LocalSnapshotManagerImpl() {
+    }
+
+    /**
      *
      * @param snapshotProvider data provider for the relevant {@link com.iota.iri.service.snapshot.Snapshot} instances
      * @param transactionPruner manager for the pruning jobs that allows us to clean up old transactions
-     * @param tangle object which acts as a database interface
      * @param config configuration with important snapshot related parameters
+     *
+     * @return
      */
-    public LocalSnapshotManagerImpl(SnapshotProvider snapshotProvider, SnapshotService snapshotService,
-            TransactionPruner transactionPruner, Tangle tangle, SnapshotConfig config) {
+    public LocalSnapshotManagerImpl init(SnapshotProvider snapshotProvider, SnapshotService snapshotService,
+            TransactionPruner transactionPruner, SnapshotConfig config) {
 
         this.snapshotProvider = snapshotProvider;
         this.snapshotService = snapshotService;
         this.transactionPruner = transactionPruner;
-        this.tangle = tangle;
         this.config = config;
+
+        return this;
     }
 
     /**
