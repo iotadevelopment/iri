@@ -10,7 +10,9 @@ import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.collections.interfaces.UnIterableMap;
 
 import java.security.InvalidAlgorithmParameterException;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of <tt>TipSelector</tt> that selects 2 tips,

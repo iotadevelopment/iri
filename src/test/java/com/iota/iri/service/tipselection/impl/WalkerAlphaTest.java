@@ -4,6 +4,7 @@ import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashId;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.service.tipselection.RatingCalculator;
 import com.iota.iri.storage.Tangle;
@@ -30,7 +31,7 @@ public class WalkerAlphaTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static SnapshotProviderImpl snapshotProvider;
+    private static SnapshotProvider snapshotProvider;
     private static WalkerAlpha walker;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 

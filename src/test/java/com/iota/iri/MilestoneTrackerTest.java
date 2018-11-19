@@ -8,6 +8,7 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.TransactionHash;
 import com.iota.iri.network.TransactionRequester;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -27,7 +28,7 @@ public class MilestoneTrackerTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static SnapshotProviderImpl snapshotProvider;
+    private static SnapshotProvider snapshotProvider;
     private static MilestoneTracker milestoneTracker;
 
 

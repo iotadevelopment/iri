@@ -5,6 +5,7 @@ import com.iota.iri.conf.MainnetConfig;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.controllers.TransactionViewModelTest;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.impl.SnapshotProviderImpl;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.storage.rocksDB.RocksDBPersistenceProvider;
@@ -21,7 +22,7 @@ public class TailFinderImplTest {
     private static final TemporaryFolder dbFolder = new TemporaryFolder();
     private static final TemporaryFolder logFolder = new TemporaryFolder();
     private static Tangle tangle;
-    private static SnapshotProviderImpl snapshotProvider;
+    private static SnapshotProvider snapshotProvider;
     private TailFinderImpl tailFinder;
 
     public TailFinderImplTest() {
