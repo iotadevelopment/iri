@@ -3,7 +3,6 @@ package com.iota.iri.service.milestone.impl;
 import com.iota.iri.TransactionValidator;
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.milestone.MilestoneSolidifier;
-import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.thread.DedicatedScheduledExecutorService;
@@ -49,7 +48,7 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
     private static final IntervalLogger log = new IntervalLogger(MilestoneSolidifier.class);
 
     /**
-     * Holds a reference to the initial Snapshot which allows us to check if milestones are still relevant.<br />
+     * Holds the snapshot provider which gives us access to the relevant snapshots.<br />
      */
     private SnapshotProvider snapshotProvider;
 
