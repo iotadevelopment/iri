@@ -17,8 +17,7 @@ import com.iota.iri.storage.Tangle;
 import java.util.*;
 
 /**
- * Represents the service that contains all the relevant business logic for modifying and calculating the ledger
- * state.<br />
+ * Creates a service instance that allows us to perform ledger state specific operations.<br />
  * <br />
  * This class is stateless and does not hold any domain specific models.<br />
  */
@@ -42,15 +41,6 @@ public class LedgerServiceImpl implements LedgerService {
      * Holds a reference to the service instance containing the business logic of the milestone package.<br />
      */
     private MilestoneService milestoneService;
-
-    /**
-     * Creates a service instance that allows us to perform ledger state specific operations.<br />
-     * <br />
-     * It simply stores the passed in dependencies in the internal properties.<br />
-     *
-
-     */
-    public LedgerServiceImpl() {}
 
     /**
      * This method initializes the instance and registers its dependencies.<br />
