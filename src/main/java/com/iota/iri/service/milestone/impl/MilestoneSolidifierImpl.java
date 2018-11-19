@@ -92,19 +92,20 @@ public class MilestoneSolidifierImpl implements MilestoneSolidifier {
     private Map.Entry<Hash, Integer> youngestMilestoneInQueue = null;
 
     /**
-     * Constructor of the class.<br />
+     * This method initializes the instance and registers its dependencies.<br />
      * <br />
-     * It simply stores the passed in parameters to be able to access them later on.<br />
+     * It simply stores the passed in values in their corresponding private properties.<br />
+     * <br />
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code milestoneSolidifier = new MilestoneSolidifierImpl().init(...);}
      *
-     */
-    public MilestoneSolidifierImpl() {
-    }
-
-    /**
-     *
-     * @param initialSnapshot initial Snapshot instance that is used by the node
+     * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots
      * @param transactionValidator TransactionValidator instance that is used by the node
-     * @return
+     * @return the initialized instance itself to allow chaining
      */
     public MilestoneSolidifierImpl init(SnapshotProvider snapshotProvider, TransactionValidator transactionValidator) {
         this.snapshotProvider = snapshotProvider;
