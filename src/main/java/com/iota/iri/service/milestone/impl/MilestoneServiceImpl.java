@@ -70,17 +70,6 @@ public class MilestoneServiceImpl implements MilestoneService {
     private ConsensusConfig config;
 
     /**
-     * Creates a service instance that allows us to interact with the milestones.<br />
-     * <br />
-     * It simply stores the passed in dependencies in the internal properties.<br />
-     *
-     */
-    public MilestoneServiceImpl() {
-
-
-    }
-
-    /**
      * This method initializes the instance and registers its dependencies.<br />
      * <br />
      * It simply stores the passed in values in their corresponding private properties.<br />
