@@ -182,6 +182,7 @@ public class MilestoneServiceImpl implements MilestoneService {
 
                                     resetCorruptedMilestone(newMilestoneViewModel.index());
                                 }
+
                                 return VALID;
                             } else {
                                 return INVALID;

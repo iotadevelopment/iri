@@ -171,8 +171,7 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      */
     @Override
     public void setLatestMilestone(Hash latestMilestoneHash, int latestMilestoneIndex) {
-        messageQ.publish("lmi %d %d", this.latestMilestoneIndex,
-                latestMilestoneIndex);
+        messageQ.publish("lmi %d %d", this.latestMilestoneIndex, latestMilestoneIndex);
         log.delegate().info("Latest milestone has changed from #" + this.latestMilestoneIndex + " to #" +
                 latestMilestoneIndex);
 
