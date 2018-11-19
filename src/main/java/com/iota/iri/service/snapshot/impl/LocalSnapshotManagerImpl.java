@@ -70,7 +70,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
      *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
      *       <br />
-     *       {@code LocalSnapshotManager localSnapshotManager = new LocalSnapshotManagerImpl().init(...);}
+     *       {@code localSnapshotManager = new LocalSnapshotManagerImpl().init(...);}
      *
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param snapshotService service instance of the snapshot package that gives us access to packages' business logic

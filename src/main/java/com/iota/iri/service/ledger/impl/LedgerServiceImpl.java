@@ -52,7 +52,7 @@ public class LedgerServiceImpl implements LedgerService {
      *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
      *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
      *       <br />
-     *       {@code LedgerService ledgerService = new LedgerServiceImpl().init(...);}
+     *       {@code ledgerService = new LedgerServiceImpl().init(...);}
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots

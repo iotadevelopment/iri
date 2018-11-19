@@ -81,7 +81,7 @@ public class SnapshotServiceImpl implements SnapshotService {
      *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
      *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
      *       <br />
-     *       {@code SnapshotService snapshotService = new SnapshotServiceImpl().init(...);}
+     *       {@code snapshotService = new SnapshotServiceImpl().init(...);}
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the snapshots that are relevant for the node

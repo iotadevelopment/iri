@@ -89,7 +89,7 @@ public class SnapshotProviderImpl implements SnapshotProvider {
      *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
      *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
      *       <br />
-     *       {@code SnapshotProvider snapshotProvider = new SnapshotProviderImpl().init(...);}
+     *       {@code snapshotProvider = new SnapshotProviderImpl().init(...);}
      *
      * @param config Snapshot related configuration parameters
      * @throws SnapshotException if anything goes wrong while trying to read the snapshots
