@@ -1,7 +1,7 @@
 package com.iota.iri.service.milestone.impl;
 
 import com.iota.iri.BundleValidator;
-import com.iota.iri.conf.IotaConfig;
+import com.iota.iri.conf.ConsensusConfig;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.Curl;
@@ -67,7 +67,7 @@ public class MilestoneServiceImpl implements MilestoneService {
     /**
      * Holds the config with important milestone specific settings.<br />
      */
-    private IotaConfig config;
+    private ConsensusConfig config;
 
     /**
      * Creates a service instance that allows us to interact with the milestones.<br />
@@ -81,7 +81,7 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     public MilestoneServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
-            MessageQ messageQ, IotaConfig config) {
+            MessageQ messageQ, ConsensusConfig config) {
 
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;

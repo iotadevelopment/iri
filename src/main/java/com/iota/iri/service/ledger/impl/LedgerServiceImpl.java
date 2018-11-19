@@ -53,12 +53,22 @@ public class LedgerServiceImpl implements LedgerService {
     public LedgerServiceImpl() {}
 
     /**
+     * This method initializes the instance and registers its dependencies.<br />
+     * <br />
+     * It simply stores the passed in values in their corresponding private properties.<br />
+     * <br />
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code LedgerService ledgerService = new LedgerServiceImpl().init(...);}
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider snapshot provider which gives us access to the relevant snapshots
-     * @param snapshotService service instance of the snapshot package that allows us to rollback ledger states
+     * @param snapshotService service instance of the snapshot package that gives us access to packages' business logic
      * @param milestoneService contains the important business logic when dealing with milestones
-     * @return
+     * @return the initialized instance itself to allow chaining
      */
     public LedgerServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotService snapshotService,
             MilestoneService milestoneService) {
@@ -208,9 +218,9 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     /**
-     * This method generates the {@link com.iota.iri.model.StateDiff} that belongs to the given milestone in the
-     * database and marks all transactions that have been approved by the milestone accordingly by setting their
-     * {@code snapshotIndex} value.<br />
+     * Generates the {@link com.iota.iri.model.StateDiff} that belongs to the given milestone in the database and marks
+     * all transactions that have been approved by the milestone accordingly by setting their {@code snapshotIndex}
+     * value.<br />
      * <br />
      * It first checks if the {@code snapshotIndex} of the transaction belonging to the milestone was correctly set
      * already (to determine if this milestone was processed already) and proceeds to generate the {@link

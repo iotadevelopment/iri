@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Creates a service instance that allows us to access the business logic for {@link Snapshot}s.<br />
  * <br />
- * The service instance is stateless and can be shared.<br />
+ * The service instance is stateless and can be shared by multiple other consumers.<br />
  */
 public class SnapshotServiceImpl implements SnapshotService {
     /**
@@ -74,7 +74,7 @@ public class SnapshotServiceImpl implements SnapshotService {
     /**
      * This method initializes the instance and registers its dependencies.<br />
      * <br />
-     * It simply stores the passed in values in their corresponding private properties and loads the snapshots.<br />
+     * It simply stores the passed in values in their corresponding private properties.<br />
      * <br />
      * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
      *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the

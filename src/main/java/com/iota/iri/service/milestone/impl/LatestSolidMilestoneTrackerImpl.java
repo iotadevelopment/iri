@@ -19,9 +19,13 @@ import com.iota.iri.zmq.MessageQ;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class implements the basic contract of the {@link LatestSolidMilestoneTracker} and extends it with mechanisms to
- * recover from database corruptions by incorporating a backoff strategy that reverts the changes introduced by previous
- * milestones whenever an error is detected until the problem causing milestone was found.<br />
+ * Creates a manager that keeps track of the latest solid milestones and that triggers the application of these
+ * milestones and their corresponding balance changes to the latest {@link Snapshot} by incorporating a background
+ * worker that periodically checks for new solid milestones.<br />
+ * <br />
+ * It extends this with a mechanisms to recover from database corruptions by using a backoff strategy that reverts the
+ * changes introduced by previous milestones whenever an error is detected until the problem causing milestone was
+ * found.<br />
  */
 public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTracker {
     /**
@@ -156,7 +160,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method contains the logic for the background worker.<br />
+     * Contains the logic for the background worker.<br />
      * <br />
      * It simply calls {@link #checkForNewLatestSolidMilestones()} and wraps with a log handler that prevents the {@link
      * MilestoneException} to crash the worker.<br />
@@ -170,7 +174,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method tries to apply the given milestone to the ledger.<br />
+     * Applies the given milestone to the ledger.<br />
      * <br />
      * If the application of the milestone fails, we start a repair routine which will revert the milestones preceding
      * our current milestone and consequently try to reapply them in the next iteration of the {@link
@@ -188,7 +192,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method resets the internal variables that are used to keep track of the repair process.<br />
+     * Resets the internal variables that are used to keep track of the repair process.<br />
      * <br />
      * It gets called whenever we advance to a milestone that has a higher milestone index than the milestone that
      * initially caused the repair routine to kick in (see {@link #revertPrecedingMilestones(MilestoneViewModel)}.<br />
@@ -203,8 +207,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method is a utility method that allows us to keep the {@link LatestMilestoneTracker} in sync with our
-     * current progress.<br />
+     * Keeps the {@link LatestMilestoneTracker} in sync with our current progress.<br />
      * <br />
      * Since the {@link LatestMilestoneTracker} scans all old milestones during its startup (which can take a while to
      * finish) it can happen that we see a newer latest milestone faster than this manager.<br />
@@ -221,7 +224,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method emits a log message whenever the latest solid milestone changes.<br />
+     * Emits a log message whenever the latest solid milestone changes.<br />
      * <br />
      * It simply compares the current latest milestone index against the previous milestone index and emits the log
      * messages using the {@link #log} and the {@link #messageQ} instances if it differs.<br />
@@ -242,7 +245,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     }
 
     /**
-     * This method tries to actively repair the ledger by reverting the milestones preceding the given milestone.<br />
+     * Tries to actively repair the ledger by reverting the milestones preceding the given milestone.<br />
      * <br />
      * It gets called when a milestone could not be applied to the ledger state because of problems like "inconsistent
      * balances". While this should theoretically never happen (because milestones are by definition "consistent"), it

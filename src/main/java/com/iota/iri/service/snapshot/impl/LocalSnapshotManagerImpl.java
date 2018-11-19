@@ -7,7 +7,6 @@ import com.iota.iri.service.snapshot.SnapshotService;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.transactionpruning.TransactionPruner;
-import com.iota.iri.storage.Tangle;
 
 import com.iota.iri.utils.thread.ThreadIdentifier;
 import com.iota.iri.utils.thread.ThreadUtils;
@@ -15,7 +14,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implements the basic contract of the {@link LocalSnapshotManager}.
+ * Creates a manager for the local snapshots, that takes care of automatically creating local snapshots when the defined
+ * intervals have passed.<br />
+ * <br />
+ * It incorporates a background worker that periodically checks if a new snapshot is due (see {@link
+ * #start(LatestMilestoneTracker)} and {@link #shutdown()}).<br />
  */
 public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     /**
@@ -58,21 +61,22 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     private ThreadIdentifier monitorThreadIdentifier = new ThreadIdentifier("Local Snapshots Monitor");
 
     /**
-     * Creates the {@link LocalSnapshotManager} that takes care of automatically creating local snapshots when the
-     * defined intervals have passed.
+     * This method initializes the instance and registers its dependencies.<br />
+     * <br />
+     * It simply stores the passed in values in their corresponding private properties.<br />
+     * <br />
+     * Note: Instead of handing over the dependencies in the constructor, we register them lazy. This allows us to have
+     *       circular dependencies because the instantiation is separated from the dependency injection. To reduce the
+     *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
+     *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
+     *       <br />
+     *       {@code LocalSnapshotManager localSnapshotManager = new LocalSnapshotManagerImpl().init(...);}
      *
-     * It simply stores the passed in parameters in their private properties.
-     */
-    public LocalSnapshotManagerImpl() {
-    }
-
-    /**
-     *
-     * @param snapshotProvider data provider for the relevant {@link com.iota.iri.service.snapshot.Snapshot} instances
+     * @param snapshotProvider data provider for the snapshots that are relevant for the node
+     * @param snapshotService service instance of the snapshot package that gives us access to packages' business logic
      * @param transactionPruner manager for the pruning jobs that allows us to clean up old transactions
-     * @param config configuration with important snapshot related parameters
-     *
-     * @return
+     * @param config important snapshot related configuration parameters
+     * @return the initialized instance itself to allow chaining
      */
     public LocalSnapshotManagerImpl init(SnapshotProvider snapshotProvider, SnapshotService snapshotService,
             TransactionPruner transactionPruner, SnapshotConfig config) {
@@ -113,7 +117,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      */
     private void monitorThread(LatestMilestoneTracker latestMilestoneTracker) {
         while (!Thread.currentThread().isInterrupted()) {
-            int localSnapshotInterval = latestMilestoneTracker.initialScanComplete() &&
+            int localSnapshotInterval = latestMilestoneTracker.isInitialScanComplete() &&
                     snapshotProvider.getLatestSnapshot().getIndex() == latestMilestoneTracker.getLatestMilestoneIndex()
                     ? config.getLocalSnapshotsIntervalSynced()
                     : config.getLocalSnapshotsIntervalUnsynced();
