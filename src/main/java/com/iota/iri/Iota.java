@@ -116,6 +116,7 @@ public class Iota {
      * Initializes the latest snapshot and then creates all services needed to run an IOTA node.
      *
      * @param configuration Information about how this node will be configured.
+     * @throws TransactionPruningException If the TransactionPruner could not restore its state.
      * @throws SnapshotException If the Snapshot fails to initialize.
      *                           This can happen if the snapshot signature is invalid or the file cannot be read.
      */
