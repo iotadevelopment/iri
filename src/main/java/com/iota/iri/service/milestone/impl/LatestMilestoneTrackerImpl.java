@@ -134,7 +134,11 @@ public class LatestMilestoneTrackerImpl implements LatestMilestoneTracker {
      *       amount of code that is necessary to correctly instantiate this class, we return the instance itself which
      *       allows us to still instantiate, initialize and assign in one line - see Example:<br />
      *       <br />
+<<<<<<< HEAD
      *       {@code latestMilestoneTracker = new LatestMilestoneTrackerImpl().init(...);}
+=======
+     *       {@code LatestMilestoneTracker latestMilestoneTracker = new LatestMilestoneTrackerImpl().init(...);}
+>>>>>>> b2825bd02a44e08c930e92f3c980ebd4806093d3
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node

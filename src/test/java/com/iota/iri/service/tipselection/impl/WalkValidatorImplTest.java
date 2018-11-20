@@ -123,8 +123,7 @@ public class WalkValidatorImplTest {
         Mockito.when(ledgerService.isBalanceDiffConsistent(new HashSet<>(), new HashMap<>(), hash))
                 .thenReturn(true);
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
-        WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService,
-                config);
+        WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
         Assert.assertFalse("Validation succeeded but should have failed tx is below max depth",
                 walkValidator.isValid(hash));
     }
@@ -231,7 +230,7 @@ public class WalkValidatorImplTest {
         snapshotProvider.getLatestSnapshot().setIndex(Integer.MAX_VALUE);
 
         WalkValidatorImpl walkValidator = new WalkValidatorImpl(tangle, snapshotProvider, ledgerService, config);
-        Assert.assertFalse("Validation succeded but should have failed due to inconsistent ledger balances",
+        Assert.assertFalse("Validation succeded but should have failed due to inconsistent ledger state",
                 walkValidator.isValid(hash));
     }
 
