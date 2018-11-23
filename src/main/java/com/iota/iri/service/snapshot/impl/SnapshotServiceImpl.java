@@ -43,6 +43,12 @@ public class SnapshotServiceImpl implements SnapshotService {
     private static final Logger log = LoggerFactory.getLogger(SnapshotServiceImpl.class);
 
     /**
+     * Holds a limit for the amount of milestones we go back in time when generating the solid entry points (to speed up
+     * the snapshot creation).<br />
+     */
+    private static final int OUTER_SHELL_SIZE = 100;
+
+    /**
      * If transactions got orphaned we wait this additional time (in seconds) until we consider them orphaned.
      */
     private static final int ORPHANED_TRANSACTION_GRACE_TIME = 3600;
@@ -620,7 +626,8 @@ public class SnapshotServiceImpl implements SnapshotService {
                 "Taking local snapshot [generating solid entry points]", log);
 
         try {
-            progressLogger.start(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex());
+            progressLogger.start(Math.min(targetMilestone.index() - snapshotProvider.getInitialSnapshot().getIndex(),
+                    OUTER_SHELL_SIZE));
 
             MilestoneViewModel nextMilestone = targetMilestone;
             while (nextMilestone != null && nextMilestone.index() > snapshotProvider.getInitialSnapshot().getIndex() &&
