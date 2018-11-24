@@ -68,6 +68,11 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
             "Latest Solid Milestone Tracker", log.delegate());
 
     /**
+     * Boolean flag that is used to identify the first iteration of the background worker.<br />
+     */
+    private boolean firstRun = true;
+
+    /**
      * This method initializes the instance and registers its dependencies.<br />
      * <br />
      * It simply stores the passed in values in their corresponding private properties.<br />
@@ -95,12 +100,6 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         this.latestMilestoneTracker = latestMilestoneTracker;
         this.messageQ = messageQ;
 
-        try {
-            ledgerService.restoreLedgerState();
-        } catch(LedgerException e) {
-            log.error("failed to fast forward the latest solid milestone", e);
-        }
-
         return this;
     }
 
@@ -124,6 +123,13 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
     @Override
     public void checkForNewLatestSolidMilestones() throws MilestoneException {
         try {
+            if (firstRun) {
+                firstRun = false;
+
+                ledgerService.restoreLedgerState();
+                logChange(snapshotProvider.getInitialSnapshot().getIndex());
+            }
+
             int currentSolidMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex();
             if (currentSolidMilestoneIndex < latestMilestoneTracker.getLatestMilestoneIndex()) {
                 MilestoneViewModel nextMilestone;
