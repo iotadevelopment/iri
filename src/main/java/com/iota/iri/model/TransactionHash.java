@@ -6,10 +6,14 @@ import com.iota.iri.utils.Converter;
 
 public class TransactionHash extends AbstractHash {
 
+    public TransactionHash() {
+        super();
+    }
+
 	protected TransactionHash(byte[] source, int offset, int sourceSize) {
 		super(source, offset, sourceSize);
 	}
-	
+
     /**
      * Calculates a transaction hash from an array of bytes. Uses the entire trits array
      * @param mode The mode we absorb the trits with
@@ -22,7 +26,7 @@ public class TransactionHash extends AbstractHash {
 
     /**
      * Calculates a transaction hash from an array of bytes
-     * @param bytes The bytes that contain this transactionHash 
+     * @param bytes The bytes that contain this transactionHash
      * @param tritsLength The length of trits the bytes represent
      * @param sponge The way we absorb the trits with
      * @return The {@link TransactionHash}
