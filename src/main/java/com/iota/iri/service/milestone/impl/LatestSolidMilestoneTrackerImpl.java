@@ -3,6 +3,7 @@ package com.iota.iri.service.milestone.impl;
 import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.model.Hash;
+import com.iota.iri.service.ledger.LedgerException;
 import com.iota.iri.service.ledger.LedgerService;
 import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.milestone.MilestoneException;
@@ -80,7 +81,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider manager for the snapshots that allows us to retrieve the relevant snapshots of this node
-     * @param ledgerService the manager for
+     * @param ledgerService service class containing the business logic for interacting with the ledger
      * @param latestMilestoneTracker the manager that keeps track of the latest milestone
      * @param messageQ ZeroMQ interface that allows us to emit messages for external recipients
      * @return the initialized instance itself to allow chaining
@@ -93,6 +94,12 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         this.ledgerService = ledgerService;
         this.latestMilestoneTracker = latestMilestoneTracker;
         this.messageQ = messageQ;
+
+        try {
+            ledgerService.restoreLedgerState();
+        } catch(LedgerException e) {
+            log.error("failed to fast forward the latest solid milestone", e);
+        }
 
         return this;
     }
@@ -124,7 +131,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
                         (nextMilestone = MilestoneViewModel.get(tangle, currentSolidMilestoneIndex + 1)) != null &&
                         TransactionViewModel.fromHash(tangle, nextMilestone.getHash()).isSolid()) {
 
-                    syncLatestMilestoneTracker(nextMilestone);
+                    syncLatestMilestoneTracker(nextMilestone.getHash(), nextMilestone.index());
 
                     if (!ledgerService.applyMilestoneToLedger(nextMilestone)) {
                         throw new MilestoneException("failed to apply milestone to ledger due to db inconsistencies");
@@ -134,6 +141,9 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
 
                     currentSolidMilestoneIndex = snapshotProvider.getLatestSnapshot().getIndex();
                 }
+            } else {
+                syncLatestMilestoneTracker(snapshotProvider.getLatestSnapshot().getHash(),
+                        snapshotProvider.getLatestSnapshot().getIndex());
             }
         } catch (Exception e) {
             throw new MilestoneException(e);
@@ -163,11 +173,12 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * Note: This method ensures that the latest milestone index is always bigger or equals the latest solid milestone
      *       index.
      *
-     * @param processedMilestone the milestone that currently gets processed
+     * @param milestoneHash transaction hash of the milestone
+     * @param milestoneIndex milestone index
      */
-    private void syncLatestMilestoneTracker(MilestoneViewModel processedMilestone) {
-        if(processedMilestone.index() > latestMilestoneTracker.getLatestMilestoneIndex()) {
-            latestMilestoneTracker.setLatestMilestone(processedMilestone.getHash(), processedMilestone.index());
+    private void syncLatestMilestoneTracker(Hash milestoneHash, int milestoneIndex) {
+        if(milestoneIndex > latestMilestoneTracker.getLatestMilestoneIndex()) {
+            latestMilestoneTracker.setLatestMilestone(milestoneHash, milestoneIndex);
         }
     }
 

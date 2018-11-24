@@ -2,7 +2,10 @@ package com.iota.iri.controllers;
 
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.StateDiff;
+import com.iota.iri.storage.Indexable;
+import com.iota.iri.storage.Persistable;
 import com.iota.iri.storage.Tangle;
+import com.iota.iri.utils.Pair;
 
 import java.util.Map;
 
@@ -48,5 +51,14 @@ public class StateDiffViewModel {
 
     public void delete(Tangle tangle) throws Exception {
         tangle.delete(StateDiff.class, hash);
+    }
+
+    public static StateDiffViewModel latest(Tangle tangle) throws Exception {
+        Pair<Indexable, Persistable> stateDiffPair = tangle.getLatest(StateDiff.class, Hash.class);
+        if(stateDiffPair != null && stateDiffPair.hi != null) {
+            StateDiff stateDiff = (StateDiff) stateDiffPair.hi;
+            return new StateDiffViewModel(stateDiff, (Hash) stateDiffPair.low);
+        }
+        return null;
     }
 }

@@ -8,6 +8,7 @@ import com.iota.iri.model.Hash;
 import com.iota.iri.service.ledger.LedgerException;
 import com.iota.iri.service.ledger.LedgerService;
 import com.iota.iri.service.milestone.MilestoneService;
+import com.iota.iri.service.snapshot.Snapshot;
 import com.iota.iri.service.snapshot.SnapshotException;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.service.snapshot.SnapshotService;
@@ -69,6 +70,25 @@ public class LedgerServiceImpl implements LedgerService {
         this.milestoneService = milestoneService;
 
         return this;
+    }
+
+    @Override
+    public void restoreLedgerState() throws LedgerException {
+        Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
+
+        try {
+            StateDiffViewModel latestStateDiff = StateDiffViewModel.latest(tangle);
+            if (latestStateDiff != null) {
+                TransactionViewModel milestoneTx = TransactionViewModel.fromHash(tangle, latestStateDiff.getHash());
+                if (milestoneTx.getType() != TransactionViewModel.PREFILLED_SLOT && milestoneTx.snapshotIndex() != 0 &&
+                        latestSnapshot.getIndex() < milestoneTx.snapshotIndex()) {
+
+                    snapshotService.replayMilestones(latestSnapshot, milestoneTx.snapshotIndex());
+                }
+            }
+        } catch (Exception e) {
+            throw new LedgerException("unexpected error while restoring the ledger state", e);
+        }
     }
 
     @Override
