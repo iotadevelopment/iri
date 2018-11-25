@@ -149,7 +149,9 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
             if (firstRun) {
                 firstRun = false;
 
+                System.out.println("INITIALIZING LEDGER ====================================================");
                 ledgerService.restoreLedgerState();
+                System.out.println("DONE INITIALIZING LEDGER ====================================================");
                 logChange(snapshotProvider.getInitialSnapshot().getIndex());
             }
 
