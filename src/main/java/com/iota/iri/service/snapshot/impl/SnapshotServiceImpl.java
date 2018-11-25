@@ -114,10 +114,7 @@ public class SnapshotServiceImpl implements SnapshotService {
     public void replayMilestones(Snapshot snapshot, int targetMilestoneIndex) throws SnapshotException {
         Map<Hash, Long> balanceChanges = new HashMap<>();
         Set<Integer> skippedMilestones = new HashSet<>();
-
-        Integer lastAppliedIndex = null;
-        Hash lastAppliedHash = null;
-        Long lastAppliedTimestamp = null;
+        MilestoneViewModel lastAppliedMilestone = null;
 
         try {
             for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex;
@@ -134,13 +131,7 @@ public class SnapshotServiceImpl implements SnapshotService {
                         });
                     }
 
-                    lastAppliedIndex = currentMilestone.index();
-                    lastAppliedHash = currentMilestone.getHash();
-
-                    TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, currentMilestone.getHash());
-                    if(milestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
-                        lastAppliedTimestamp = milestoneTransaction.getTimestamp();
-                    }
+                    lastAppliedMilestone = currentMilestone;
 
                     log.info("SOLID: " + currentMilestoneIndex);
                 } else {
@@ -153,14 +144,14 @@ public class SnapshotServiceImpl implements SnapshotService {
 
                 snapshot.applyStateDiff(new SnapshotStateDiffImpl(balanceChanges));
 
-                if (lastAppliedIndex != null) {
-                    snapshot.setIndex(lastAppliedIndex);
-                }
-                if (lastAppliedHash != null) {
-                    snapshot.setHash(lastAppliedHash);
-                }
-                if (lastAppliedTimestamp != null) {
-                    snapshot.setTimestamp(lastAppliedTimestamp);
+                if (lastAppliedMilestone != null) {
+                    snapshot.setIndex(lastAppliedMilestone.index());
+                    snapshot.setHash(lastAppliedMilestone.getHash());
+
+                    TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, lastAppliedMilestone.getHash());
+                    if(milestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
+                        snapshot.setTimestamp(milestoneTransaction.getTimestamp());
+                    }
                 }
 
                 for (int skippedMilestoneIndex : skippedMilestones) {
