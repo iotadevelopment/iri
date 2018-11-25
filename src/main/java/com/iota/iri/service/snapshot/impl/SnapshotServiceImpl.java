@@ -120,8 +120,7 @@ public class SnapshotServiceImpl implements SnapshotService {
         IntervalLogger intervalLogger = new IntervalLogger(log);
 
         try {
-            for (int currentMilestoneIndex = snapshot.getIndex() + 1; !Thread.currentThread().isInterrupted() &&
-                    currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
+            for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
 
                 MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                 if (currentMilestone != null) {
