@@ -75,7 +75,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
      * Holds a reference to the manager of the background worker.<br />
      */
     private final SilentScheduledExecutorService executorService = new DedicatedScheduledExecutorService(
-            "Latest Solid Milestone Tracker", log.delegate());
+            "Latest Solid Milestone Tracker", log.delegate(), true);
 
     /**
      * Boolean flag that is used to identify the first iteration of the background worker.<br />
