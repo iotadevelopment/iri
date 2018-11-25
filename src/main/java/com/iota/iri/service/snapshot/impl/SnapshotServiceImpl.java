@@ -18,6 +18,7 @@ import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 import com.iota.iri.service.transactionpruning.jobs.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.log.ProgressLogger;
+import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.log.interval.IntervalProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.utils.dag.TraversalException;
@@ -116,9 +117,11 @@ public class SnapshotServiceImpl implements SnapshotService {
         Set<Integer> skippedMilestones = new HashSet<>();
         MilestoneViewModel lastAppliedMilestone = null;
 
+        IntervalLogger intervalLogger = new IntervalLogger(log);
+
         try {
-            for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex;
-                 currentMilestoneIndex++) {
+            for (int currentMilestoneIndex = snapshot.getIndex() + 1; !Thread.currentThread().isInterrupted() &&
+                    currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
 
                 MilestoneViewModel currentMilestone = MilestoneViewModel.get(tangle, currentMilestoneIndex);
                 if (currentMilestone != null) {
@@ -133,7 +136,7 @@ public class SnapshotServiceImpl implements SnapshotService {
 
                     lastAppliedMilestone = currentMilestone;
 
-                    log.info("SOLID: " + currentMilestoneIndex);
+                    intervalLogger.info("SOLID: " + currentMilestoneIndex);
                 } else {
                     skippedMilestones.add(currentMilestoneIndex);
                 }
