@@ -141,6 +141,8 @@ public class SnapshotServiceImpl implements SnapshotService {
                     if(milestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT) {
                         lastAppliedTimestamp = milestoneTransaction.getTimestamp();
                     }
+
+                    log.info("SOLID: " + currentMilestoneIndex);
                 } else {
                     skippedMilestones.add(currentMilestoneIndex);
                 }
