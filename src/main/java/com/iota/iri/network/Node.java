@@ -5,10 +5,10 @@ import com.iota.iri.conf.NodeConfig;
 import com.iota.iri.controllers.TipsViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
-import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.model.Hash;
 import com.iota.iri.model.HashFactory;
 import com.iota.iri.model.TransactionHash;
+import com.iota.iri.service.milestone.LatestMilestoneTracker;
 import com.iota.iri.service.snapshot.SnapshotProvider;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.zmq.MessageQ;
@@ -584,6 +584,19 @@ public class Node {
         sendPacketsCounter.getAndIncrement();
     }
 
+    /**
+     * Does the same as {@link #sendPacket(DatagramPacket, TransactionViewModel, Neighbor)} but defaults to using the
+     * same internal {@link #sendingPacket} as all the other methods in this class, which allows external callers to
+     * send packets that are in "sync" (sending is synchronized over the packet object) with the rest of the methods
+     * used in this class.<br />
+     *
+     * @param transactionViewModel the transaction that shall be sent
+     * @param neighbor the neighbor that should receive the packet
+     * @throws Exception if anything unexpected happens during the sending of the packet
+     */
+    public void sendPacket(TransactionViewModel transactionViewModel, Neighbor neighbor) throws Exception {
+        sendPacket(sendingPacket, transactionViewModel, neighbor);
+    }
 
     /**
      * This thread picks up a new transaction from the broadcast queue and
