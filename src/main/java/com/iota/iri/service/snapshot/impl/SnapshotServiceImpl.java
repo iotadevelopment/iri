@@ -135,8 +135,6 @@ public class SnapshotServiceImpl implements SnapshotService {
                     }
 
                     lastAppliedMilestone = currentMilestone;
-
-                    intervalLogger.info("SOLID: " + currentMilestoneIndex);
                 } else {
                     skippedMilestones.add(currentMilestoneIndex);
                 }
