@@ -117,7 +117,7 @@ public class SnapshotServiceImpl implements SnapshotService {
         Set<Integer> skippedMilestones = new HashSet<>();
         MilestoneViewModel lastAppliedMilestone = null;
 
-        IntervalLogger intervalLogger = new IntervalLogger(log);
+        System.out.println(targetMilestoneIndex);
 
         try {
             for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
