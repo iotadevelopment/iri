@@ -149,9 +149,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
             if (firstRun) {
                 firstRun = false;
 
-                System.out.println("INITIALIZING LEDGER ====================================================");
                 ledgerService.restoreLedgerState();
-                System.out.println("DONE INITIALIZING LEDGER ====================================================");
                 logChange(snapshotProvider.getInitialSnapshot().getIndex());
             }
 
@@ -173,7 +171,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
                         snapshotProvider.getLatestSnapshot().getIndex());
             }
         } catch (Exception e) {
-            throw new MilestoneException(e);
+            throw new MilestoneException("unexpected error while checking for new latest solid milestones", e);
         }
     }
 
@@ -187,7 +185,7 @@ public class LatestSolidMilestoneTrackerImpl implements LatestSolidMilestoneTrac
         try {
             checkForNewLatestSolidMilestones();
         } catch (MilestoneException e) {
-            log.error("error while updating the solid milestone", e);
+            log.error("unexpected error while checking for new latest solid milestones", e.getCause());
         }
     }
 

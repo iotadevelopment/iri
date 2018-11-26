@@ -5,13 +5,15 @@ import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.SpongeFactory;
 import com.iota.iri.model.Hash;
 
+import java.util.Optional;
+
 /**
  * Represents the service that contains all the relevant business logic for interacting with milestones.<br />
  * <br />
  * This class is stateless and does not hold any domain specific models.<br />
  */
 public interface MilestoneService {
-    MilestoneViewModel findLatestProcessedSolidMilestoneInDatabase() throws Exception;
+    Optional<MilestoneViewModel> findLatestProcessedSolidMilestoneInDatabase();
 
     /**
      * Analyzes the given transaction to determine if it is a valid milestone.<br />

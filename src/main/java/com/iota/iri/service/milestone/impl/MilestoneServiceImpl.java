@@ -101,69 +101,83 @@ public class MilestoneServiceImpl implements MilestoneService {
 
     //region {PUBLIC METHODS] //////////////////////////////////////////////////////////////////////////////////////////
 
-
-    public MilestoneViewModel findLatestProcessedSolidMilestoneInDatabase() throws Exception {
-        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
-        if (latestMilestone == null) {
-            return null;
-        }
-
-        // trivial case #1: the node was fully synced
-        if (wasMilestoneAppliedToLedger(latestMilestone)) {
-            return latestMilestone;
-        }
-
-        // trivial case #2: the node was fully synced but the last milestone was not processed, yet
-        MilestoneViewModel latestMilestonePredecessor = MilestoneViewModel.findClosestPrevMilestone(tangle,
-                latestMilestone.index(), snapshotProvider.getInitialSnapshot().getIndex());
-        if (latestMilestonePredecessor != null && wasMilestoneAppliedToLedger(latestMilestonePredecessor)) {
-            return latestMilestonePredecessor;
-        }
-
-        // non-trivial case: do a binary search from the end of the ledger to the front
-        int rangeEnd = latestMilestone.index();
-        int rangeStart = snapshotProvider.getInitialSnapshot().getIndex() + 1;
-
-        MilestoneViewModel lastAppliedCandidate = null;
-        while (rangeEnd - rangeStart >= 0) {
-            // if no candidate found in range -> return last candidate
-            MilestoneViewModel currentCandidate = getMilestoneInMiddleOfRange(rangeStart, rangeEnd);
-            if (currentCandidate == null) {
-                return lastAppliedCandidate;
+    @Override
+    public Optional<MilestoneViewModel> findLatestProcessedSolidMilestoneInDatabase() {
+        try {
+            // if we have no milestone in our database -> abort
+            MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
+            if (latestMilestone == null) {
+                return Optional.empty();
             }
 
-            // if the milestone was applied -> continue to search for later ones that were also applied
-            if (wasMilestoneAppliedToLedger(currentCandidate)) {
-                rangeStart = currentCandidate.index() + 1;
-
-                lastAppliedCandidate = currentCandidate;
+            // trivial case #1: the node was fully synced
+            if (wasMilestoneAppliedToLedger(latestMilestone)) {
+                return Optional.of(latestMilestone);
             }
 
-            // if the milestone was not applied -> continue to search for earlier ones
-            else {
-                rangeEnd = currentCandidate.index() - 1;
+            // trivial case #2: the node was fully synced but the last milestone was not processed, yet
+            MilestoneViewModel latestMilestonePredecessor = MilestoneViewModel.findClosestPrevMilestone(tangle,
+                    latestMilestone.index(), snapshotProvider.getInitialSnapshot().getIndex());
+            if (latestMilestonePredecessor != null && wasMilestoneAppliedToLedger(latestMilestonePredecessor)) {
+                return Optional.of(latestMilestonePredecessor);
             }
+
+            // non-trivial case: do a binary search from the end of the ledger to the front
+            Optional<MilestoneViewModel> lastAppliedCandidate = Optional.empty();
+            int rangeEnd = latestMilestone.index();
+            int rangeStart = snapshotProvider.getInitialSnapshot().getIndex() + 1;
+            while (rangeEnd - rangeStart >= 0) {
+                // if no candidate found in range -> return last candidate
+                MilestoneViewModel currentCandidate = getMilestoneInMiddleOfRange(rangeStart, rangeEnd);
+                if (currentCandidate == null) {
+                    return lastAppliedCandidate;
+                }
+
+                // if the milestone was applied -> continue to search for later ones that were also applied
+                if (wasMilestoneAppliedToLedger(currentCandidate)) {
+                    rangeStart = currentCandidate.index() + 1;
+
+                    lastAppliedCandidate = Optional.of(currentCandidate);
+                }
+
+                // if the milestone was not applied -> continue to search for earlier ones
+                else {
+                    rangeEnd = currentCandidate.index() - 1;
+                }
+            }
+
+            return lastAppliedCandidate;
+        } catch (Exception e) {
+            log.error("unexpected error while trying to find the latest processed solid milestone in the database", e);
+
+            return Optional.empty();
         }
-
-        return lastAppliedCandidate;
     }
 
-    private MilestoneViewModel getMilestoneInMiddleOfRange(int rangeStart, int rangeEnd) throws Exception {
-        int range = rangeEnd - rangeStart;
-        int middleOfRange = rangeEnd - range / 2;
+    private MilestoneViewModel getMilestoneInMiddleOfRange(int rangeStart, int rangeEnd) throws MilestoneException {
+        try {
+            int range = rangeEnd - rangeStart;
+            int middleOfRange = rangeEnd - range / 2;
 
-        MilestoneViewModel milestone = MilestoneViewModel.findClosestNextMilestone(tangle, middleOfRange - 1, rangeEnd);
-        if (milestone == null) {
-            milestone = MilestoneViewModel.findClosestPrevMilestone(tangle, middleOfRange, rangeStart);
+            MilestoneViewModel milestone = MilestoneViewModel.findClosestNextMilestone(tangle, middleOfRange - 1, rangeEnd);
+            if (milestone == null) {
+                milestone = MilestoneViewModel.findClosestPrevMilestone(tangle, middleOfRange, rangeStart);
+            }
+
+            return milestone;
+        } catch (Exception e) {
+            throw new MilestoneException("unexpected error while determining milestone in middle of search range", e);
         }
-
-        return milestone;
     }
 
-    private boolean wasMilestoneAppliedToLedger(MilestoneViewModel milestone) throws Exception {
-        TransactionViewModel latestMilestoneTransaction = TransactionViewModel.fromHash(tangle, milestone.getHash());
-        return latestMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
-                latestMilestoneTransaction.snapshotIndex() != 0;
+    private boolean wasMilestoneAppliedToLedger(MilestoneViewModel milestone) throws MilestoneException {
+        try {
+            TransactionViewModel milestoneTransaction = TransactionViewModel.fromHash(tangle, milestone.getHash());
+            return milestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
+                    milestoneTransaction.snapshotIndex() != 0;
+        } catch (Exception e) {
+            throw new MilestoneException("unexpected error while trying to determine if milestone was applied", e);
+        }
     }
 
     @Override

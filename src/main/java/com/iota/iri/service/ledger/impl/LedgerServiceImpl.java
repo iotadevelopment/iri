@@ -74,27 +74,16 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     public void restoreLedgerState() throws LedgerException {
-        Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
-
         try {
-            MilestoneViewModel latestProcessedMilestone = milestoneService.findLatestProcessedSolidMilestoneInDatabase();
-            if (latestProcessedMilestone != null) {
-                System.out.println("RESTORE ====> "+ latestProcessedMilestone.index());
-                snapshotService.replayMilestones(latestSnapshot, latestProcessedMilestone.index());
-            }
-            /*
-            StateDiffViewModel latestStateDiff = StateDiffViewModel.latest(tangle);
-            if (latestStateDiff != null) {
-                TransactionViewModel milestoneTx = TransactionViewModel.fromHash(tangle, latestStateDiff.getHash());
-                if (milestoneTx.getType() != TransactionViewModel.PREFILLED_SLOT && milestoneTx.snapshotIndex() != 0 &&
-                        latestSnapshot.getIndex() < milestoneTx.snapshotIndex()) {
-
-                    snapshotService.replayMilestones(latestSnapshot, milestoneTx.snapshotIndex());
+            milestoneService.findLatestProcessedSolidMilestoneInDatabase().ifPresent(milestoneViewModel -> {
+                try {
+                    snapshotService.replayMilestones(snapshotProvider.getLatestSnapshot(), milestoneViewModel.index());
+                } catch (SnapshotException e) {
+                    throw new RuntimeException(e);
                 }
-            }
-            */
-        } catch (Exception e) {
-            throw new LedgerException("unexpected error while restoring the ledger state", e);
+            });
+        } catch (RuntimeException e) {
+            throw new LedgerException("unexpected error while restoring the ledger state", e.getCause());
         }
     }
 
