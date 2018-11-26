@@ -87,8 +87,6 @@ public class Iota {
 
     public final LocalSnapshotManagerImpl localSnapshotManager;
 
-    public final LedgerServiceImpl ledgerService = new LedgerServiceImpl();
-
     public final MilestoneServiceImpl milestoneService;
 
     public final LatestMilestoneTrackerImpl latestMilestoneTracker;
@@ -96,6 +94,8 @@ public class Iota {
     public final LatestSolidMilestoneTrackerImpl latestSolidMilestoneTracker;
 
     public final SeenMilestonesRetrieverImpl seenMilestonesRetriever;
+
+    public final LedgerServiceImpl ledgerService = new LedgerServiceImpl();
 
     public final AsyncTransactionPruner transactionPruner;
 
@@ -202,14 +202,13 @@ public class Iota {
         snapshotProvider.init(configuration);
         snapshotService.init(tangle, snapshotProvider, configuration);
         localSnapshotManager.init(snapshotProvider, snapshotService, transactionPruner, configuration);
-        ledgerService.init(tangle, snapshotProvider, snapshotService, milestoneService);
-        milestoneService.init(tangle, snapshotProvider, snapshotService, messageQ, configuration);
         milestoneService.init(tangle, snapshotProvider, snapshotService, messageQ, configuration);
         latestMilestoneTracker.init(tangle, snapshotProvider, milestoneService, milestoneSolidifier,
                 messageQ, configuration);
         latestSolidMilestoneTracker.init(tangle, snapshotProvider, milestoneService, ledgerService,
                 latestMilestoneTracker, messageQ);
         seenMilestonesRetriever.init(tangle, snapshotProvider, transactionRequester);
+        ledgerService.init(tangle, snapshotProvider, snapshotService, milestoneService);
         milestoneSolidifier.init(snapshotProvider, transactionValidator);
         transactionPruner.init(tangle, snapshotProvider, tipsViewModel, configuration).restoreState();
         transactionRequesterWorker.init(tangle, transactionRequester, tipsViewModel, node);
