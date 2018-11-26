@@ -208,8 +208,8 @@ public class Iota {
         latestSolidMilestoneTracker.init(tangle, snapshotProvider, milestoneService, ledgerService,
                 latestMilestoneTracker, messageQ);
         seenMilestonesRetriever.init(tangle, snapshotProvider, transactionRequester);
-        ledgerService.init(tangle, snapshotProvider, snapshotService, milestoneService);
         milestoneSolidifier.init(snapshotProvider, transactionValidator);
+        ledgerService.init(tangle, snapshotProvider, snapshotService, milestoneService);
         transactionPruner.init(tangle, snapshotProvider, tipsViewModel, configuration).restoreState();
         transactionRequesterWorker.init(tangle, transactionRequester, tipsViewModel, node);
     }
