@@ -6,10 +6,6 @@ import com.iota.iri.utils.Converter;
 
 public class TransactionHash extends AbstractHash {
 
-    public TransactionHash() {
-        super();
-    }
-
 	protected TransactionHash(byte[] source, int offset, int sourceSize) {
 		super(source, offset, sourceSize);
 	}
