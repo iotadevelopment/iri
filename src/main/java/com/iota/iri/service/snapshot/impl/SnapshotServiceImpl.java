@@ -18,7 +18,6 @@ import com.iota.iri.service.transactionpruning.jobs.MilestonePrunerJob;
 import com.iota.iri.service.transactionpruning.jobs.UnconfirmedSubtanglePrunerJob;
 import com.iota.iri.storage.Tangle;
 import com.iota.iri.utils.log.ProgressLogger;
-import com.iota.iri.utils.log.interval.IntervalLogger;
 import com.iota.iri.utils.log.interval.IntervalProgressLogger;
 import com.iota.iri.utils.dag.DAGHelper;
 import com.iota.iri.utils.dag.TraversalException;
@@ -116,8 +115,6 @@ public class SnapshotServiceImpl implements SnapshotService {
         Map<Hash, Long> balanceChanges = new HashMap<>();
         Set<Integer> skippedMilestones = new HashSet<>();
         MilestoneViewModel lastAppliedMilestone = null;
-
-        System.out.println(targetMilestoneIndex);
 
         try {
             for (int currentMilestoneIndex = snapshot.getIndex() + 1; currentMilestoneIndex <= targetMilestoneIndex; currentMilestoneIndex++) {
@@ -487,17 +484,13 @@ public class SnapshotServiceImpl implements SnapshotService {
 
         snapshotProvider.writeSnapshotToDisk(newSnapshot, config.getLocalSnapshotsBasePath());
 
-        snapshotProvider.getInitialSnapshot().lockWrite();
         snapshotProvider.getLatestSnapshot().lockWrite();
-
-        snapshotProvider.getInitialSnapshot().update(newSnapshot);
-
         snapshotProvider.getLatestSnapshot().setInitialHash(newSnapshot.getHash());
         snapshotProvider.getLatestSnapshot().setInitialIndex(newSnapshot.getIndex());
         snapshotProvider.getLatestSnapshot().setInitialTimestamp(newSnapshot.getTimestamp());
-
-        snapshotProvider.getInitialSnapshot().unlockWrite();
         snapshotProvider.getLatestSnapshot().unlockWrite();
+
+        snapshotProvider.getInitialSnapshot().update(newSnapshot);
     }
 
     /**

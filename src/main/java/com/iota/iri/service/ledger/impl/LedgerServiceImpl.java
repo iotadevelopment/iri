@@ -77,6 +77,12 @@ public class LedgerServiceImpl implements LedgerService {
         Snapshot latestSnapshot = snapshotProvider.getLatestSnapshot();
 
         try {
+            MilestoneViewModel latestProcessedMilestone = milestoneService.findLatestProcessedSolidMilestoneInDatabase();
+            if (latestProcessedMilestone != null) {
+                System.out.println("RESTORE ====> "+ latestProcessedMilestone.index());
+                snapshotService.replayMilestones(latestSnapshot, latestProcessedMilestone.index());
+            }
+            /*
             StateDiffViewModel latestStateDiff = StateDiffViewModel.latest(tangle);
             if (latestStateDiff != null) {
                 TransactionViewModel milestoneTx = TransactionViewModel.fromHash(tangle, latestStateDiff.getHash());
@@ -86,6 +92,7 @@ public class LedgerServiceImpl implements LedgerService {
                     snapshotService.replayMilestones(latestSnapshot, milestoneTx.snapshotIndex());
                 }
             }
+            */
         } catch (Exception e) {
             throw new LedgerException("unexpected error while restoring the ledger state", e);
         }

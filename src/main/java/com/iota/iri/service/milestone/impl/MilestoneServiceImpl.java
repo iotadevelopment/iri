@@ -101,6 +101,71 @@ public class MilestoneServiceImpl implements MilestoneService {
 
     //region {PUBLIC METHODS] //////////////////////////////////////////////////////////////////////////////////////////
 
+
+    public MilestoneViewModel findLatestProcessedSolidMilestoneInDatabase() throws Exception {
+        MilestoneViewModel latestMilestone = MilestoneViewModel.latest(tangle);
+        if (latestMilestone == null) {
+            return null;
+        }
+
+        // trivial case #1: the node was fully synced
+        if (wasMilestoneAppliedToLedger(latestMilestone)) {
+            return latestMilestone;
+        }
+
+        // trivial case #2: the node was fully synced but the last milestone was not processed, yet
+        MilestoneViewModel latestMilestonePredecessor = MilestoneViewModel.findClosestPrevMilestone(tangle,
+                latestMilestone.index(), snapshotProvider.getInitialSnapshot().getIndex());
+        if (latestMilestonePredecessor != null && wasMilestoneAppliedToLedger(latestMilestonePredecessor)) {
+            return latestMilestonePredecessor;
+        }
+
+        // non-trivial case: do a binary search from the end of the ledger to the front
+        int rangeEnd = latestMilestone.index();
+        int rangeStart = snapshotProvider.getInitialSnapshot().getIndex() + 1;
+
+        MilestoneViewModel lastAppliedCandidate = null;
+        while (rangeEnd - rangeStart >= 0) {
+            // if no candidate found in range -> return last candidate
+            MilestoneViewModel currentCandidate = getMilestoneInMiddleOfRange(rangeStart, rangeEnd);
+            if (currentCandidate == null) {
+                return lastAppliedCandidate;
+            }
+
+            // if the milestone was applied -> continue to search for later ones that were also applied
+            if (wasMilestoneAppliedToLedger(currentCandidate)) {
+                rangeStart = currentCandidate.index() + 1;
+
+                lastAppliedCandidate = currentCandidate;
+            }
+
+            // if the milestone was not applied -> continue to search for earlier ones
+            else {
+                rangeEnd = currentCandidate.index() - 1;
+            }
+        }
+
+        return lastAppliedCandidate;
+    }
+
+    private MilestoneViewModel getMilestoneInMiddleOfRange(int rangeStart, int rangeEnd) throws Exception {
+        int range = rangeEnd - rangeStart;
+        int middleOfRange = rangeEnd - range / 2;
+
+        MilestoneViewModel milestone = MilestoneViewModel.findClosestNextMilestone(tangle, middleOfRange - 1, rangeEnd);
+        if (milestone == null) {
+            milestone = MilestoneViewModel.findClosestPrevMilestone(tangle, middleOfRange, rangeStart);
+        }
+
+        return milestone;
+    }
+
+    private boolean wasMilestoneAppliedToLedger(MilestoneViewModel milestone) throws Exception {
+        TransactionViewModel latestMilestoneTransaction = TransactionViewModel.fromHash(tangle, milestone.getHash());
+        return latestMilestoneTransaction.getType() != TransactionViewModel.PREFILLED_SLOT &&
+                latestMilestoneTransaction.snapshotIndex() != 0;
+    }
+
     @Override
     public void updateMilestoneIndexOfMilestoneTransactions(Hash milestoneHash, int index) throws MilestoneException {
         if (index <= 0) {
