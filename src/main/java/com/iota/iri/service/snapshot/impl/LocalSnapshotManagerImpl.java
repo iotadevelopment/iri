@@ -43,11 +43,6 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
     private SnapshotService snapshotService;
 
     /**
-     * Manager for the pruning jobs that allows us to clean up old transactions.
-     */
-    private TransactionPruner transactionPruner;
-
-    /**
      * Configuration with important snapshot related parameters.
      */
     private SnapshotConfig config;
@@ -74,16 +69,14 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      *
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
      * @param snapshotService service instance of the snapshot package that gives us access to packages' business logic
-     * @param transactionPruner manager for the pruning jobs that allows us to clean up old transactions
      * @param config important snapshot related configuration parameters
      * @return the initialized instance itself to allow chaining
      */
     public LocalSnapshotManagerImpl init(SnapshotProvider snapshotProvider, SnapshotService snapshotService,
-            TransactionPruner transactionPruner, SnapshotConfig config) {
+            SnapshotConfig config) {
 
         this.snapshotProvider = snapshotProvider;
         this.snapshotService = snapshotService;
-        this.transactionPruner = transactionPruner;
         this.config = config;
 
         return this;
@@ -111,7 +104,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
      * It periodically checks if a new {@link com.iota.iri.service.snapshot.Snapshot} has to be taken until the
      * {@link Thread} is terminated. If it detects that a {@link com.iota.iri.service.snapshot.Snapshot} is due it
      * triggers the creation of the {@link com.iota.iri.service.snapshot.Snapshot} by calling
-     * {@link SnapshotService#takeLocalSnapshot(LatestMilestoneTracker, TransactionPruner)}.
+     * {@link SnapshotService#takeLocalSnapshot()}.
      *
      * @param latestMilestoneTracker tracker for the milestones to determine when a new local snapshot is due
      */
@@ -127,7 +120,7 @@ public class LocalSnapshotManagerImpl implements LocalSnapshotManager {
 
             if (latestSnapshotIndex - initialSnapshotIndex > config.getLocalSnapshotsDepth() + localSnapshotInterval) {
                 try {
-                    snapshotService.takeLocalSnapshot(latestMilestoneTracker, transactionPruner);
+                    snapshotService.takeLocalSnapshot();
                 } catch (SnapshotException e) {
                     log.error("error while taking local snapshot", e);
                 }

@@ -66,6 +66,10 @@ public class SnapshotServiceImpl implements SnapshotService {
      */
     private SnapshotProvider snapshotProvider;
 
+    private LatestMilestoneTracker latestMilestoneTracker;
+
+    private TransactionPruner transactionPruner;
+
     /**
      * Holds the config with important snapshot specific settings.<br />
      */
@@ -85,12 +89,17 @@ public class SnapshotServiceImpl implements SnapshotService {
      *
      * @param tangle Tangle object which acts as a database interface
      * @param snapshotProvider data provider for the snapshots that are relevant for the node
+     * @param latestMilestoneTracker milestone tracker that allows us to retrieve information about the known milestones
+     * @param transactionPruner manager for the pruning jobs that takes care of cleaning up the old data that
      * @param config important snapshot related configuration parameters
      * @return the initialized instance itself to allow chaining
      */
-    public SnapshotServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider, SnapshotConfig config) {
+    public SnapshotServiceImpl init(Tangle tangle, SnapshotProvider snapshotProvider,
+            LatestMilestoneTracker latestMilestoneTracker, TransactionPruner transactionPruner, SnapshotConfig config) {
         this.tangle = tangle;
         this.snapshotProvider = snapshotProvider;
+        this.latestMilestoneTracker = latestMilestoneTracker;
+        this.transactionPruner = transactionPruner;
         this.config = config;
 
         return this;
@@ -193,12 +202,10 @@ public class SnapshotServiceImpl implements SnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public void takeLocalSnapshot(LatestMilestoneTracker latestMilestoneTracker, TransactionPruner transactionPruner)
-            throws SnapshotException {
-
+    public void takeLocalSnapshot() throws SnapshotException {
         MilestoneViewModel targetMilestone = determineMilestoneForLocalSnapshot(tangle, snapshotProvider, config);
 
-        Snapshot newSnapshot = generateSnapshot(latestMilestoneTracker, targetMilestone);
+        Snapshot newSnapshot = generateSnapshot(targetMilestone);
 
         cleanupExpiredSolidEntryPoints(tangle, snapshotProvider.getInitialSnapshot().getSolidEntryPoints(),
                 newSnapshot.getSolidEntryPoints(), transactionPruner);
@@ -212,9 +219,7 @@ public class SnapshotServiceImpl implements SnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public Snapshot generateSnapshot(LatestMilestoneTracker latestMilestoneTracker, MilestoneViewModel targetMilestone)
-            throws SnapshotException {
-
+    public Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException {
         if (targetMilestone == null) {
             throw new SnapshotException("the target milestone must not be null");
         } else if (targetMilestone.index() > snapshotProvider.getLatestSnapshot().getIndex()) {
@@ -248,7 +253,7 @@ public class SnapshotServiceImpl implements SnapshotService {
         }
 
         snapshot.setSolidEntryPoints(generateSolidEntryPoints(targetMilestone));
-        snapshot.setSeenMilestones(generateSeenMilestones(latestMilestoneTracker, targetMilestone));
+        snapshot.setSeenMilestones(generateSeenMilestones(targetMilestone));
 
         return snapshot;
     }
@@ -271,9 +276,7 @@ public class SnapshotServiceImpl implements SnapshotService {
      * {@inheritDoc}
      */
     @Override
-    public Map<Hash, Integer> generateSeenMilestones(LatestMilestoneTracker latestMilestoneTracker,
-            MilestoneViewModel targetMilestone) throws SnapshotException {
-
+    public Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException {
         ProgressLogger progressLogger = new IntervalProgressLogger(
                 "Taking local snapshot [processing seen milestones]", log)
                 .start(config.getLocalSnapshotsDepth());

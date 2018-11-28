@@ -200,8 +200,8 @@ public class Iota {
 
     private void injectDependencies() throws SnapshotException, TransactionPruningException {
         snapshotProvider.init(configuration);
-        snapshotService.init(tangle, snapshotProvider, configuration);
-        localSnapshotManager.init(snapshotProvider, snapshotService, transactionPruner, configuration);
+        snapshotService.init(tangle, snapshotProvider, latestMilestoneTracker, transactionPruner, configuration);
+        localSnapshotManager.init(snapshotProvider, snapshotService, configuration);
         milestoneService.init(tangle, snapshotProvider, snapshotService, messageQ, configuration);
         latestMilestoneTracker.init(tangle, snapshotProvider, milestoneService, milestoneSolidifier,
                 messageQ, configuration);

@@ -61,12 +61,9 @@ public interface SnapshotService {
      * After persisting the local snapshot on the hard disk of the node, it updates the {@link Snapshot} instances used
      * by the {@code snapshotProvider} to reflect the newly created {@link Snapshot}.
      *
-     * @param latestMilestoneTracker milestone tracker that allows us to retrieve information about the known milestones
-     * @param transactionPruner manager for the pruning jobs that takes care of cleaning up the old data that
      * @throws SnapshotException if anything goes wrong while creating the local snapshot
      */
-    void takeLocalSnapshot(LatestMilestoneTracker latestMilestoneTracker, TransactionPruner transactionPruner) throws
-            SnapshotException;
+    void takeLocalSnapshot() throws SnapshotException;
 
     /**
      * This method generates a local snapshot of the full ledger state at the given milestone.
@@ -75,13 +72,11 @@ public interface SnapshotService {
      * points and all seen milestones, that were issued after the snapshot and can therefore be used to generate the
      * local snapshot files.
      *
-     * @param latestMilestoneTracker milestone tracker that allows us to retrieve information about the known milestones
      * @param targetMilestone milestone that is used as a reference point for the snapshot
      * @return a local snapshot of the full ledger state at the given milestone
      * @throws SnapshotException if anything goes wrong while generating the local snapshot
      */
-    Snapshot generateSnapshot(LatestMilestoneTracker latestMilestoneTracker, MilestoneViewModel targetMilestone) throws
-            SnapshotException;
+    Snapshot generateSnapshot(MilestoneViewModel targetMilestone) throws SnapshotException;
 
     /**
      * This method generates the solid entry points for a snapshot that belong to the given milestone.
@@ -103,11 +98,9 @@ public interface SnapshotService {
      * that use local snapshot files to bootstrap their nodes, to faster request the missing milestones when syncing the
      * very first time.
      *
-     * @param latestMilestoneTracker milestone tracker that allows us to retrieve information about the known milestones
      * @param targetMilestone milestone that is used as a reference point for the snapshot
      * @return a map of solid entry points associating their hash to the milestone index that confirmed them
      * @throws SnapshotException if anything goes wrong while generating the solid entry points
      */
-    Map<Hash, Integer> generateSeenMilestones(LatestMilestoneTracker latestMilestoneTracker,
-            MilestoneViewModel targetMilestone) throws SnapshotException;
+    Map<Hash, Integer> generateSeenMilestones(MilestoneViewModel targetMilestone) throws SnapshotException;
 }
