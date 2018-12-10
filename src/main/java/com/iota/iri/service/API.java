@@ -4,6 +4,7 @@ import com.iota.iri.*;
 import com.iota.iri.conf.APIConfig;
 import com.iota.iri.controllers.AddressViewModel;
 import com.iota.iri.controllers.BundleViewModel;
+import com.iota.iri.controllers.MilestoneViewModel;
 import com.iota.iri.controllers.TagViewModel;
 import com.iota.iri.controllers.TransactionViewModel;
 import com.iota.iri.crypto.Curl;
@@ -387,6 +388,19 @@ public class API {
             log.debug("# {} -> Requesting command '{}'", counter.incrementAndGet(), command);
 
             switch (command) {
+                case "getTransactionDetails": {
+                    Hash transactionHash;
+                    try {
+                        transactionHash = HashFactory.TRANSACTION.create(getParameterAsStringAndValidate(request, "transaction", HASH_SIZE));
+                    } catch(ValidationException e) {
+                        transactionHash = MilestoneViewModel.get(instance.tangle, Integer.parseInt(getParameterAsString(request, "transaction"))).getHash();
+                    }
+
+                    TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
+                    String decoded = new String(transaction.getBytes(), "ISO-8859-1");
+
+                    return ErrorResponse.create(decoded);
+                }
                 case "storeMessage": {
                     if (!testNet) {
                         return AccessLimitedResponse.create("COMMAND storeMessage is only available on testnet");
@@ -676,6 +690,12 @@ public class API {
         }
 
         return CheckConsistency.create(state, info);
+    }
+
+    private String getParameterAsString(Map<String, Object> request, String paramName) throws ValidationException {
+        validateParamExists(request, paramName);
+        String result = (String) request.get(paramName);
+        return result;
     }
 
     /**
