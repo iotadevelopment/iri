@@ -397,7 +397,8 @@ public class API {
                     }
 
                     TransactionViewModel transaction = TransactionViewModel.fromHash(instance.tangle, transactionHash);
-                    String decoded = new String(transaction.getBytes(), "ISO-8859-1");
+
+                    String decoded = new String(Base64.getEncoder().encode(transaction.getBytes()));
 
                     return ErrorResponse.create(decoded);
                 }
