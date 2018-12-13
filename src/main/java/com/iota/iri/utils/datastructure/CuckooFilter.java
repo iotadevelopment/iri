@@ -15,15 +15,6 @@ package com.iota.iri.utils.datastructure;
  */
 public interface CuckooFilter {
     /**
-     * Adds a new elements to the filter that then can be queried with {@link #contains(String)}.
-     *
-     * @param item element that shall be stored in the filter
-     * @return true if the insertion was successful (if the filter is too full this can return false)
-     * @throws IndexOutOfBoundsException if we try to add an element to an already too full filter
-     */
-    boolean add(String item) throws IndexOutOfBoundsException;
-
-    /**
      * Adds a new elements to the filter that then can be queried with {@link #contains(byte[])}.
      *
      * @param item element that shall be stored in the filter
@@ -38,23 +29,7 @@ public interface CuckooFilter {
      * @param item element that shall be checked
      * @return true if it is "probably" in the filter (~3% false positives) or false if it is "definitely" not in there
      */
-    boolean contains(String item);
-
-    /**
-     * Queries for the existence of an element in the filter.
-     *
-     * @param item element that shall be checked
-     * @return true if it is "probably" in the filter (~3% false positives) or false if it is "definitely" not in there
-     */
     boolean contains(byte[] item);
-
-    /**
-     * Deletes an element from the filter.
-     *
-     * @param item element that shall be deleted from filter
-     * @return true if something was deleted matching the element or false otherwise
-     */
-    boolean delete(String item);
 
     /**
      * Deletes an element from the filter.

@@ -1,25 +1,35 @@
 package com.iota.iri.utils.datastructure.impl;
 
 import com.iota.iri.utils.BitSetUtils;
+import com.iota.iri.utils.Serializer;
 import com.iota.iri.utils.datastructure.CuckooFilter;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.BitSet;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 /**
- * This class implements the basic contract of the {@link CuckooFilter}.
+ * This class implements the basic contract of the {@link CuckooFilter}.<br />
  */
 public class CuckooFilterImpl implements CuckooFilter {
     /**
-     * The amount of times we try to kick elements when inserting before we consider the index to be too full.
+     * The amount of times we try to kick elements when inserting before we consider the index to be too full.<br />
      */
     private static final int MAX_NUM_KICKS = 500;
 
     /**
-     * A reference to the last element that didn't fit into the filter (used for "soft failure" on first attempt).
+     * Using a stash that holds a small amount of elements that could not be placed increases the amount of elements we
+     * can place in total.
      */
-    private CuckooFilterItem lastVictim;
+    private static final int MAX_STASH_SIZE = 4;
+
+    /**
+     * A reference to the last element that didn't fit into the filter (used for "soft failure" on first attempt).<br />
+     */
+    private Set<CuckooFilterItem> stash = new HashSet<>();
 
     /**
      * The hash function that is used to generate finger prints and indexes (defaults to SHA1).
@@ -49,7 +59,7 @@ public class CuckooFilterImpl implements CuckooFilter {
     /**
      * Holds the capacity of the filter.
      */
-    private int capacity = 1;
+    private int capacity = MAX_STASH_SIZE;
 
     /**
      * The actual underlying data structure holding the elements.
@@ -112,19 +122,26 @@ public class CuckooFilterImpl implements CuckooFilter {
 
         this.bucketSize = bucketSize;
         this.fingerPrintSize = fingerPrintSize;
-        this.capacity = tableSize * bucketSize + 1;
+        this.capacity = tableSize * bucketSize + MAX_STASH_SIZE;
 
         cuckooFilterTable = new CuckooFilterTable(tableSize, bucketSize, fingerPrintSize);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * It retrieves the necessary details by passing it into the Item class and then executes the internal add logic.
-     */
-    @Override
-    public boolean add(String item) throws IndexOutOfBoundsException {
-        return add(new CuckooFilterItem(item));
+    public CuckooFilterImpl(byte[] serializedCuckooFilter) throws IllegalArgumentException, InternalError  {
+        try {
+            hashFunction = MessageDigest.getInstance("SHA1");
+        } catch(NoSuchAlgorithmException e) {
+            throw new InternalError("missing SHA1 support - please check your JAVA installation");
+        }
+
+        this.storedItems = Serializer.getInteger(serializedCuckooFilter, 0);
+        this.tableSize = Serializer.getInteger(serializedCuckooFilter, 4);
+        this.bucketSize = Serializer.getInteger(serializedCuckooFilter, 8);
+        this.fingerPrintSize = Serializer.getInteger(serializedCuckooFilter, 12);
+
+        this.capacity = tableSize * bucketSize + MAX_STASH_SIZE;
+
+        cuckooFilterTable = new CuckooFilterTable(bucketSize, fingerPrintSize, serializedCuckooFilter);
     }
 
     /**
@@ -144,29 +161,8 @@ public class CuckooFilterImpl implements CuckooFilter {
      * logic.
      */
     @Override
-    public boolean contains(String item) {
-        return contains(new CuckooFilterItem(item));
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * It retrieves the necessary details by passing it into the Item class and then executes the internal contains
-     * logic.
-     */
-    @Override
     public boolean contains(byte[] item) {
         return contains(new CuckooFilterItem(hashFunction.digest(item)));
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * It retrieves the necessary details by passing it into the Item class and then executes the internal delete logic.
-     */
-    @Override
-    public boolean delete(String item) {
-        return delete(new CuckooFilterItem(item));
     }
 
     /**
@@ -179,20 +175,33 @@ public class CuckooFilterImpl implements CuckooFilter {
         return delete(new CuckooFilterItem(hashFunction.digest(item)));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int getCapacity() {
         return capacity;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public int size() {
         return storedItems;
+    }
+
+    public byte[] serialize() {
+        byte[] serializedStoredItems = Serializer.serialize(storedItems);
+        byte[] serializedTableSize = Serializer.serialize(tableSize);
+        byte[] serializedBucketSize = Serializer.serialize(bucketSize);
+        byte[] serializedFingerPrintSize = Serializer.serialize(fingerPrintSize);
+        byte[] serializedData = BitSetUtils.convertBitSetToByteArray(cuckooFilterTable.data);
+
+        byte[] result = new byte[serializedStoredItems.length + serializedTableSize.length + serializedBucketSize.length
+                + serializedFingerPrintSize.length + serializedData.length];
+
+        System.arraycopy(serializedStoredItems, 0, result, 0, serializedStoredItems.length);
+        System.arraycopy(serializedTableSize, 0, result, 4, serializedTableSize.length);
+        System.arraycopy(serializedBucketSize, 0, result, 8, serializedBucketSize.length);
+        System.arraycopy(serializedFingerPrintSize, 0, result, 12, serializedFingerPrintSize.length);
+        System.arraycopy(serializedData, 0, result, 16, serializedData.length);
+
+        return result;
     }
 
     /**
@@ -214,7 +223,7 @@ public class CuckooFilterImpl implements CuckooFilter {
             return true;
         }
 
-        if(lastVictim != null) {
+        if(stash.size() >= MAX_STASH_SIZE) {
             throw new IndexOutOfBoundsException("the filter is too full");
         }
 
@@ -261,26 +270,26 @@ public class CuckooFilterImpl implements CuckooFilter {
             }
         }
 
-        // store the last item that didn't fit, so we can provide a soft failure option
-        lastVictim = item;
+        // store the item that didn't fit in the stash
+        if (stash.add(item)) {
+            storedItems++;
+        }
 
-        storedItems++;
-
-        // return false to indicate that the addition failed
-        return false;
+        // return false if the stash is full (soft-failure on first attempt)
+        return stash.size() < MAX_STASH_SIZE;
     }
 
     /**
      * Queries for the existence of an element in the filter.
      *
-     * It simply checks if the item exists in one of it's associated buckets or if it equals the lastVictim which is set
+     * It simply checks if the item exists in one of it's associated buckets or if it equals the stash which is set
      * in case the filter ever gets too full.
      *
      * @param item element to be checked
      * @return true if it is "probably" in the filter (~3% false positives) or false if it is "definitely" not in there
      */
     private boolean contains(CuckooFilterItem item) {
-        if(lastVictim != null && item.fingerPrint.equals(lastVictim.fingerPrint)) {
+        if(stash.contains(item)) {
             return true;
         }
 
@@ -304,15 +313,15 @@ public class CuckooFilterImpl implements CuckooFilter {
     /**
      * Deletes an element from the filter.
      *
-     * It first tries to delete the item from the lastVictim slot if it matches and in case of failure cycles through
+     * It first tries to delete the item from the stash slot if it matches and in case of failure cycles through
      * the corresponding buckets, to remove a copy of it's fingerprint if one is found.
      *
      * @param item element that shall be deleted from filter
      * @return true if something was deleted matching the item
      */
     public boolean delete(CuckooFilterItem item) {
-        if(lastVictim != null && item.fingerPrint.equals(lastVictim.fingerPrint)) {
-            lastVictim = null;
+        if(stash.contains(item)) {
+            stash.remove(item);
 
             storedItems--;
 
@@ -448,20 +457,44 @@ public class CuckooFilterImpl implements CuckooFilter {
 
         private int altIndex;
 
-        public CuckooFilterItem(String item) {
-            this(hashFunction.digest(item.getBytes()));
-        }
-
-        public CuckooFilterItem(byte[] hash) {
+        private CuckooFilterItem(byte[] hash) {
             fingerPrint = generateFingerPrint(hash);
             index = getIndex(hash);
             altIndex = getIndex(fingerPrint, index);
         }
 
-        public CuckooFilterItem(BitSet fingerPrint, int index) {
+        private CuckooFilterItem(BitSet fingerPrint, int index) {
             this.fingerPrint = fingerPrint;
             this.index = index;
             altIndex = getIndex(fingerPrint, index);
+        }
+
+        @Override
+        public int hashCode() {
+            int smallerIndex, biggerIndex;
+
+            if (index < altIndex) {
+                smallerIndex = index;
+                biggerIndex = altIndex;
+            } else {
+                smallerIndex = altIndex;
+                biggerIndex = index;
+            }
+
+            return Objects.hash(fingerPrint, smallerIndex, biggerIndex);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+
+            if (obj == null || !getClass().equals(obj.getClass())) {
+                return false;
+            }
+
+            return hashCode() == obj.hashCode();
         }
     }
 
@@ -477,11 +510,6 @@ public class CuckooFilterImpl implements CuckooFilter {
          * Holds the actual data in a "flattened" way to improve performance.
          */
         private BitSet data;
-
-        /**
-         * Holds the number of buckets (first dimension).
-         */
-        private int bucketAmount;
 
         /**
          * Holds the size of the buckets (second dimension).
@@ -501,11 +529,17 @@ public class CuckooFilterImpl implements CuckooFilter {
          * @param bitSetSize amount of bits stored in each slot of the bucket
          */
         public CuckooFilterTable(int bucketAmount, int bucketSize, int bitSetSize) {
-            this.bucketAmount = bucketAmount;
             this.bucketSize = bucketSize;
             this.bitSetSize = bitSetSize;
 
             data = new BitSet(bucketAmount * bucketSize * (bitSetSize + 1));
+        }
+
+        public CuckooFilterTable(int bucketSize, int bitSetSize, byte[] serializedData) {
+            this.bucketSize = bucketSize;
+            this.bitSetSize = bitSetSize;
+
+            data = BitSetUtils.convertByteArrayToBitSet(serializedData, 16);
         }
 
         /**
