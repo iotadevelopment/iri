@@ -6,10 +6,7 @@ import com.iota.iri.utils.datastructure.CuckooFilter;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.BitSet;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 /**
  * This class implements the basic contract of the {@link CuckooFilter}.<br />
@@ -65,6 +62,10 @@ public class CuckooFilterImpl implements CuckooFilter {
      * The actual underlying data structure holding the elements.
      */
     private CuckooFilterTable cuckooFilterTable;
+
+    public static CuckooFilterImpl unserialize(byte[] serializedCuckooFilter) {
+        return new CuckooFilterImpl(serializedCuckooFilter);
+    }
 
     /**
      * Simplified constructor that automatically chooses the values with best space complexity and false positive rate.
@@ -127,21 +128,41 @@ public class CuckooFilterImpl implements CuckooFilter {
         cuckooFilterTable = new CuckooFilterTable(tableSize, bucketSize, fingerPrintSize);
     }
 
-    public CuckooFilterImpl(byte[] serializedCuckooFilter) throws IllegalArgumentException, InternalError  {
+    private CuckooFilterImpl(byte[] serializedCuckooFilter) throws IllegalArgumentException, InternalError  {
         try {
             hashFunction = MessageDigest.getInstance("SHA1");
         } catch(NoSuchAlgorithmException e) {
             throw new InternalError("missing SHA1 support - please check your JAVA installation");
         }
 
-        this.storedItems = Serializer.getInteger(serializedCuckooFilter, 0);
-        this.tableSize = Serializer.getInteger(serializedCuckooFilter, 4);
-        this.bucketSize = Serializer.getInteger(serializedCuckooFilter, 8);
-        this.fingerPrintSize = Serializer.getInteger(serializedCuckooFilter, 12);
+        int offset = 0;
+
+        int stashItemCount = Serializer.getInteger(serializedCuckooFilter, offset);
+        offset += 4;
+
+        for (int i = 0; i < stashItemCount; i++) {
+            int stashItemByteCount = Serializer.getInteger(serializedCuckooFilter, offset);
+            offset += 4;
+
+            stash.add(new CuckooFilterItem(serializedCuckooFilter, offset, stashItemByteCount));
+            offset += stashItemByteCount;
+        }
+
+        this.storedItems = Serializer.getInteger(serializedCuckooFilter, offset);
+        offset += 4;
+
+        this.tableSize = Serializer.getInteger(serializedCuckooFilter, offset);
+        offset += 4;
+
+        this.bucketSize = Serializer.getInteger(serializedCuckooFilter, offset);
+        offset += 4;
+
+        this.fingerPrintSize = Serializer.getInteger(serializedCuckooFilter, offset);
+        offset += 4;
 
         this.capacity = tableSize * bucketSize + MAX_STASH_SIZE;
 
-        cuckooFilterTable = new CuckooFilterTable(bucketSize, fingerPrintSize, serializedCuckooFilter);
+        cuckooFilterTable = new CuckooFilterTable(bucketSize, fingerPrintSize, serializedCuckooFilter, offset);
     }
 
     /**
@@ -186,20 +207,62 @@ public class CuckooFilterImpl implements CuckooFilter {
     }
 
     public byte[] serialize() {
+        int byteCount = 0;
+
+        Deque<byte[]> serializedStashItems = new ArrayDeque<>();
+        for (CuckooFilterItem item : stash) {
+            byte[] serializedStashItem = item.serialize();
+            byteCount += serializedStashItem.length;
+
+            serializedStashItems.addFirst(serializedStashItem);
+        }
+
+        byte[] stashItemCount = Serializer.serialize(serializedStashItems.size());
+        byteCount += 4;
+
+        for (byte[] serializedStashItem : serializedStashItems) {
+            byteCount += serializedStashItem.length;
+        }
+
         byte[] serializedStoredItems = Serializer.serialize(storedItems);
+        byteCount += 4;
+
         byte[] serializedTableSize = Serializer.serialize(tableSize);
+        byteCount += 4;
+
         byte[] serializedBucketSize = Serializer.serialize(bucketSize);
+        byteCount += 4;
+
         byte[] serializedFingerPrintSize = Serializer.serialize(fingerPrintSize);
+        byteCount += 4;
+
         byte[] serializedData = BitSetUtils.convertBitSetToByteArray(cuckooFilterTable.data);
+        byteCount += serializedData.length;
 
-        byte[] result = new byte[serializedStoredItems.length + serializedTableSize.length + serializedBucketSize.length
-                + serializedFingerPrintSize.length + serializedData.length];
+        byte[] result = new byte[byteCount];
 
-        System.arraycopy(serializedStoredItems, 0, result, 0, serializedStoredItems.length);
-        System.arraycopy(serializedTableSize, 0, result, 4, serializedTableSize.length);
-        System.arraycopy(serializedBucketSize, 0, result, 8, serializedBucketSize.length);
-        System.arraycopy(serializedFingerPrintSize, 0, result, 12, serializedFingerPrintSize.length);
-        System.arraycopy(serializedData, 0, result, 16, serializedData.length);
+        int offset = 0;
+        System.arraycopy(stashItemCount, 0, result, offset, serializedStoredItems.length);
+        offset += 4;
+
+        for (byte[] serializedStashItem : serializedStashItems) {
+            System.arraycopy(serializedStashItem, 0, result, offset, serializedStashItem.length);
+            offset += serializedStashItem.length;
+        }
+
+        System.arraycopy(serializedStoredItems, 0, result, offset, serializedStoredItems.length);
+        offset += 4;
+
+        System.arraycopy(serializedTableSize, 0, result, offset, serializedTableSize.length);
+        offset += 4;
+
+        System.arraycopy(serializedBucketSize, 0, result, offset, serializedBucketSize.length);
+        offset += 4;
+
+        System.arraycopy(serializedFingerPrintSize, 0, result, offset, serializedFingerPrintSize.length);
+        offset += 4;
+
+        System.arraycopy(serializedData, 0, result, offset, serializedData.length);
 
         return result;
     }
@@ -469,6 +532,16 @@ public class CuckooFilterImpl implements CuckooFilter {
             altIndex = getIndex(fingerPrint, index);
         }
 
+        private CuckooFilterItem(byte[] serializedData, int offset, int length) {
+            this.index = Serializer.getInteger(serializedData, offset);
+            offset += 4;
+
+            this.altIndex = Serializer.getInteger(serializedData, offset);
+            offset += 4;
+
+            this.fingerPrint = BitSetUtils.convertByteArrayToBitSet(serializedData, offset, (length - 8) * 8);
+        }
+
         @Override
         public int hashCode() {
             int smallerIndex, biggerIndex;
@@ -495,6 +568,29 @@ public class CuckooFilterImpl implements CuckooFilter {
             }
 
             return hashCode() == obj.hashCode();
+        }
+
+        public byte[] serialize() {
+            byte[] indexSerialized = Serializer.serialize(index);
+            byte[] altIndexSerialized = Serializer.serialize(altIndex);
+            byte[] fingerPrintSerialized = BitSetUtils.convertBitSetToByteArray(fingerPrint);
+
+            byte[] result = new byte[3 * 4 + fingerPrintSerialized.length];
+
+            int offset = 4;
+
+            System.arraycopy(indexSerialized, 0, result, offset, 4);
+            offset += 4;
+
+            System.arraycopy(altIndexSerialized, 0, result, offset, 4);
+            offset += 4;
+
+            System.arraycopy(fingerPrintSerialized, 0, result, offset, fingerPrintSerialized.length);
+            offset = 0;
+
+            System.arraycopy(Serializer.serialize(result.length - 4), 0, result, offset, 4);
+
+            return result;
         }
     }
 
@@ -535,11 +631,11 @@ public class CuckooFilterImpl implements CuckooFilter {
             data = new BitSet(bucketAmount * bucketSize * (bitSetSize + 1));
         }
 
-        public CuckooFilterTable(int bucketSize, int bitSetSize, byte[] serializedData) {
+        public CuckooFilterTable(int bucketSize, int bitSetSize, byte[] serializedData, int offset) {
             this.bucketSize = bucketSize;
             this.bitSetSize = bitSetSize;
 
-            data = BitSetUtils.convertByteArrayToBitSet(serializedData, 16);
+            data = BitSetUtils.convertByteArrayToBitSet(serializedData, offset);
         }
 
         /**

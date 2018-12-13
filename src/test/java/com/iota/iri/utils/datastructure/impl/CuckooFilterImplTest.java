@@ -149,9 +149,10 @@ public class CuckooFilterImplTest {
 
     @Test
     public void testFSerialization() {
-        CuckooFilterImpl originalCuckooFilter = new CuckooFilterImpl(10000000);
-        originalCuckooFilter.add("Test".getBytes());
-        originalCuckooFilter.add("Test1".getBytes());
+        CuckooFilterImpl originalCuckooFilter = new CuckooFilterImpl(1);
+        for (int i = 0; i < 7; i++) {
+            originalCuckooFilter.add(("Test" + i).getBytes());
+        }
 
         CuckooFilterImpl clonedCuckooFilter = new CuckooFilterImpl(originalCuckooFilter.serialize());
 
@@ -159,13 +160,12 @@ public class CuckooFilterImplTest {
                 clonedCuckooFilter.getCapacity());
         Assert.assertEquals("the cloned filter should have the same size", originalCuckooFilter.size(),
                 clonedCuckooFilter.size());
-
-        Assert.assertTrue("the cloned filter should contain the previously added elements",
-                clonedCuckooFilter.contains("Test".getBytes()));
-        Assert.assertTrue("the cloned filter should contain the previously added elements",
-                clonedCuckooFilter.contains("Test1".getBytes()));
+        for (int i = 0; i < 7; i++) {
+            Assert.assertTrue("the cloned filter should contain the previously added elements (Test" + i + ")",
+                    clonedCuckooFilter.contains(("Test" + i).getBytes()));
+        }
         Assert.assertFalse("the cloned filter should not contain a missing element",
-                clonedCuckooFilter.contains("Test2".getBytes()));
+                clonedCuckooFilter.contains("Best2".getBytes()));
 
     }
 }
