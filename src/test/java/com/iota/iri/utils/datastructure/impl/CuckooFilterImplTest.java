@@ -13,43 +13,40 @@ public class CuckooFilterImplTest {
     /**
      * Holds the amount of elements we want to store in the filter.<br />
      * <br />
-     * Note: 1955 items allows for a ~0.955 load factor at an effective capacity of 2048<br />
+     * Note: 1955 items allow for a ~0.955 load factor at an effective capacity of 2048<br />
      */
     private static final int ELEMENTS_TO_STORE = 1955;
 
     /**
      * Holds a reference to the filter that is shared throughout the tests.<br />
      */
-    private static CuckooFilter cuckooFilter;
+    private CuckooFilterImpl cuckooFilter;
 
     /**
      * Initializes our test by creating an empty {@link CuckooFilterImpl}.<br />
      */
-    @BeforeClass
-    public static void setup() {
+    @Before
+    public void setUp() {
         cuckooFilter = new CuckooFilterImpl(ELEMENTS_TO_STORE);
     }
 
     /**
      * Frees the resources again, so the unused filter can be cleaned up by the GarbageCollector.<br />
      */
-    @AfterClass
-    public static void teardown() {
+    @After
+    public void teardown() {
         cuckooFilter = null;
     }
 
     /**
-     * This method tests the function of the add method by:<br />
+     * Tests the function of the add method by:<br />
      * <br />
      *   1. inserting the defined amount of elements<br />
      *   2. checking if the size is within the expected range<br />
      */
     @Test
-    public void testAadd() {
-        int insertedItems;
-        for (insertedItems = 0; insertedItems < ELEMENTS_TO_STORE; insertedItems++) {
-            cuckooFilter.add(("INSERTED_ITEM" + Integer.toString(insertedItems)).getBytes());
-        }
+    public void testAdd() {
+        addTestItems(ELEMENTS_TO_STORE);
 
         int sizeDiff = ELEMENTS_TO_STORE - cuckooFilter.size();
 
@@ -58,11 +55,12 @@ public class CuckooFilterImplTest {
     }
 
     /**
-     * This method tests the function of the contains method (for the byte[] parameter) by checking if all previously
-     * added elements are found.<br />
+     * Tests the function of the contains method by checking if all previously added elements are found.<br />
      */
     @Test
-    public void testBcontains() {
+    public void testContains() {
+        addTestItems(ELEMENTS_TO_STORE);
+
         int insertedItems;
         for (insertedItems = 0; insertedItems < ELEMENTS_TO_STORE; insertedItems++) {
             Assert.assertTrue("the filter should contain all previously added elements",
@@ -71,38 +69,34 @@ public class CuckooFilterImplTest {
     }
 
     /**
-     * This method tests the function of the delete method (for the byte[] parameter) by:<br />
+     * Tests the function of the delete method (for the byte[] parameter) by:<br />
      * <br />
      *   1. removing all previously added elements<br />
      *   2. checking if the filter is empty afterwards<br />
      */
     @Test
-    public void testCdelete() {
+    public void testDelete() {
+        addTestItems(ELEMENTS_TO_STORE);
+
         int insertedItems;
         for (insertedItems = 0; insertedItems < ELEMENTS_TO_STORE; insertedItems++) {
             cuckooFilter.delete(("INSERTED_ITEM" + Integer.toString(insertedItems)).getBytes());
         }
 
         Assert.assertEquals("the filter should be empty", 0, cuckooFilter.size());
-
-
     }
 
     /**
-     * This method tests the performance of the filter (using the byte[] parameter) in regards to false positives
-     * by:<br />
+     * Tests the performance of the filter in regards to false positives by:<br />
      * <br />
-     *   1. inserting the defined amount of elements<br />
+     *   1. inserting a pre-defined amount of elements<br />
      *   2. querying for non-existing elements<br />
      *   3. calculating the false-positive hits<br />
      *   4. comparing the value against the expected result<br />
      */
     @Test
-    public void testDfalsePositiveRate() {
-        int insertedItems;
-        for (insertedItems = 0; insertedItems < ELEMENTS_TO_STORE; insertedItems++) {
-            cuckooFilter.add(("INSERTED_ITEM" + Integer.toString(insertedItems)).getBytes());
-        }
+    public void testFalsePositiveRate() {
+        addTestItems(ELEMENTS_TO_STORE);
 
         // a big enough sample size to get a reasonable result
         int elementsToQuery = 100000;
@@ -121,7 +115,7 @@ public class CuckooFilterImplTest {
     }
 
     /**
-     * This method tests the function of the getCapacity method by:<br />
+     * Tests the function of the getCapacity method by:<br />
      * <br />
      *   1. creating filters of various sizes<br />
      *   2. comparing the created capacity against the expected range<br />
@@ -132,7 +126,7 @@ public class CuckooFilterImplTest {
      *       capacity <= 2 * (1 / 0.955) * filterSize<br />
      */
     @Test
-    public void testEcapacity() {
+    public void testCapacity() {
         int[] filterSizes = {10, 500, 25_000, 125_000, 10_000_000};
 
         CuckooFilter emptyCuckooFilter;
@@ -147,25 +141,37 @@ public class CuckooFilterImplTest {
         }
     }
 
+    /**
+     * Tests the serialization/unserialization capabilities of the filter by:<br />
+     * <br />
+     *   1. adding some items to our filter<br />
+     *   2. serialize it<br />
+     *   3. "import" the serialized data into a new filter<br />
+     *   4. performing membership tests and size checks against the imported filter<br />
+     */
     @Test
     public void testFSerialization() {
-        CuckooFilterImpl originalCuckooFilter = new CuckooFilterImpl(1);
-        for (int i = 0; i < 7; i++) {
-            originalCuckooFilter.add(("Test" + i).getBytes());
-        }
+        addTestItems(2000);
 
-        CuckooFilterImpl clonedCuckooFilter = new CuckooFilterImpl(originalCuckooFilter.serialize());
+        CuckooFilterImpl clonedCuckooFilter = CuckooFilterImpl.unserialize(cuckooFilter.serialize());
 
-        Assert.assertEquals("the cloned filter should have the same capacity", originalCuckooFilter.getCapacity(),
+        Assert.assertEquals("the cloned filter should have the same capacity", cuckooFilter.getCapacity(),
                 clonedCuckooFilter.getCapacity());
-        Assert.assertEquals("the cloned filter should have the same size", originalCuckooFilter.size(),
+        Assert.assertEquals("the cloned filter should have the same size", cuckooFilter.size(),
                 clonedCuckooFilter.size());
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 2000; i++) {
             Assert.assertTrue("the cloned filter should contain the previously added elements (Test" + i + ")",
-                    clonedCuckooFilter.contains(("Test" + i).getBytes()));
+                    clonedCuckooFilter.contains(("INSERTED_ITEM" + i).getBytes()));
         }
         Assert.assertFalse("the cloned filter should not contain a missing element",
-                clonedCuckooFilter.contains("Best2".getBytes()));
+                clonedCuckooFilter.contains("MISSING_ITEM".getBytes()));
 
+    }
+
+    private void addTestItems(int elementsToStore) {
+        int insertedItems;
+        for (insertedItems = 0; insertedItems < elementsToStore; insertedItems++) {
+            cuckooFilter.add(("INSERTED_ITEM" + Integer.toString(insertedItems)).getBytes());
+        }
     }
 }

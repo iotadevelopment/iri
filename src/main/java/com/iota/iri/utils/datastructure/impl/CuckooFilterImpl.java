@@ -19,7 +19,7 @@ public class CuckooFilterImpl implements CuckooFilter {
 
     /**
      * Using a stash that holds a small amount of elements that could not be placed increases the amount of elements we
-     * can place in total.
+     * can place in total by an order of magnitude.<br />
      */
     private static final int MAX_STASH_SIZE = 4;
 
@@ -29,32 +29,32 @@ public class CuckooFilterImpl implements CuckooFilter {
     private Set<CuckooFilterItem> stash = new HashSet<>();
 
     /**
-     * The hash function that is used to generate finger prints and indexes (defaults to SHA1).
+     * The hash function that is used to generate finger prints and indexes (SHA1).<br />
      */
     private MessageDigest hashFunction;
 
     /**
-     * the amount of buckets in our table (get's calculated from the itemCount that we want to store)
+     * Amount of buckets in our table (get's calculated from the itemCount that we want to store).<br />
      */
     private int tableSize = 1;
 
     /**
-     * The amount of items that can be stored in each bucket.
+     * Amount of items that can be stored in each bucket.<br />
      */
     private int bucketSize;
 
     /**
-     * The amount of bits per fingerprint for each entry (the optimum is around 7 bits with a load of ~0.955)
+     * Amount of bits per fingerprint for each entry (the optimum is around 8 bits with a load of ~0.955).<br />
      */
     private int fingerPrintSize;
 
     /**
-     * Holds the amount if items that are stored in the filter.
+     * Amount if items that are currently stored in the filter.<br />
      */
     private int storedItems = 0;
 
     /**
-     * Holds the capacity of the filter.
+     * The maximum capacity of the filter (if all slots are occupied).<br />
      */
     private int capacity = MAX_STASH_SIZE;
 
@@ -63,6 +63,15 @@ public class CuckooFilterImpl implements CuckooFilter {
      */
     private CuckooFilterTable cuckooFilterTable;
 
+    /**
+     * Creates a cuckoo filter from a previously serialized filter.<br />
+     * <br />
+     * This is useful to persist the filter between restarts of the node or to transfer the state of the filter between
+     * different machines.<br />
+     *
+     * @param serializedCuckooFilter serialized representation of the contents and parameters of the filter
+     * @return in-memory representation of the filter that can be queried for membership again
+     */
     public static CuckooFilterImpl unserialize(byte[] serializedCuckooFilter) {
         return new CuckooFilterImpl(serializedCuckooFilter);
     }

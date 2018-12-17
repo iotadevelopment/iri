@@ -55,7 +55,7 @@ public class Transaction implements Persistable {
      * This score indicates the likeliness of this transaction having been pruned by IRI in the past due to local
      * snapshots.<br />
      */
-    public int prunedScore = 0;
+    public int solidScore = 0;
 
     public long height = 0;
     public String sender = "";
@@ -78,7 +78,7 @@ public class Transaction implements Persistable {
         int allocateSize =
                 Hash.SIZE_IN_BYTES * 6 + //address,bundle,trunk,branch,obsoleteTag,tag
                         Long.BYTES * 9 + //value,currentIndex,lastIndex,timestamp,attachmentTimestampLowerBound,attachmentTimestampUpperBound,arrivalTime,height
-                        Integer.BYTES * 4 + //validity,type,snapshot,prunedScore
+                        Integer.BYTES * 4 + //validity,type,snapshot,solidScore
                         1 + //solid
                         sender.getBytes().length; //sender
         ByteBuffer buffer = ByteBuffer.allocate(allocateSize);
@@ -109,7 +109,7 @@ public class Transaction implements Persistable {
         flags |= milestone ? IS_MILESTONE_BITMASK : 0;
         buffer.put(flags);
 
-        buffer.put(Serializer.serialize(prunedScore));
+        buffer.put(Serializer.serialize(solidScore));
         buffer.put(Serializer.serialize(snapshot));
         buffer.put(sender.getBytes());
         return buffer.array();
@@ -165,7 +165,7 @@ public class Transaction implements Persistable {
             milestone = (bytes[i] & IS_MILESTONE_BITMASK) != 0;
             i++;
 
-            prunedScore = Serializer.getInteger(bytes, i);
+            solidScore = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
             snapshot = Serializer.getInteger(bytes, i);
             i += Integer.BYTES;
