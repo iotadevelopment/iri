@@ -2,6 +2,7 @@ package com.iota.iri.service.snapshot.impl;
 
 import com.iota.iri.model.Hash;
 import com.iota.iri.service.snapshot.SnapshotMetaData;
+import com.iota.iri.utils.datastructure.CuckooFilter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +51,8 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
      */
     private Map<Hash, Integer> seenMilestones;
 
+    private CuckooFilter solidTransactions;
+
     /**
      * Creates a meta data object with the given information.
      *
@@ -63,11 +66,12 @@ public class SnapshotMetaDataImpl implements SnapshotMetaData {
      * @param seenMilestones map of milestone transaction hashes associated to their milestone index
      */
     public SnapshotMetaDataImpl(Hash hash, int index, Long timestamp, Map<Hash, Integer> solidEntryPoints,
-                                Map<Hash, Integer> seenMilestones) {
+                                Map<Hash, Integer> seenMilestones, CuckooFilter solidTransactions) {
 
         this.initialHash = hash;
         this.initialIndex = index;
         this.initialTimestamp = timestamp;
+        this.solidTransactions = solidTransactions;
 
         setHash(hash);
         setIndex(index);

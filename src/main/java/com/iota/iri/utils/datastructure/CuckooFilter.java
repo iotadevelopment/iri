@@ -58,4 +58,6 @@ public interface CuckooFilter {
      * @return the amount of stored items
      */
     int size();
+
+    byte[] serialize();
 }

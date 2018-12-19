@@ -69,7 +69,7 @@ public class CuckooFilterImplTest {
     }
 
     /**
-     * Tests the function of the delete method (for the byte[] parameter) by:<br />
+     * Tests the function of the delete method by:<br />
      * <br />
      *   1. removing all previously added elements<br />
      *   2. checking if the filter is empty afterwards<br />
